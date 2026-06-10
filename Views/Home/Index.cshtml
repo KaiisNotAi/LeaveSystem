@@ -1,8 +1,45 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "首頁";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center mb-4">
+    <h1 class="display-4">學生請假系統</h1>
+    <p class="lead">線上化請假流程，三方協作更有效率</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">📝 學員</h5>
+                <p class="card-text">提交請假申請、查詢個人累計時數、追蹤簽核進度。</p>
+                <a href="#" class="btn btn-outline-primary btn-sm">學員入口（建置中）</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">✅ 簽核人</h5>
+                <p class="card-text">導師、科長、分署長集中處理待簽核申請，留下簽核意見。</p>
+                <a href="#" class="btn btn-outline-primary btn-sm">簽核入口（建置中）</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">⚙ 行政／管理員</h5>
+                <p class="card-text">管理帳號、班期、假別、簽核規則，登錄曠課時數，匯總報表。</p>
+                <a href="#" class="btn btn-outline-primary btn-sm">後台入口（建置中）</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4 small">
+    本系統正逐步建置中，目前處於 <strong>Phase 0：基礎建設</strong>。
+    完整功能將依
+    <a asp-controller="Home" asp-action="Privacy">開發階段與里程碑</a>
+    分階段交付。
 </div>
