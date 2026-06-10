@@ -15,8 +15,10 @@ namespace LeaveSystem.Controllers.Admin;
 /// 為什麼擺在 Controllers/Admin 子資料夾？
 /// 之後行政後台會有不少 Controller（班期、假別、簽核規則…），
 /// 集中放一個資料夾比較好整理；命名空間也跟著調整。
+///
+/// 注意：這裡不使用 ASP.NET Core Area 機制，
+/// 「/Admin/Users」只是由下面的 [Route] 屬性產生的路由前綴而已。
 /// </summary>
-[Area("")]
 [Route("Admin/Users/{action=Index}/{id?}")]
 [Authorize(Roles = "Admin,Staff")]
 public class UsersController : Controller

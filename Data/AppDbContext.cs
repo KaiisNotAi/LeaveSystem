@@ -69,6 +69,13 @@ public class AppDbContext : DbContext
             .HasIndex(r => r.Name)
             .IsUnique();
 
+        // Role 是字典表，Id 由我們手動指定（與 Enums.UserRole 數值對齊），
+        // 不能讓 SQL Server 把它設為 IDENTITY 自動編號，否則 SeedData 寫入時會失敗：
+        //   "Cannot insert explicit value for identity column ... when IDENTITY_INSERT is set to OFF"
+        modelBuilder.Entity<Role>()
+            .Property(r => r.Id)
+            .ValueGeneratedNever();
+
         // ─── UserRole：複合主鍵 ───
         modelBuilder.Entity<UserRole>()
             .HasKey(ur => new { ur.UserId, ur.RoleId });
