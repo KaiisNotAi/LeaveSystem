@@ -1,0 +1,26 @@
+@*
+    導覽列右側的登入區塊。
+    根據是否登入顯示不同內容：
+      未登入 → 顯示「登入」連結
+      已登入 → 顯示「您好，XXX」與「登出」按鈕
+*@
+<ul class="navbar-nav">
+    @if (User?.Identity?.IsAuthenticated == true)
+    {
+        <li class="nav-item">
+            <span class="nav-link text-dark">您好，@User.Identity.Name</span>
+        </li>
+        <li class="nav-item">
+            <form asp-controller="Account" asp-action="Logout" method="post" class="form-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-link nav-link text-dark border-0">登出</button>
+            </form>
+        </li>
+    }
+    else
+    {
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">登入</a>
+        </li>
+    }
+</ul>
