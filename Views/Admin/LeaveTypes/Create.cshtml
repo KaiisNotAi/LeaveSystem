@@ -1,0 +1,51 @@
+@model LeaveSystem.Models.ViewModels.LeaveTypeCreateViewModel
+@{
+    ViewData["Title"] = "新增假別";
+}
+
+<h3>@ViewData["Title"]</h3>
+
+<form asp-action="Create" method="post" class="mt-3">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" placeholder="例：病假" />
+            <span asp-validation-for="Name" class="text-danger small"></span>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Code" class="form-label"></label>
+            <input asp-for="Code" class="form-control" placeholder="例：SICK" />
+            <span asp-validation-for="Code" class="text-danger small"></span>
+            <div class="form-text">大寫英文/數字/底線；未來與外部系統對接用。</div>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="SortOrder" class="form-label"></label>
+            <input asp-for="SortOrder" class="form-control" type="number" />
+            <span asp-validation-for="SortOrder" class="text-danger small"></span>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+        </div>
+        <div class="col-12">
+            <label asp-for="Description" class="form-label"></label>
+            <textarea asp-for="Description" class="form-control" rows="2"
+                      placeholder="例：需附證明文件"></textarea>
+            <span asp-validation-for="Description" class="text-danger small"></span>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">建立</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">取消</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

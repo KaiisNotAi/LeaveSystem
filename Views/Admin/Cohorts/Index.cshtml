@@ -1,0 +1,68 @@
+@model IEnumerable<LeaveSystem.Models.Entities.Cohort>
+@{
+    ViewData["Title"] = "班期管理";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@ViewData["Title"]</h3>
+    <a asp-action="Create" class="btn btn-primary">＋ 新增班期</a>
+</div>
+
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>班期名稱</th>
+                <th>開課日期</th>
+                <th>結訓日期</th>
+                <th class="text-end">總時數</th>
+                <th class="text-end">請假上限</th>
+                <th>導師</th>
+                <th>科長</th>
+                <th>分署長</th>
+                <th class="text-end">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">尚未建立任何班期</td>
+                </tr>
+            }
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td>@c.Name</td>
+                    <td>@c.StartDate.ToString("yyyy-MM-dd")</td>
+                    <td>@c.EndDate.ToString("yyyy-MM-dd")</td>
+                    <td class="text-end">@c.TotalHours</td>
+                    <td class="text-end">
+                        @c.LeaveLimitHours 時
+                        <span class="text-muted small">(@c.LeaveLimitPercent%)</span>
+                    </td>
+                    <td>@(c.Tutor?.DisplayName ?? "—")</td>
+                    <td>@(c.SectionChief?.DisplayName ?? "—")</td>
+                    <td>@(c.BranchDirector?.DisplayName ?? "—")</td>
+                    <td class="text-end">
+                        <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-primary">編輯</a>
+                        <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline"
+                              onsubmit="return confirm('確定要刪除班期「@c.Name」嗎？此動作無法復原。');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
