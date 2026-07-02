@@ -38,6 +38,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// 註冊請假時數計算服務（Phase 3）
+builder.Services.AddScoped<ILeaveCalculator, LeaveCalculator>();
+
 // 註冊 Cookie 認證
 //   LoginPath：未登入造訪需登入頁面時自動轉址到這裡
 //   AccessDeniedPath：登入了但角色不足時轉址到這裡
