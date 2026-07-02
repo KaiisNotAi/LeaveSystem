@@ -57,17 +57,20 @@ builder.Services
 var app = builder.Build();
 
 // ─────────────────────────────────────────────────────────────────
-// 啟動時自動建立資料庫並寫入種子資料
-// 這樣第一次跑就會有預設管理員、角色、假別、簽核規則可用。
+// 啟動時自動套用資料庫 Migration 並寫入種子資料
+// 每次 Entity 變更 → dotnet ef migrations add XxxName → git commit → 隊員 pull 後 F5 自動同步。
 // ─────────────────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // EnsureCreated() 是「快速建表」工具，適合開發階段。
-    // 之後建議改用 EF Core Migration（dotnet ef migrations add / database update）
-    // 來追蹤每次資料表結構變更，請見 docs/06-開發環境設定.md。
-    db.Database.EnsureCreated();
+    // Migrate() 會：
+    //  1. 若資料庫不存在 → 建立資料庫
+    //  2. 檢查 __EFMigrationsHistory 表，找出尚未套用的 Migration
+    //  3. 依序執行 Up() 方法建立/修改資料表
+    //  4. 執行完後把該 Migration 標記為已套用
+    // 完整流程說明請見 docs/06-開發環境設定.md §4、§10。
+    db.Database.Migrate();
 
     SeedData.Initialize(db);
 }
