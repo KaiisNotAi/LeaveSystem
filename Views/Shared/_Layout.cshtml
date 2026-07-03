@@ -43,6 +43,12 @@
                                 <a class="nav-link text-dark" href="/LeaveRequests">我的請假申請</a>
                             </li>
                         }
+                        @if (User.IsInRole("Tutor") || User.IsInRole("SectionChief") || User.IsInRole("BranchDirector"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/Approvals">待簽核工作台</a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">隱私權聲明</a>
                         </li>

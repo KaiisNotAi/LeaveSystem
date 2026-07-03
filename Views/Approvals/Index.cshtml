@@ -1,0 +1,129 @@
+@using LeaveSystem.Models.Enums
+@model LeaveSystem.Models.ViewModels.ApprovalIndexViewModel
+@{
+    ViewData["Title"] = "待簽核工作台";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@ViewData["Title"]</h3>
+</div>
+
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <strong>待我簽核</strong>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive mb-0">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>申請編號</th>
+                        <th>學員</th>
+                        <th>假別</th>
+                        <th>請假區間</th>
+                        <th class="text-end">時數</th>
+                        <th>目前關卡</th>
+                        <th>建立時間</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.PendingItems.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">目前沒有待你簽核的申請</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.PendingItems)
+                        {
+                            <tr>
+                                <td>#@item.LeaveRequestId</td>
+                                <td>@item.StudentDisplayName</td>
+                                <td>@item.LeaveTypeName</td>
+                                <td>
+                                    @item.StartAt.ToString("yyyy-MM-dd HH:mm")
+                                    <span class="text-muted">~</span>
+                                    @item.EndAt.ToString("yyyy-MM-dd HH:mm")
+                                </td>
+                                <td class="text-end">@item.TotalHours</td>
+                                <td><span class="badge bg-warning text-dark">第 @item.CurrentLevel 關</span></td>
+                                <td>@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="text-end">
+                                    <a asp-action="Details" asp-route-id="@item.LeaveRequestId" class="btn btn-sm btn-primary">查看並簽核</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-light">
+        <strong>我已簽核歷史</strong>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive mb-0">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>申請編號</th>
+                        <th>關卡</th>
+                        <th>學員</th>
+                        <th>假別</th>
+                        <th>決定</th>
+                        <th>意見</th>
+                        <th>簽核時間</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.HistoryItems.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">目前沒有簽核歷史</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.HistoryItems)
+                        {
+                            var (decisionText, badgeClass) = item.Decision switch
+                            {
+                                ApprovalDecision.Approved => ("核准", "bg-success"),
+                                ApprovalDecision.Rejected => ("駁回", "bg-danger"),
+                                _ => ("待處理", "bg-secondary")
+                            };
+
+                            <tr>
+                                <td>#@item.LeaveRequestId</td>
+                                <td>第 @item.Level 關</td>
+                                <td>@item.StudentDisplayName</td>
+                                <td>@item.LeaveTypeName</td>
+                                <td><span class="badge @badgeClass">@decisionText</span></td>
+                                <td class="text-muted small">@item.Comment</td>
+                                <td>@item.DecidedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="text-end">
+                                    <a asp-action="Details" asp-route-id="@item.LeaveRequestId" class="btn btn-sm btn-outline-primary">查看詳情</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
