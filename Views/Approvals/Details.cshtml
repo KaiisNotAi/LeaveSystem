@@ -1,0 +1,169 @@
+@using LeaveSystem.Models.Enums
+@model LeaveSystem.Models.ViewModels.ApprovalDetailViewModel
+@{
+    ViewData["Title"] = $"簽核詳情 #{Model.LeaveRequestId}";
+
+    static string GetRoleDisplay(string role) => role switch
+    {
+        "Tutor" => "導師",
+        "SectionChief" => "科長",
+        "BranchDirector" => "分署長",
+        _ => role
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@ViewData["Title"]</h3>
+    <a asp-action="Index" class="btn btn-outline-secondary">返回工作台</a>
+</div>
+
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <strong>請假單資訊</strong>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small">學員</div>
+                <div>@Model.StudentDisplayName</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">假別</div>
+                <div>@Model.LeaveTypeName</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">整張單狀態</div>
+                <div>
+                    @{
+                        var (statusText, statusClass) = Model.Status switch
+                        {
+                            LeaveStatus.Pending => ($"簽核中（第 {Model.CurrentLevel} 關）", "bg-warning text-dark"),
+                            LeaveStatus.Approved => ("已核准", "bg-success"),
+                            LeaveStatus.Rejected => ("已駁回", "bg-danger"),
+                            LeaveStatus.Cancelled => ("已撤銷", "bg-secondary"),
+                            _ => ("草稿", "bg-info text-dark")
+                        };
+                    }
+                    <span class="badge @statusClass">@statusText</span>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="text-muted small">請假區間</div>
+                <div>
+                    @Model.StartAt.ToString("yyyy-MM-dd HH:mm")
+                    <span class="text-muted">~</span>
+                    @Model.EndAt.ToString("yyyy-MM-dd HH:mm")
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">總時數</div>
+                <div>@Model.TotalHours 小時</div>
+            </div>
+
+            <div class="col-12">
+                <div class="text-muted small">請假原因</div>
+                <div class="border rounded p-2">@Model.Reason</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <strong>簽核歷程</strong>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive mb-0">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>關卡</th>
+                        <th>角色</th>
+                        <th>決定</th>
+                        <th>簽核人</th>
+                        <th>意見</th>
+                        <th>時間</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var step in Model.Steps)
+                    {
+                        var (decisionText, badgeClass) = step.Decision switch
+                        {
+                            ApprovalDecision.Approved => ("已核准", "bg-success"),
+                            ApprovalDecision.Rejected => ("已駁回", "bg-danger"),
+                            _ => ("待處理", "bg-secondary")
+                        };
+
+                        <tr>
+                            <td>第 @step.Level 關</td>
+                            <td>@GetRoleDisplay(step.ApproverRole)</td>
+                            <td><span class="badge @badgeClass">@decisionText</span></td>
+                            <td>@(step.ApproverDisplayName ?? "—")</td>
+                            <td class="text-muted small">@(string.IsNullOrWhiteSpace(step.Comment) ? "—" : step.Comment)</td>
+                            <td>@step.DecidedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (Model.CanActOnCurrentStep && Model.CurrentStepId.HasValue)
+{
+    <div class="card border-warning mb-4">
+        <div class="card-header bg-warning-subtle">
+            <strong>當前關卡簽核動作</strong>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-3">你目前可以對此單據執行核准或駁回（駁回必須填寫原因）。</p>
+
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <form asp-action="Approve" method="post" class="border rounded p-3 h-100">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="StepId" value="@Model.CurrentStepId" />
+
+                        <label class="form-label">核准意見（選填）</label>
+                        <textarea name="Comment" class="form-control" rows="3" placeholder="可留空，或填寫備註"></textarea>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-success">核准</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="col-lg-6">
+                    <form asp-action="Reject" method="post" class="border rounded p-3 h-100">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="StepId" value="@Model.CurrentStepId" />
+
+                        <label class="form-label">駁回原因（必填）</label>
+                        <textarea name="Comment" class="form-control" rows="3" required placeholder="請輸入駁回原因"></textarea>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-danger">駁回</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-secondary">
+        你目前無法對此單據執行簽核動作（可能不是你的關卡，或此單據已完成/已駁回）。
+    </div>
+}
