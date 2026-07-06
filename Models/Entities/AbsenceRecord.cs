@@ -24,9 +24,9 @@ public class AbsenceRecord
     public DateTime OccurredAt { get; set; }
 
     /// <summary>
-    /// 曠課時數（最小單位 1 小時）。
+    /// 曠課時數（最小單位 1 小時，只接受正整數時數）。
     /// </summary>
-    [Range(0.5, 100)]
+    [Range(1, 100)]
     public decimal Hours { get; set; }
 
     /// <summary>
