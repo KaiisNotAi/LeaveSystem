@@ -1,0 +1,127 @@
+@model LeaveSystem.Models.ViewModels.AdminReportViewModel
+@{
+    ViewData["Title"] = "行政彙總報表";
+    var q = Model.Query;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@ViewData["Title"]</h3>
+    <span class="text-muted small">分組：班期 × 學員 × 假別 × 年月 ／ 僅計入已核准</span>
+</div>
+
+@* ─── 篩選表單 ─── *@
+<form asp-action="Admin" method="get" class="card p-3 mb-3 bg-light">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label">班期</label>
+            <select name="CohortId" class="form-select">
+                <option value="">— 不限 —</option>
+                @foreach (var c in Model.CohortOptions)
+                {
+                    if (q.CohortId == c.Id)
+                    {
+                        <option value="@c.Id" selected>@c.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">學員</label>
+            <select name="StudentId" class="form-select">
+                <option value="">— 不限 —</option>
+                @foreach (var s in Model.StudentOptions)
+                {
+                    if (q.StudentId == s.Id)
+                    {
+                        <option value="@s.Id" selected>@s.DisplayName（@s.Username）</option>
+                    }
+                    else
+                    {
+                        <option value="@s.Id">@s.DisplayName（@s.Username）</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">假別</label>
+            <select name="LeaveTypeId" class="form-select">
+                <option value="">— 不限 —</option>
+                @foreach (var t in Model.LeaveTypeOptions)
+                {
+                    if (q.LeaveTypeId == t.Id)
+                    {
+                        <option value="@t.Id" selected>@t.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@t.Id">@t.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">日期起</label>
+            <input name="DateFrom" type="date" class="form-control"
+                   value="@(q.DateFrom?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">日期迄</label>
+            <input name="DateTo" type="date" class="form-control"
+                   value="@(q.DateTo?.ToString("yyyy-MM-dd"))" />
+        </div>
+    </div>
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">查詢</button>
+        <a asp-action="Admin" class="btn btn-outline-secondary">清除條件</a>
+    </div>
+    <div class="mt-2 text-muted small">
+        日期以請假單 <code>StartAt</code> 為比對欄位；跨月的請假整筆算開始月。
+    </div>
+</form>
+
+@* ─── 彙總結果表 ─── *@
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>班期</th>
+                <th>學員</th>
+                <th>假別</th>
+                <th>年月</th>
+                <th class="text-end">已核准時數</th>
+                <th class="text-end">已核准單數</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Rows.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">沒有符合條件的彙總資料</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td>@row.CohortName</td>
+                        <td>@row.StudentDisplayName</td>
+                        <td>@row.LeaveTypeName</td>
+                        <td>@row.Year.ToString("D4")-@row.Month.ToString("D2")</td>
+                        <td class="text-end">@row.TotalHours</td>
+                        <td class="text-end">@row.RequestCount</td>
+                    </tr>
+                }
+                <tr class="fw-bold table-light">
+                    <td colspan="4" class="text-end">總計</td>
+                    <td class="text-end">@Model.Rows.Sum(r => r.TotalHours)</td>
+                    <td class="text-end">@Model.Rows.Sum(r => r.RequestCount)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
