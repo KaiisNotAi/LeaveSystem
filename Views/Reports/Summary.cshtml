@@ -1,0 +1,108 @@
+@model LeaveSystem.Models.ViewModels.MyLeaveSummaryViewModel
+@{
+    ViewData["Title"] = "我的累計時數";
+
+    // 進度百分比與 progress-bar 樣式（依用量分色）
+    int? percent = null;
+    string progressClass = "bg-success";
+    if (Model.CohortLeaveLimitHours is int limit && limit > 0)
+    {
+        percent = (int)Math.Round((double)Model.TotalApprovedHours * 100 / limit);
+        if (percent >= 100)      { progressClass = "bg-danger"; }
+        else if (percent >= 80)  { progressClass = "bg-warning"; }
+        else if (percent >= 50)  { progressClass = "bg-info"; }
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@ViewData["Title"]</h3>
+    <a asp-action="Index" class="btn btn-outline-primary">← 回紀錄查詢</a>
+</div>
+
+@* ─── 班期上限資訊 ─── *@
+@if (Model.CohortName is null)
+{
+    <div class="alert alert-warning">
+        你的帳號尚未指派班期，暫時無法顯示班期請假上限。請聯絡行政人員。
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <strong>@Model.CohortName</strong>
+            <span class="text-muted small">
+                　目前已核准合計 @Model.TotalApprovedHours 小時 / 上限 @Model.CohortLeaveLimitHours 小時
+            </span>
+        </div>
+        <div class="card-body">
+            @if (percent.HasValue)
+            {
+                <div class="progress" style="height: 22px;" role="progressbar"
+                     aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar @progressClass"
+                         style="width: @(Math.Min(percent.Value, 100))%;">
+                        @percent%
+                    </div>
+                </div>
+                @if (percent >= 100)
+                {
+                    <div class="text-danger small mt-2">
+                        已達或超過班期上限，後續請假可能無法通過簽核。
+                    </div>
+                }
+                else if (percent >= 80)
+                {
+                    <div class="text-warning small mt-2">
+                        接近班期上限，請留意剩餘可請假時數。
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@* ─── 各假別統計表 ─── *@
+<div class="card">
+    <div class="card-header bg-light">
+        <strong>各假別已核准明細</strong>
+        <span class="text-muted small">（僅計入已核准的請假單）</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive mb-0">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>假別</th>
+                        <th class="text-end">已核准時數</th>
+                        <th class="text-end">已核准單數</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Items.Any())
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">尚無已核准的請假紀錄</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td>@item.LeaveTypeName</td>
+                                <td class="text-end">@item.TotalHours</td>
+                                <td class="text-end">@item.RequestCount</td>
+                            </tr>
+                        }
+                        <tr class="fw-bold table-light">
+                            <td>總計</td>
+                            <td class="text-end">@Model.TotalApprovedHours</td>
+                            <td class="text-end">@Model.Items.Sum(i => i.RequestCount)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
