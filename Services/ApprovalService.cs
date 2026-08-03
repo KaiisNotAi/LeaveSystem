@@ -1,6 +1,7 @@
 using LeaveSystem.Data;
 using LeaveSystem.Models.Enums;
 using LeaveSystem.Models.ViewModels;
+using LeaveSystem.Services.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace LeaveSystem.Services;
@@ -27,10 +28,12 @@ public class ApprovalService : IApprovalService
     private const string ErrorRejectCommentRequired = "駁回原因為必填。";
 
     private readonly AppDbContext _db;
+    private readonly INotificationDispatcher _notifications;
 
-    public ApprovalService(AppDbContext db)
+    public ApprovalService(AppDbContext db, INotificationDispatcher? notifications = null)
     {
         _db = db;
+        _notifications = notifications ?? new NullNotificationDispatcher();
     }
 
     public Task<IReadOnlyList<PendingApprovalItem>> GetPendingForUserAsync(int currentUserId)
@@ -90,6 +93,15 @@ public class ApprovalService : IApprovalService
         request.UpdatedAt = now;
         await _db.SaveChangesAsync();
 
+        if (outcome == ApprovalOutcome.AdvancedToNextLevel)
+        {
+            await _notifications.NotifyApprovedNextAsync(request.Id);
+        }
+        else if (outcome == ApprovalOutcome.FullyApproved)
+        {
+            await _notifications.NotifyFullyApprovedAsync(request.Id);
+        }
+
         return new ApprovalActionResult(true, null, outcome);
     }
 
@@ -124,6 +136,8 @@ public class ApprovalService : IApprovalService
         request.UpdatedAt = now;
 
         await _db.SaveChangesAsync();
+
+        await _notifications.NotifyRejectedAsync(request.Id, step.Comment ?? string.Empty);
 
         return new ApprovalActionResult(true, null, ApprovalOutcome.Rejected);
     }
