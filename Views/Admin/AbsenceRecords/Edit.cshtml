@@ -1,0 +1,106 @@
+@model LeaveSystem.Models.ViewModels.AbsenceRecordEditInput
+@{
+    ViewData["Title"] = "編輯曠課紀錄";
+}
+
+<h3>@ViewData["Title"]</h3>
+
+@* ─────────────────────────────────────────────────────────────
+   Phase 6 UX 優化：學員下拉採「班期 → 學員」兩層過濾（同 Create）。
+   Edit 頁面多一個「進場反推」步驟：以目前 StudentId 對應 option 的
+   data-cohort-id 反推設定「班期」下拉的初值，讓行政一進來就看到正確過濾結果。
+   ───────────────────────────────────────────────────────────── *@
+
+<form asp-action="Edit" method="post" class="mt-3">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            @* 純 UX 輔助欄位：不掛 asp-for、不給 name，不會被 Model Binding *@
+            <label for="CohortFilter" class="form-label">班期</label>
+            <select id="CohortFilter" class="form-select">
+                <option value="">— 全部班期 —</option>
+                @foreach (var c in Model.CohortOptions)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+            <div class="form-text">先選班期，下方學員將只顯示該班學員。</div>
+        </div>
+
+        <div class="col-md-3">
+            <label asp-for="StudentId" class="form-label"></label>
+            <select asp-for="StudentId" class="form-select">
+                <option value="">— 請選擇學員 —</option>
+                @foreach (var s in Model.StudentOptions)
+                {
+                    <option value="@s.Id" data-cohort-id="@s.CohortId">@s.DisplayName（@s.Username）</option>
+                }
+            </select>
+            <span asp-validation-for="StudentId" class="text-danger small"></span>
+        </div>
+
+        <div class="col-md-3">
+            <label asp-for="OccurredAt" class="form-label"></label>
+            <input asp-for="OccurredAt" class="form-control" type="datetime-local"
+                   value="@Model.OccurredAt.ToString("yyyy-MM-ddTHH:mm")" />
+            <span asp-validation-for="OccurredAt" class="text-danger small"></span>
+        </div>
+
+        <div class="col-md-3">
+            <label asp-for="Hours" class="form-label"></label>
+            <input asp-for="Hours" class="form-control" type="number" min="1" max="100" step="1" />
+            <span asp-validation-for="Hours" class="text-danger small"></span>
+            <div class="form-text">最小單位 1 小時，僅接受正整數。</div>
+        </div>
+
+        <div class="col-12">
+            <label asp-for="Note" class="form-label"></label>
+            <textarea asp-for="Note" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="Note" class="text-danger small"></span>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">儲存</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">取消</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Phase 6 兩層下拉（Edit 版本，同 Create + 進場反推預選）。
+        (function () {
+            const cohortSel = document.getElementById('CohortFilter');
+            const studentSel = document.getElementById('StudentId');
+            if (!cohortSel || !studentSel) return;
+
+            function applyFilter() {
+                const cohortId = cohortSel.value;
+                let currentStillVisible = false;
+                for (const opt of studentSel.options) {
+                    if (!opt.value) { opt.hidden = false; continue; }
+                    const optCohort = opt.getAttribute('data-cohort-id') || '';
+                    const show = !cohortId || optCohort === cohortId;
+                    opt.hidden = !show;
+                    if (show && opt.selected) currentStillVisible = true;
+                }
+                if (!currentStillVisible) studentSel.value = '';
+            }
+
+            // 進場反推：讀取目前選中的學員 option 的 data-cohort-id，設回班期下拉
+            const selectedOption = studentSel.options[studentSel.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const preselectCohort = selectedOption.getAttribute('data-cohort-id') || '';
+                if (preselectCohort) cohortSel.value = preselectCohort;
+            }
+
+            cohortSel.addEventListener('change', applyFilter);
+            applyFilter();
+        })();
+    </script>
+}
+

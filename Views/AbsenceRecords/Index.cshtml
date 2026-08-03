@@ -1,0 +1,81 @@
+@model LeaveSystem.Models.ViewModels.MyAbsenceRecordViewModel
+@{
+    ViewData["Title"] = "我的曠課紀錄";
+    var q = Model.Query;
+}
+
+<h3>@ViewData["Title"]</h3>
+
+@* ─── 終身總計卡片：不受日期篩選影響 ─── *@
+<div class="card mb-3 border-warning">
+    <div class="card-body d-flex align-items-center justify-content-between">
+        <div>
+            <div class="text-muted small">截至目前累計曠課時數</div>
+            <div class="fs-3 fw-bold text-warning">@Model.TotalHours <span class="fs-6 text-muted">小時</span></div>
+        </div>
+        <div class="text-muted small text-end">
+            此數字為終身總計，<br />不受下方日期篩選影響。
+        </div>
+    </div>
+</div>
+
+@* ─── 篩選表單（GET，條件保留在 URL） ─── *@
+<form asp-action="Index" method="get" class="card p-3 mb-3 bg-light">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">日期起</label>
+            <input name="DateFrom" type="date" class="form-control"
+                   value="@(q.DateFrom?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">日期迄</label>
+            <input name="DateTo" type="date" class="form-control"
+                   value="@(q.DateTo?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">查詢</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">清除條件</a>
+        </div>
+    </div>
+    <div class="mt-2 text-muted small">
+        日期以曠課發生時間（<code>OccurredAt</code>）為比對欄位；日期迄含當天。
+    </div>
+</form>
+
+@* ─── 結果列表 ─── *@
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>發生時間</th>
+                <th class="text-end">時數</th>
+                <th>備註</th>
+                <th>登錄時間</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Items.Any())
+            {
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">沒有符合條件的曠課紀錄</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.OccurredAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">@item.Hours</td>
+                        <td>@(item.Note ?? "")</td>
+                        <td>@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="text-muted small">
+    如果你認為紀錄有誤，請聯繫行政人員協助修正（曠課紀錄由行政登錄，學員無法自行修改）。
+</div>

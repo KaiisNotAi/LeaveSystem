@@ -47,6 +47,9 @@ builder.Services.AddScoped<IApprovalService, ApprovalService>();
 // 註冊紀錄查詢與時數統計服務（Phase 5）
 builder.Services.AddScoped<ILeaveReportService, LeaveReportService>();
 
+// 註冊曠課紀錄服務（Phase 6）
+builder.Services.AddScoped<IAbsenceRecordService, AbsenceRecordService>();
+
 // 註冊 Cookie 認證
 //   LoginPath：未登入造訪需登入頁面時自動轉址到這裡
 //   AccessDeniedPath：登入了但角色不足時轉址到這裡
