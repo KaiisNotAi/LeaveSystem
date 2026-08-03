@@ -16,6 +16,33 @@ public class PendingApprovalItem
     public DateTime EndAt { get; set; }
     public decimal TotalHours { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// 學員所屬班期與已請時數用量資訊。學員未指派班期時，班期相關欄位為 null。
+    /// </summary>
+    public StudentCohortUsage Usage { get; set; } = new();
+}
+
+/// <summary>
+/// 學員所屬班期名稱與已請時數用量（含上限、剩餘、百分比）。
+/// 「已請時數」只累計 <see cref="LeaveStatus.Approved"/>，與 Phase 3 班期上限口徑一致。
+/// 學員未指派班期時 <see cref="CohortName"/> 為 null；班期上限為 0 或未設定時 <see cref="UsagePercent"/> / <see cref="RemainingHours"/> 為 null（避免除以零）。
+/// </summary>
+public class StudentCohortUsage
+{
+    public string? CohortName { get; set; }
+
+    /// <summary>累計已核准時數。</summary>
+    public decimal ApprovedHours { get; set; }
+
+    /// <summary>班期請假上限時數（來自 Cohort.LeaveLimitHours）。</summary>
+    public int? CohortLeaveLimitHours { get; set; }
+
+    /// <summary>剩餘可請時數；上限為 null / 0 時為 null。負值一律夾到 0。</summary>
+    public decimal? RemainingHours { get; set; }
+
+    /// <summary>已請時數佔上限的百分比；上限為 null / 0 時為 null。</summary>
+    public decimal? UsagePercent { get; set; }
 }
 
 /// <summary>
@@ -74,6 +101,11 @@ public class ApprovalDetailViewModel
     public int? CurrentStepId { get; set; }
 
     public List<ApprovalStepViewModel> Steps { get; set; } = new();
+
+    /// <summary>
+    /// 學員所屬班期與已請時數用量資訊。
+    /// </summary>
+    public StudentCohortUsage Usage { get; set; } = new();
 }
 
 /// <summary>

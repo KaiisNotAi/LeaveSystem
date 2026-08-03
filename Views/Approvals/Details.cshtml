@@ -80,6 +80,56 @@
 
 <div class="card mb-4">
     <div class="card-header bg-light">
+        <strong>學員班期用量</strong>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small">所屬班期</div>
+                <div>@(Model.Usage.CohortName ?? "—")</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">已核准時數 / 班期上限</div>
+                <div>
+                    <strong>@Model.Usage.ApprovedHours</strong>
+                    <span class="text-muted">/</span>
+                    @if (Model.Usage.CohortLeaveLimitHours.HasValue)
+                    {
+                        <span>@Model.Usage.CohortLeaveLimitHours 小時</span>
+                        @if (Model.Usage.UsagePercent.HasValue)
+                        {
+                            <span class="badge bg-info text-dark ms-2">@Model.Usage.UsagePercent.Value.ToString("0.#")%</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small">剩餘可請時數</div>
+                <div>
+                    @if (Model.Usage.RemainingHours.HasValue)
+                    {
+                        <strong>@Model.Usage.RemainingHours 小時</strong>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </div>
+            </div>
+        </div>
+        @if (Model.Usage.CohortName is null)
+        {
+            <div class="text-muted small mt-2">（此學員目前未指派班期，僅顯示已核准時數。）</div>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-light">
         <strong>簽核歷程</strong>
     </div>
     <div class="card-body p-0">
