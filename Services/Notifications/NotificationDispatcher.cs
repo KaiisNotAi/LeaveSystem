@@ -173,7 +173,7 @@ public class NotificationDispatcher : INotificationDispatcher
     };
 
     private static string BuildRequestUrl(int leaveRequestId) => $"/LeaveRequests/Index";
-    private static string BuildApprovalUrl(int leaveRequestId) => $"/Approvals/Detail/{leaveRequestId}";
+    private static string BuildApprovalUrl(int leaveRequestId) => $"/Approvals/Details/{leaveRequestId}";
 }
 
 /// <summary>

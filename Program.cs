@@ -96,6 +96,12 @@ using (var scope = app.Services.CreateScope())
     // 完整流程說明請見 docs/06-開發環境設定.md §4、§10。
     db.Database.Migrate();
 
+    // 修補歷史通知的錯誤連結：/Approvals/Detail/{id} → /Approvals/Details/{id}
+    // （BuildApprovalUrl 曾產生單數 Detail，導致舊通知點擊 404）
+    db.Database.ExecuteSqlRaw(
+        "UPDATE Notifications SET Url = REPLACE(Url, '/Approvals/Detail/', '/Approvals/Details/') " +
+        "WHERE Url LIKE '/Approvals/Detail/%'");
+
     SeedData.Initialize(db);
 }
 
