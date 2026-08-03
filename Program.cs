@@ -1,5 +1,7 @@
 using LeaveSystem.Data;
 using LeaveSystem.Services;
+using LeaveSystem.Services.Email;
+using LeaveSystem.Services.Notifications;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,6 +51,12 @@ builder.Services.AddScoped<ILeaveReportService, LeaveReportService>();
 
 // 註冊曠課紀錄服務（Phase 6）
 builder.Services.AddScoped<IAbsenceRecordService, AbsenceRecordService>();
+
+// 註冊站內通知 + Email 服務（Phase 7）
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IEmailSender, MailKitEmailSender>();
+builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
 // 註冊 Cookie 認證
 //   LoginPath：未登入造訪需登入頁面時自動轉址到這裡

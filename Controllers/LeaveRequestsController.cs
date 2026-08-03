@@ -4,6 +4,7 @@ using LeaveSystem.Models.Entities;
 using LeaveSystem.Models.Enums;
 using LeaveSystem.Models.ViewModels;
 using LeaveSystem.Services;
+using LeaveSystem.Services.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,11 +21,13 @@ public class LeaveRequestsController : Controller
 {
     private readonly AppDbContext _db;
     private readonly ILeaveCalculator _leaveCalculator;
+    private readonly INotificationDispatcher _notifications;
 
-    public LeaveRequestsController(AppDbContext db, ILeaveCalculator leaveCalculator)
+    public LeaveRequestsController(AppDbContext db, ILeaveCalculator leaveCalculator, INotificationDispatcher notifications)
     {
         _db = db;
         _leaveCalculator = leaveCalculator;
+        _notifications = notifications;
     }
 
     public async Task<IActionResult> Index()
@@ -184,6 +187,8 @@ public class LeaveRequestsController : Controller
 
         _db.LeaveRequests.Add(leaveRequest);
         await _db.SaveChangesAsync();
+
+        await _notifications.NotifySubmittedAsync(leaveRequest.Id);
 
         TempData["Success"] = $"請假申請已送出（共 {totalHours:0.##} 小時，{pendingSteps.Count} 關簽核）。";
         return RedirectToAction(nameof(Index));
