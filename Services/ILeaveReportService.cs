@@ -69,4 +69,21 @@ public interface ILeaveReportService
     /// </summary>
     /// <param name="query">篩選條件（皆選填）。</param>
     Task<AdminReportViewModel> GetAdminReportAsync(AdminReportQuery query);
+
+    /// <summary>
+    /// Phase 8：取得指定班期（可再限定單一學員）在時間區間內的請假明細（全狀態），
+    /// 供 <c>/Admin/Export</c> 匯出頁面使用。
+    ///
+    /// 資料範圍：
+    ///   ‧ 主 WHERE：學員所屬 <c>CohortId</c> = <c>query.CohortId</c>（必填）
+    ///   ‧ 選填：<c>query.StudentId</c>、<c>query.DateFrom</c>、<c>query.DateTo</c>
+    ///   ‧ **包含所有狀態**（Pending / Approved / Rejected …），
+    ///     讓行政能一次看清「已核准 / 進行中 / 被駁回」。
+    ///
+    /// 排序：<c>StartAt DESC</c>。
+    ///
+    /// 日期邊界：<c>DateTo</c> 若時間為 00:00:00，Service 會補到當日 23:59:59.9999
+    /// （體例對齊 <see cref="GetAdminReportAsync"/>）。
+    /// </summary>
+    Task<IReadOnlyList<AdminLeaveDetailRow>> GetLeaveDetailsForAdminAsync(AdminExportQuery query);
 }

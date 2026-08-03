@@ -52,6 +52,10 @@ builder.Services.AddScoped<ILeaveReportService, LeaveReportService>();
 // 註冊曠課紀錄服務（Phase 6）
 builder.Services.AddScoped<IAbsenceRecordService, AbsenceRecordService>();
 
+// 註冊匯出服務（Phase 8）
+builder.Services.AddScoped<LeaveSystem.Services.Export.ICsvExporter, LeaveSystem.Services.Export.CsvExporter>();
+builder.Services.AddScoped<LeaveSystem.Services.Export.IExcelExporter, LeaveSystem.Services.Export.ClosedXmlExcelExporter>();
+
 // 註冊站內通知 + Email 服務（Phase 7）
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<INotificationService, NotificationService>();

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LeaveSystem.Data;
 using LeaveSystem.Models.ViewModels;
 using LeaveSystem.Services;
+using LeaveSystem.Services.Export;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,11 +26,19 @@ public class ReportsController : Controller
 {
     private readonly ILeaveReportService _reportService;
     private readonly AppDbContext _db;
+    private readonly ICsvExporter _csv;
+    private readonly IExcelExporter _excel;
 
-    public ReportsController(ILeaveReportService reportService, AppDbContext db)
+    public ReportsController(
+        ILeaveReportService reportService,
+        AppDbContext db,
+        ICsvExporter csv,
+        IExcelExporter excel)
     {
         _reportService = reportService;
         _db = db;
+        _csv = csv;
+        _excel = excel;
     }
 
     /// <summary>
@@ -85,6 +94,48 @@ public class ReportsController : Controller
         var vm = await _reportService.GetAdminReportAsync(query);
         return View(vm);
     }
+
+    // ─── 匯出（Phase 8）─────────────────────────────────
+    // 授權同 Admin：Staff / Admin 皆可匯出行政彙總報表。
+    // 沿用同一份 AdminReportQuery，讓 View 端只要把匯出按鈕塞進同一個 form
+    // 即可繼承目前的篩選條件（GET）。
+
+    /// <summary>
+    /// GET /Reports/ExportAdminCsv：彙總報表匯出 CSV（UTF-8 BOM）。
+    /// </summary>
+    [HttpGet]
+    [Authorize(Roles = "Staff,Admin")]
+    public async Task<IActionResult> ExportAdminCsv(AdminReportQuery query)
+    {
+        var vm = await _reportService.GetAdminReportAsync(query);
+        var bytes = _csv.Export(vm.Rows, AdminReportExportColumns);
+        return File(bytes, "text/csv; charset=utf-8", $"admin-report-{DateTime.Today:yyyyMMdd}.csv");
+    }
+
+    /// <summary>
+    /// GET /Reports/ExportAdminXlsx：彙總報表匯出 Excel。
+    /// </summary>
+    [HttpGet]
+    [Authorize(Roles = "Staff,Admin")]
+    public async Task<IActionResult> ExportAdminXlsx(AdminReportQuery query)
+    {
+        var vm = await _reportService.GetAdminReportAsync(query);
+        var bytes = _excel.Export(vm.Rows, AdminReportExportColumns, "彙總");
+        return File(bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"admin-report-{DateTime.Today:yyyyMMdd}.xlsx");
+    }
+
+    /// <summary>彙總報表匯出欄位定義（對齊 Views/Reports/Admin.cshtml 顯示順序）。</summary>
+    private static readonly IReadOnlyList<ExportColumn<AdminReportRow>> AdminReportExportColumns = new[]
+    {
+        new ExportColumn<AdminReportRow>("班期", r => r.CohortName),
+        new ExportColumn<AdminReportRow>("學員", r => r.StudentDisplayName),
+        new ExportColumn<AdminReportRow>("假別", r => r.LeaveTypeName),
+        new ExportColumn<AdminReportRow>("年月", r => $"{r.Year:D4}-{r.Month:D2}"),
+        new ExportColumn<AdminReportRow>("時數合計", r => r.TotalHours, ExportValueType.Hours),
+        new ExportColumn<AdminReportRow>("單數", r => r.RequestCount, ExportValueType.Number),
+    };
 
     // ─── 輔助方法 ───
 

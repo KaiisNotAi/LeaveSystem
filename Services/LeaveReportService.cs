@@ -241,4 +241,59 @@ public class LeaveReportService : ILeaveReportService
             LeaveTypeOptions = leaveTypeOptions
         };
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AdminLeaveDetailRow>> GetLeaveDetailsForAdminAsync(AdminExportQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (!query.CohortId.HasValue)
+        {
+            // CohortId 是必填；防呆：Controller 應已擋下，Service 再擋一次避免整表撈出。
+            return Array.Empty<AdminLeaveDetailRow>();
+        }
+
+        var q = _db.LeaveRequests
+            .AsNoTracking()
+            .Include(r => r.LeaveType)
+            .Include(r => r.Student)
+                .ThenInclude(u => u.Cohort)
+            .Where(r => r.Student.CohortId == query.CohortId.Value);
+
+        if (query.StudentId.HasValue)
+        {
+            q = q.Where(r => r.StudentId == query.StudentId.Value);
+        }
+        if (query.DateFrom.HasValue)
+        {
+            var from = query.DateFrom.Value;
+            q = q.Where(r => r.StartAt >= from);
+        }
+        if (query.DateTo.HasValue)
+        {
+            var to = query.DateTo.Value.TimeOfDay == TimeSpan.Zero
+                ? query.DateTo.Value.Date.AddDays(1).AddTicks(-1)
+                : query.DateTo.Value;
+            q = q.Where(r => r.StartAt <= to);
+        }
+
+        var rows = await q
+            .OrderByDescending(r => r.StartAt)
+            .Select(r => new AdminLeaveDetailRow
+            {
+                Id = r.Id,
+                CreatedAt = r.CreatedAt,
+                CohortName = r.Student.Cohort != null ? r.Student.Cohort.Name : string.Empty,
+                StudentDisplayName = r.Student.DisplayName,
+                LeaveTypeName = r.LeaveType.Name,
+                StartAt = r.StartAt,
+                EndAt = r.EndAt,
+                TotalHours = r.TotalHours,
+                Status = r.Status,
+                CurrentLevel = r.CurrentLevel,
+                Reason = r.Reason
+            })
+            .ToListAsync();
+
+        return rows;
+    }
 }
