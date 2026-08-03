@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>02 專題簡介 — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 專題報告</a></div>
+        <div class="chapter">第 02 章 — 專題簡介</div>
+    </header>
+
+    <main class="deck">
+        <!-- Slide 1: 章節封面 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 02</div>
+            <h1>專題簡介</h1>
+            <p class="lead">
+                系統想解決什麼？由誰來用？怎麼被實作出來？<br>
+                本章帶你認識目標、技術架構、六大角色與品質要求。
+            </p>
+        </section>
+
+        <!-- Slide 2: 系統目標 -->
+        <section class="slide">
+            <h1>2.1 系統目標</h1>
+            <div class="content">
+                <p>導入線上請假管理系統，<strong>完全取代紙本與 LINE 通報</strong>，讓三方在同一平台合作：</p>
+                <div class="card-grid" style="margin-top:20px;">
+                    <div class="card">
+                        <div class="card-title">🎒 學員</div>
+                        <div class="card-body">一站式申請、即時查看簽核進度、自動累計請假時數。</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">👨‍🏫 簽核人</div>
+                        <div class="card-body">集中處理待辦清單、簽核意見留存、班期累計一目了然。</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📋 行政</div>
+                        <div class="card-body">不再人工抄寫、系統自動匯總、可隨時匯出 CSV / Excel 報表。</div>
+                    </div>
+                </div>
+                <figure class="screenshot-placeholder small" data-shot="home-page">
+                    <div class="ph-box">📷 截圖佔位：系統首頁</div>
+                    <figcaption>建議擷取：/（未登入狀態）或登入後的角色專屬首頁</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <!-- Slide 3: 系統架構分層 -->
+        <section class="slide">
+            <h1>2.2 系統架構分層</h1>
+            <div class="content">
+                <p>採 ASP.NET Core MVC 分層架構，各層責任明確、易於測試：</p>
+                <div class="flow" style="margin-top:24px;">
+                    <div class="node start">Browser<br>(瀏覽器)</div>
+                    <span class="arrow">↔</span>
+                    <div class="node">Controller<br>(路由 / 驗證)</div>
+                    <span class="arrow">↔</span>
+                    <div class="node">Service<br>(商業邏輯)</div>
+                    <span class="arrow">↔</span>
+                    <div class="node">EF Core<br>(DbContext)</div>
+                    <span class="arrow">↔</span>
+                    <div class="node approved">SQL Server<br>(資料庫)</div>
+                </div>
+                <table style="margin-top:20px;">
+                    <thead><tr><th>層</th><th>職責</th><th>代表類別</th></tr></thead>
+                    <tbody>
+                        <tr><td>Controller</td><td>接請求、模型驗證、呼叫 Service</td><td>LeaveRequestsController、ApprovalsController</td></tr>
+                        <tr><td>Service</td><td>商業規則、跨表計算、交易控制</td><td>LeaveCalculator、ApprovalService、LeaveReportService</td></tr>
+                        <tr><td>Entity + DbContext</td><td>資料模型與 Code First 遷移</td><td>AppDbContext、LeaveRequest、User…（共 11 個 Entity）</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Slide 4: 技術棧 -->
+        <section class="slide">
+            <h1>2.3 技術棧</h1>
+            <div class="content">
+                <div class="card-grid">
+                    <div class="card"><div class="card-title">.NET 10</div><div class="card-body">最新 LTS，跨平台執行環境</div></div>
+                    <div class="card"><div class="card-title">ASP.NET Core MVC</div><div class="card-body">路由 + Razor 視圖，介面全繁中</div></div>
+                    <div class="card"><div class="card-title">EF Core</div><div class="card-body">Code First + Migration，程式碼即為資料庫定義</div></div>
+                    <div class="card"><div class="card-title">SQL Server</div><div class="card-body">關聯式資料庫，支援 LocalDB 開發</div></div>
+                    <div class="card"><div class="card-title">BCrypt.Net</div><div class="card-body">密碼加鹽雜湊，安全存放</div></div>
+                    <div class="card"><div class="card-title">Cookie 認證</div><div class="card-body">HttpOnly、8 小時滑動過期</div></div>
+                    <div class="card"><div class="card-title">MailKit</div><div class="card-body">Email 通知（開發用 PickupDirectory）</div></div>
+                    <div class="card"><div class="card-title">ClosedXML</div><div class="card-body">Excel 匯出，支援多 sheet</div></div>
+                    <div class="card"><div class="card-title">xUnit + FluentAssertions</div><div class="card-body">TDD 規格測試，87/87 全綠</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: 角色權限 -->
+        <section class="slide">
+            <h1>2.4 六大角色與權限</h1>
+            <div class="content">
+                <table>
+                    <thead><tr><th>角色</th><th>英文代號</th><th>主要權限</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>學員</strong> 🎒</td><td>Student</td><td>提交請假申請、查詢自己的紀錄與時數、查閱自己的曠課</td></tr>
+                        <tr><td><strong>導師</strong> 👨‍🏫</td><td>Tutor</td><td>簽核所屬班期學員的申請（第一關）</td></tr>
+                        <tr><td><strong>科長</strong> 👩‍💼</td><td>SectionChief</td><td>簽核需二級審核的申請（8.01~24 小時）</td></tr>
+                        <tr><td><strong>分署長</strong> 🧑‍⚖️</td><td>BranchDirector</td><td>簽核需三級審核的申請（24.01 小時以上）</td></tr>
+                        <tr><td><strong>行政</strong> 📋</td><td>Staff</td><td>建立帳號、管理班期/假別、登錄曠課、查看與匯出報表</td></tr>
+                        <tr><td><strong>系統管理員</strong> 🛡️</td><td>Admin</td><td>Staff 全部權限 + 簽核規則管理 + 系統參數調整</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Slide 6: 非功能需求 & 章末 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 02 · 小結</div>
+            <h1>品質與非功能需求</h1>
+            <div style="font-size:19px; margin-top:20px;">
+                <p>
+                    <span class="badge">繁體中文</span>
+                    <span class="badge">SQL Server</span>
+                    <span class="badge">Razor Pages + MVC</span>
+                    <span class="badge accent">可審計</span>
+                    <span class="badge success">TDD 87/87 全綠</span>
+                </p>
+                <ul>
+                    <li>介面全繁體中文，符合本地使用者習慣</li>
+                    <li>所有 public 類別與方法附中文 XML 註解，學習導向</li>
+                    <li>重要操作（登入、簽核、改規則）寫入 AuditLog</li>
+                    <li>採 TDD 開發，服務層先寫測試再實作</li>
+                </ul>
+                <p style="margin-top:24px;">
+                    <a href="03-features.html" style="font-size:22px; color:var(--accent-dark); font-weight:700;">
+                        → 進入第 03 章：功能描述
+                    </a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="01-motivation.html">◀ 上一章</a>
+        <span class="page-indicator">1 / 6</span>
+        <div>
+            <button data-action="prev">◀</button>
+            <button data-action="next">▶</button>
+            <button data-action="fullscreen">⛶</button>
+            <a href="03-features.html">下一章 ▶</a>
+        </div>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>

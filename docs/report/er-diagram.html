@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>實體關聯圖 (ER Diagram) — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+    <style>
+        /* 本頁專用：加寬版面 + 消除水平捲軸 */
+        main.deck { max-width: 1720px; }
+        section.slide.er-slide {
+            max-width: 1680px;
+            aspect-ratio: auto;
+            min-height: auto;
+            padding: 32px 40px 60px;
+        }
+
+        .er-wrap { background: #fff; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); }
+        .er-wrap svg { display: block; width: 100%; height: auto; } /* 完全響應式，不設 min-width */
+        text { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; }
+        .entity-title { font-weight: 700; fill: #fff; font-size: 18px; }
+        .attr { fill: #111827; font-size: 15px; }
+        .pk { font-weight: 700; fill: #b91c1c; font-size: 15px; }
+        .fk { fill: #1e3a8a; font-style: italic; font-size: 15px; }
+        .rel-label {
+            fill: #1e3a8a;
+            font-size: 14px;
+            font-weight: 600;
+            paint-order: stroke;
+            stroke: #fff;
+            stroke-width: 4px;
+            stroke-linejoin: round;
+        }
+        .note {
+            fill: #6b7280;
+            font-size: 13px;
+            font-style: italic;
+            paint-order: stroke;
+            stroke: #fff;
+            stroke-width: 3px;
+        }
+        .legend-er { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 14px; font-size: 15px; color: var(--text-muted); }
+        .legend-er strong { color: var(--text); }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 · UML 圖表</a></div>
+        <div class="chapter">實體關聯圖 (ER Diagram)</div>
+    </header>
+
+    <main class="deck">
+        <section class="slide er-slide">
+            <h1>實體關聯圖 ER Diagram</h1>
+            <p style="color:var(--text-muted); font-size:17px;">
+                共 11 個實體，分為 <strong>身分</strong>、<strong>組織/規則</strong>、
+                <strong>交易資料</strong>、<strong>通知/稽核</strong> 四大群組（以背景色區分）。
+                <span class="badge danger">PK</span> 主鍵、<span class="badge">FK</span> 外鍵；連線標記 1 或 N。
+            </p>
+
+            <div class="er-wrap">
+                <!-- viewBox: 1800 x 1560，關聯線一律走群組間空白通道 -->
+                <svg viewBox="0 -70 1800 1630" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <marker id="one" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="16" markerHeight="16" orient="auto">
+                            <line x1="6" y1="1" x2="6" y2="11" stroke="#1e3a8a" stroke-width="2.5"/>
+                        </marker>
+                        <marker id="many" viewBox="0 0 14 14" refX="12" refY="7" markerWidth="16" markerHeight="16" orient="auto">
+                            <path d="M0,1 L12,7 L0,13 M12,7 L2,7" fill="none" stroke="#1e3a8a" stroke-width="2.2"/>
+                        </marker>
+                    </defs>
+
+                    <!--
+                        版面通道規劃：
+                        - 群組 ① 範圍：x=20~540（右邊界 540） 
+                        - 群組 ② 範圍：x=580~1100（左邊界 580、右邊界 1100）
+                        - 群組 ③ 範圍：x=1140~1780（左邊界 1140）
+                        - 上緣空白：y=30 以下（外緣 y=45）
+                        - 中間橫向通道：y=930~960（頂三群組結束、底群組開始）
+                        - 底緣空白：y=1470 以下
+                        - 垂直通道 A（① 右 / ② 左之間）：x=545~575，取 x=560
+                        - 垂直通道 B（② 右 / ③ 左之間）：x=1105~1135，取 x=1120
+                    -->
+
+                    <!-- ==== 頂部群組標題列（獨立於實體區塊上方） ==== -->
+                    <g font-family="Microsoft JhengHei, Noto Sans TC, sans-serif">
+                        <rect x="20"   y="-55" width="520" height="46" rx="10" fill="#1e3a8a"/>
+                        <text x="280"  y="-24" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">① 身分與角色</text>
+
+                        <rect x="580"  y="-55" width="520" height="46" rx="10" fill="#047857"/>
+                        <text x="840"  y="-24" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">② 組織 / 規則</text>
+
+                        <rect x="1140" y="-55" width="640" height="46" rx="10" fill="#c2410c"/>
+                        <text x="1460" y="-24" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">③ 交易與紀錄</text>
+                    </g>
+
+                    <!-- ==== 群組背景（無標題，僅作分區底色） ==== -->
+                    <rect x="20"   y="30"  width="520"  height="900" rx="16" fill="#eff6ff" opacity="0.55"/>
+                    <rect x="580"  y="30"  width="520"  height="900" rx="16" fill="#f0fdf4" opacity="0.55"/>
+                    <rect x="1140" y="30"  width="640"  height="900" rx="16" fill="#fef3c7" opacity="0.45"/>
+
+                    <!-- ④ 群組（下方橫幅）標題保留於區塊內（無實體遮擋） -->
+                    <rect x="20"   y="960" width="1760" height="510" rx="16" fill="#faf5ff" opacity="0.55"/>
+                    <text x="900"  y="990" text-anchor="middle" font-size="20" font-weight="700" fill="#6d28d9">④ 通知與稽核</text>
+
+                    <!-- ==== ① 身分 ==== -->
+                    <g>
+                        <rect x="50" y="90" width="290" height="270" rx="10" fill="#fff" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <rect x="50" y="90" width="290" height="38" rx="10" fill="#1e3a8a"/>
+                        <text x="195" y="115" text-anchor="middle" class="entity-title">UserAccount 使用者</text>
+                        <text x="66" y="152" class="pk">🔑 Id (PK)</text>
+                        <text x="66" y="178" class="attr">Username</text>
+                        <text x="66" y="204" class="attr">PasswordHash</text>
+                        <text x="66" y="230" class="attr">FullName</text>
+                        <text x="66" y="256" class="attr">Email</text>
+                        <text x="66" y="282" class="fk">CohortId (FK, nullable)</text>
+                        <text x="66" y="308" class="attr">IsActive</text>
+                        <text x="66" y="334" class="attr">CreatedAt</text>
+                    </g>
+
+                    <g>
+                        <rect x="50" y="410" width="200" height="180" rx="10" fill="#fff" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <rect x="50" y="410" width="200" height="38" rx="10" fill="#1e3a8a"/>
+                        <text x="150" y="435" text-anchor="middle" class="entity-title">Role 角色</text>
+                        <text x="66" y="472" class="pk">🔑 Id (PK)</text>
+                        <text x="66" y="498" class="attr">Name</text>
+                        <text x="66" y="524" class="attr">Description</text>
+                        <text x="66" y="558" class="note">6 種角色（種子資料）</text>
+                    </g>
+
+                    <g>
+                        <rect x="300" y="430" width="220" height="160" rx="10" fill="#fff7ed" stroke="#d97706" stroke-width="2.5" stroke-dasharray="6 4"/>
+                        <rect x="300" y="430" width="220" height="38" rx="10" fill="#d97706"/>
+                        <text x="410" y="455" text-anchor="middle" class="entity-title">UserRole 橋接</text>
+                        <text x="316" y="492" class="fk">UserId (PK, FK)</text>
+                        <text x="316" y="518" class="fk">RoleId (PK, FK)</text>
+                        <text x="316" y="554" class="note">多對多關聯表</text>
+                    </g>
+
+                    <!-- ==== ② 組織 ==== -->
+                    <g>
+                        <rect x="610" y="90" width="290" height="280" rx="10" fill="#fff" stroke="#047857" stroke-width="2.5"/>
+                        <rect x="610" y="90" width="290" height="38" rx="10" fill="#047857"/>
+                        <text x="755" y="115" text-anchor="middle" class="entity-title">Cohort 班期</text>
+                        <text x="626" y="152" class="pk">🔑 Id (PK)</text>
+                        <text x="626" y="178" class="attr">Name</text>
+                        <text x="626" y="204" class="attr">StartDate / EndDate</text>
+                        <text x="626" y="230" class="attr">TotalHours</text>
+                        <text x="626" y="256" class="attr">LeaveLimitPercent</text>
+                        <text x="626" y="282" class="fk">TutorUserId (FK?)</text>
+                        <text x="626" y="308" class="fk">SectionChiefUserId (FK?)</text>
+                        <text x="626" y="334" class="fk">BranchDirectorUserId (FK?)</text>
+                    </g>
+
+                    <g>
+                        <rect x="610" y="410" width="290" height="180" rx="10" fill="#fff" stroke="#047857" stroke-width="2.5"/>
+                        <rect x="610" y="410" width="290" height="38" rx="10" fill="#047857"/>
+                        <text x="755" y="435" text-anchor="middle" class="entity-title">LeaveType 假別</text>
+                        <text x="626" y="472" class="pk">🔑 Id (PK)</text>
+                        <text x="626" y="498" class="attr">Name（病假/事假…）</text>
+                        <text x="626" y="524" class="attr">Code</text>
+                        <text x="626" y="550" class="attr">IsActive</text>
+                    </g>
+
+                    <g>
+                        <rect x="610" y="640" width="290" height="260" rx="10" fill="#fff" stroke="#047857" stroke-width="2.5"/>
+                        <rect x="610" y="640" width="290" height="38" rx="10" fill="#047857"/>
+                        <text x="755" y="665" text-anchor="middle" class="entity-title">ApprovalRule 簽核規則</text>
+                        <text x="626" y="702" class="pk">🔑 Id (PK)</text>
+                        <text x="626" y="728" class="attr">MinHours</text>
+                        <text x="626" y="754" class="attr">MaxHours (nullable)</text>
+                        <text x="626" y="780" class="attr">RequiredRoles (JSON)</text>
+                        <text x="626" y="806" class="attr">Description</text>
+                        <text x="626" y="850" class="note">獨立設定表，由 Service</text>
+                        <text x="626" y="870" class="note">依 TotalHours 查詢</text>
+                    </g>
+
+                    <!-- ==== ③ 交易 ==== -->
+                    <g>
+                        <rect x="1170" y="90" width="310" height="310" rx="10" fill="#fff" stroke="#c2410c" stroke-width="3"/>
+                        <rect x="1170" y="90" width="310" height="38" rx="10" fill="#c2410c"/>
+                        <text x="1325" y="115" text-anchor="middle" class="entity-title">LeaveRequest 請假單</text>
+                        <text x="1186" y="152" class="pk">🔑 Id (PK)</text>
+                        <text x="1186" y="178" class="fk">StudentId (FK → UserAccount)</text>
+                        <text x="1186" y="204" class="fk">LeaveTypeId (FK → LeaveType)</text>
+                        <text x="1186" y="230" class="attr">StartAt / EndAt</text>
+                        <text x="1186" y="256" class="attr">TotalHours</text>
+                        <text x="1186" y="282" class="attr">Reason</text>
+                        <text x="1186" y="308" class="attr">Status (LeaveStatus)</text>
+                        <text x="1186" y="334" class="attr">CurrentLevel</text>
+                        <text x="1186" y="360" class="attr">CreatedAt / UpdatedAt</text>
+                    </g>
+
+                    <g>
+                        <rect x="1510" y="90" width="260" height="310" rx="10" fill="#fff" stroke="#be185d" stroke-width="3"/>
+                        <rect x="1510" y="90" width="260" height="38" rx="10" fill="#be185d"/>
+                        <text x="1640" y="115" text-anchor="middle" class="entity-title">LeaveRequestStep 簽核步驟</text>
+                        <text x="1526" y="152" class="pk">🔑 Id (PK)</text>
+                        <text x="1526" y="178" class="fk">LeaveRequestId (FK)</text>
+                        <text x="1526" y="204" class="attr">Level（1,2,3）</text>
+                        <text x="1526" y="230" class="attr">ApproverRole</text>
+                        <text x="1526" y="256" class="fk">ApproverUserId (FK?)</text>
+                        <text x="1526" y="282" class="attr">Decision</text>
+                        <text x="1526" y="308" class="attr">Comment</text>
+                        <text x="1526" y="334" class="attr">DecidedAt</text>
+                    </g>
+
+                    <g>
+                        <rect x="1170" y="450" width="310" height="230" rx="10" fill="#fff" stroke="#b91c1c" stroke-width="2.5"/>
+                        <rect x="1170" y="450" width="310" height="38" rx="10" fill="#b91c1c"/>
+                        <text x="1325" y="475" text-anchor="middle" class="entity-title">AbsenceRecord 曠課紀錄</text>
+                        <text x="1186" y="512" class="pk">🔑 Id (PK)</text>
+                        <text x="1186" y="538" class="fk">StudentId (FK → UserAccount)</text>
+                        <text x="1186" y="564" class="attr">OccurredAt</text>
+                        <text x="1186" y="590" class="attr">Hours（1~100 整數）</text>
+                        <text x="1186" y="616" class="attr">Note</text>
+                        <text x="1186" y="642" class="fk">CreatedByUserId (FK)</text>
+                        <text x="1186" y="668" class="attr">CreatedAt</text>
+                    </g>
+
+                    <!-- ==== ④ 通知 / 稽核 ==== -->
+                    <g>
+                        <rect x="640" y="1030" width="310" height="230" rx="10" fill="#fff" stroke="#6d28d9" stroke-width="2.5"/>
+                        <rect x="640" y="1030" width="310" height="38" rx="10" fill="#6d28d9"/>
+                        <text x="795" y="1055" text-anchor="middle" class="entity-title">Notification 通知</text>
+                        <text x="656" y="1092" class="pk">🔑 Id (PK)</text>
+                        <text x="656" y="1118" class="fk">RecipientUserId (FK)</text>
+                        <text x="656" y="1144" class="attr">Title / Message</text>
+                        <text x="656" y="1170" class="attr">LinkUrl</text>
+                        <text x="656" y="1196" class="attr">IsRead</text>
+                        <text x="656" y="1222" class="attr">CreatedAt / ReadAt</text>
+                    </g>
+
+                    <g>
+                        <rect x="1170" y="1030" width="310" height="230" rx="10" fill="#fff" stroke="#374151" stroke-width="2.5"/>
+                        <rect x="1170" y="1030" width="310" height="38" rx="10" fill="#374151"/>
+                        <text x="1325" y="1055" text-anchor="middle" class="entity-title">AuditLog 稽核日誌</text>
+                        <text x="1186" y="1092" class="pk">🔑 Id (PK)</text>
+                        <text x="1186" y="1118" class="fk">UserId (FK, nullable)</text>
+                        <text x="1186" y="1144" class="attr">Action（Login/Approve…）</text>
+                        <text x="1186" y="1170" class="attr">EntityType / EntityId</text>
+                        <text x="1186" y="1196" class="attr">Detail</text>
+                        <text x="1186" y="1222" class="attr">CreatedAt</text>
+                    </g>
+
+                    <!-- ==== 關聯線（全部走群組間空白通道） ==== -->
+                    <g fill="none" stroke="#1e3a8a" stroke-width="2">
+
+                        <!-- R1: UserAccount → UserRole：底出 → 折 → UserRole 頂 -->
+                        <polyline points="270,360 270,400 410,400 410,430" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="285" y="395" class="rel-label">1 : N</text>
+
+                        <!-- R2: Role → UserRole：Role 右 → UserRole 左 -->
+                        <polyline points="250,510 300,510" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="255" y="500" class="rel-label">1 : N</text>
+
+                        <!-- R3: Cohort → UserAccount：Cohort 左 → 通道A → UserAccount 右 -->
+                        <polyline points="610,200 570,200 570,180 340,180" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="360" y="170" class="rel-label">1 : N（班期含多位學員）</text>
+
+                        <!-- R4: Cohort ↔ UserAccount（3 個 FK） -->
+                        <polyline points="610,300 555,300 555,260 340,260" marker-start="url(#one)" marker-end="url(#one)"
+                                  stroke-dasharray="5 4"/>
+                        <text x="345" y="285" class="note">Tutor / Chief / Director（3 個 FK）</text>
+
+                        <!-- R5: UserAccount → LeaveRequest：走頂緣 y=75 -->
+                        <polyline points="270,90 270,75 1325,75 1325,90" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="700" y="70" class="rel-label">1 : N（學員送多張請假單）</text>
+
+                        <!-- R6: LeaveType → LeaveRequest：LeaveType 右 → 通道B → LeaveRequest 左 -->
+                        <polyline points="900,500 1120,500 1120,290 1170,290" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="960" y="490" class="rel-label">1 : N</text>
+
+                        <!-- R7: LeaveRequest → LeaveRequestStep -->
+                        <polyline points="1480,220 1510,220" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="1445" y="210" class="rel-label">1 : N</text>
+                        <text x="1445" y="240" class="note">1~3 關</text>
+
+                        <!-- R8: UserAccount → LeaveRequestStep（簽核人）：走頂緣 y=45 -->
+                        <polyline points="220,90 220,45 1640,45 1640,90" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="750" y="35" class="rel-label">1 : N（簽核人 approver）</text>
+
+                        <!--
+                            R9 / R10: UserAccount ↔ AbsenceRecord
+                            舊路徑會壓到 LeaveType(y=410-590) 與 ApprovalRule(y=640-900)。
+                            新路徑：往下走通道A（x=560）→ 底部橫向通道（y=945）→
+                                    上折通道B（x=1120）→ 進入 AbsenceRecord 左緣
+                        -->
+
+                        <!-- R9: StudentId（實線） -->
+                        <polyline points="340,340 560,340 560,945 1120,945 1120,540 1170,540"
+                                  marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="580" y="935" class="rel-label">1 : N（學員曠課紀錄）</text>
+
+                        <!-- R10: CreatedByUserId（虛線，走同通道但錯開 y、x） -->
+                        <polyline points="340,310 545,310 545,915 1105,915 1105,620 1170,620"
+                                  marker-start="url(#one)" marker-end="url(#many)"
+                                  stroke-dasharray="5 4"/>
+                        <text x="900" y="908" class="note">CreatedByUserId：登錄者（行政）</text>
+
+                        <!-- R11: UserAccount → Notification：走版面左緣 x=60 -->
+                        <polyline points="60,360 60,1140 640,1140" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="80" y="1130" class="rel-label">1 : N（收件者）</text>
+
+                        <!-- R12: UserAccount → AuditLog：走版面底緣 y=1500 -->
+                        <polyline points="100,360 100,1500 1325,1500 1325,1260" marker-start="url(#one)" marker-end="url(#many)"/>
+                        <text x="600" y="1492" class="rel-label">1 : N（操作者，nullable）</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="legend-er">
+                <span><strong>🔑</strong> = 主鍵 PK</span>
+                <span><span class="badge">FK</span> 藍色斜體 = 外鍵</span>
+                <span><strong>│</strong> = 「1」端</span>
+                <span><strong>&gt;─</strong> = 「N」端（鴉爪）</span>
+                <span>橘色虛線框 = 多對多橋接表</span>
+                <span>灰色虛線 = 選用 / nullable 關聯</span>
+            </div>
+
+            <h2 style="margin-top:28px;">主要關聯總覽</h2>
+            <table>
+                <thead><tr><th style="width:60px;">編號</th><th>關聯</th><th style="width:100px;">基數</th><th>說明</th></tr></thead>
+                <tbody>
+                    <tr><td>R1+R2</td><td>UserAccount ↔ Role</td><td>N : M</td><td>透過 UserRole 橋接（一位使用者可有多個角色）</td></tr>
+                    <tr><td>R3</td><td>Cohort → UserAccount</td><td>1 : N</td><td>一個班期可含多位學員</td></tr>
+                    <tr><td>R4</td><td>Cohort ↔ UserAccount</td><td>1 : 1 × 3</td><td>班期同時參照 3 位簽核人（Tutor / Chief / Director）</td></tr>
+                    <tr><td>R5</td><td>UserAccount → LeaveRequest</td><td>1 : N</td><td>一位學員可送多張請假單</td></tr>
+                    <tr><td>R6</td><td>LeaveType → LeaveRequest</td><td>1 : N</td><td>一種假別對應多筆申請</td></tr>
+                    <tr><td>R7</td><td>LeaveRequest → LeaveRequestStep</td><td>1 : N</td><td>一張單依規則產生 1~3 個簽核步驟</td></tr>
+                    <tr><td>R8</td><td>UserAccount → LeaveRequestStep</td><td>1 : N</td><td>簽核人 approver（未簽時為 NULL）</td></tr>
+                    <tr><td>R9</td><td>UserAccount → AbsenceRecord</td><td>1 : N</td><td>學員被登錄多筆曠課</td></tr>
+                    <tr><td>R10</td><td>UserAccount → AbsenceRecord</td><td>1 : N</td><td>CreatedByUserId 記錄行政登錄者</td></tr>
+                    <tr><td>R11</td><td>UserAccount → Notification</td><td>1 : N</td><td>一位使用者可收多則通知</td></tr>
+                    <tr><td>R12</td><td>UserAccount → AuditLog</td><td>1 : N</td><td>操作稽核（可 NULL 表匿名 / 系統）</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="use-case.html">◀ 使用案例圖</a>
+        <span class="page-indicator">ER Diagram</span>
+        <a href="index.html">🏠 回目錄</a>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>

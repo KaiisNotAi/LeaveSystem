@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>03 功能描述 — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 專題報告</a></div>
+        <div class="chapter">第 03 章 — 功能描述</div>
+    </header>
+
+    <main class="deck">
+        <!-- Slide 1: 章封面 + 八大功能總覽 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 03</div>
+            <h1>功能描述</h1>
+            <p class="lead">本章依 Phase 0~8 開發順序，逐一介紹系統的八大功能模組。</p>
+            <div class="card-grid" style="margin-top:20px;">
+                <div class="card"><div class="card-title">① 帳號登入</div><div class="card-body">Cookie + BCrypt</div></div>
+                <div class="card"><div class="card-title">② 班期/假別/規則</div><div class="card-body">行政後台 CRUD</div></div>
+                <div class="card"><div class="card-title">③ 學員請假</div><div class="card-body">時段下拉 + 上限檢查</div></div>
+                <div class="card"><div class="card-title">④ 三級簽核</div><div class="card-body">狀態機 + 逐級派送</div></div>
+                <div class="card"><div class="card-title">⑤ 紀錄查詢</div><div class="card-body">個人 / 彙總報表</div></div>
+                <div class="card"><div class="card-title">⑥ 曠課紀錄</div><div class="card-body">行政登錄 + 學員自查</div></div>
+                <div class="card"><div class="card-title">⑦ 通知</div><div class="card-body">站內 🔔 + Email</div></div>
+                <div class="card"><div class="card-title">⑧ 報表匯出</div><div class="card-body">CSV + Excel 多 sheet</div></div>
+            </div>
+        </section>
+
+        <!-- Slide 2: 帳號登入 -->
+        <section class="slide">
+            <h1>3.1 帳號管理與登入</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>安全機制</h3>
+                    <ul>
+                        <li>密碼以 <strong>BCrypt</strong> 加鹽雜湊（不可逆）</li>
+                        <li>Cookie 認證：<strong>HttpOnly</strong>、8 小時、SlidingExpiration</li>
+                        <li>角色授權：[Authorize(Roles=...)] 標記</li>
+                        <li>非授權存取 → 導向 <code>/Account/AccessDenied</code></li>
+                    </ul>
+                    <h3>行政後台建帳號</h3>
+                    <ul>
+                        <li>建立、編輯、重設密碼、停用/啟用</li>
+                        <li>可指派角色與所屬班期</li>
+                        <li>預設管理員：<code>Admin / Admin@123</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="login">
+                        <div class="ph-box">📷 登入頁面</div>
+                        <figcaption>/Account/Login</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="user-list">
+                        <div class="ph-box">📷 使用者管理</div>
+                        <figcaption>/Admin/Users</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: 班期 / 假別 / 簽核規則 -->
+        <section class="slide">
+            <h1>3.2 班期 · 假別 · 簽核規則</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>班期 Cohort</h3>
+                    <ul>
+                        <li>設定總上課時數（例：900 小時）</li>
+                        <li>設定請假上限百分比（預設 10%）</li>
+                        <li>指派導師 / 科長 / 分署長</li>
+                    </ul>
+                    <h3>假別 LeaveType</h3>
+                    <ul>
+                        <li>病假、事假、喪假、公假…可自訂</li>
+                        <li>行政端增刪改查</li>
+                    </ul>
+                    <h3>簽核規則 ApprovalRule</h3>
+                    <ul>
+                        <li>依請假時數自動判斷簽核層級</li>
+                        <li>規則可由 Admin 調整門檻</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="cohort-edit">
+                        <div class="ph-box">📷 班期編輯</div>
+                        <figcaption>/Admin/Cohorts/Edit</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="approval-rule">
+                        <div class="ph-box">📷 簽核門檻設定</div>
+                        <figcaption>/Admin/ApprovalRules</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: 學員請假申請 -->
+        <section class="slide">
+            <h1>3.3 學員請假申請</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>送單流程</h3>
+                    <ol>
+                        <li>選擇假別（下拉）</li>
+                        <li>選擇 <strong>日期 + 上課時段</strong>（最小 1 小時）</li>
+                        <li>填寫請假原因（必填）</li>
+                        <li>系統自動計算總時數</li>
+                        <li>系統檢查是否超過班期上限</li>
+                        <li>送出後即進入 <span class="badge pending">Pending</span> 狀態</li>
+                    </ol>
+                    <p class="hint">
+                        💡 系統自動扣除午休 12:00-13:00 與下班時段 17:00 後。
+                    </p>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="leave-create">
+                        <div class="ph-box">📷 請假申請表單</div>
+                        <figcaption>/LeaveRequests/Create（含時段下拉）</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="leave-my">
+                        <div class="ph-box">📷 我的請假單</div>
+                        <figcaption>/LeaveRequests</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: 時數計算規則 -->
+        <section class="slide">
+            <h1>3.3 時數計算規則（LeaveCalculator）</h1>
+            <div class="content">
+                <p>每日上課時段：上午 <strong>08:00–12:00</strong>（4 小時）+ 下午 <strong>13:00–17:00</strong>（4 小時）＝ <strong>8 小時 / 日</strong>。</p>
+                <table>
+                    <thead>
+                        <tr><th>請假區間</th><th>計算過程</th><th>總時數</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>6/9 08:00 ~ 09:00</td><td>純上午 1 小時</td><td>1 小時</td></tr>
+                        <tr><td>6/9 11:00 ~ 14:00</td><td>1（11–12）＋ 1（13–14）＝ 2（扣午休）</td><td>2 小時</td></tr>
+                        <tr><td>6/9 08:00 ~ 17:00</td><td>4 ＋ 4 ＝ 8（整天）</td><td>8 小時</td></tr>
+                        <tr><td>6/9 08:00 ~ 6/10 17:00</td><td>8 ＋ 8 ＝ 16（跨日）</td><td>16 小時</td></tr>
+                        <tr><td>6/9 13:00 ~ 6/10 12:00</td><td>4 ＋ 4 ＝ 8（跨日跨午休）</td><td>8 小時</td></tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:12px;">
+                    <span class="badge">最小單位 1 小時</span>
+                    <span class="badge accent">學員下拉只能選整點</span>
+                    <span class="badge success">跨午休 / 跨日皆正確處理</span>
+                </p>
+            </div>
+        </section>
+
+        <!-- Slide 6: 簽核狀態機 -->
+        <section class="slide">
+            <h1>3.4 簽核狀態機</h1>
+            <div class="content">
+                <div class="flow">
+                    <div class="node">Draft<br>草稿</div>
+                    <div class="arrow-label"><span class="arrow">→</span><span>送出</span></div>
+                    <div class="node pending">Pending<br>簽核中</div>
+                </div>
+                <div class="flow" style="margin-top:20px;">
+                    <div class="node pending">Pending</div>
+                    <div class="arrow-label"><span class="arrow">→</span><span>全部通過</span></div>
+                    <div class="node approved">Approved</div>
+                    <span style="width:40px;"></span>
+                    <div class="node pending">Pending</div>
+                    <div class="arrow-label"><span class="arrow">→</span><span>任一駁回</span></div>
+                    <div class="node rejected">Rejected</div>
+                    <span style="width:40px;"></span>
+                    <div class="node pending">Pending</div>
+                    <div class="arrow-label"><span class="arrow">→</span><span>學員撤銷</span></div>
+                    <div class="node" style="background:#9ca3af; color:#fff; border-color:#9ca3af;">Cancelled</div>
+                </div>
+                <h3 style="margin-top:24px;">簽核層級對照表</h3>
+                <table>
+                    <thead><tr><th>請假時數</th><th>簽核流程</th></tr></thead>
+                    <tbody>
+                        <tr><td>≤ 8 小時</td><td>導師</td></tr>
+                        <tr><td>8.01 ~ 24 小時</td><td>導師 → 科長</td></tr>
+                        <tr><td>24.01 小時以上</td><td>導師 → 科長 → 分署長</td></tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:8px;">🔒 <strong>逐級簽核</strong>：上一級未核准前，下一級看不到。駁回原因必填，整張單立即終止。</p>
+            </div>
+        </section>
+
+        <!-- Slide 7: 簽核操作頁 -->
+        <section class="slide">
+            <h1>3.4 簽核操作頁</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>簽核人視角</h3>
+                    <ul>
+                        <li><code>/Approvals</code>：待辦清單（依角色 + CurrentLevel 過濾）</li>
+                        <li><code>/Approvals/Details/{id}</code>：單張詳情</li>
+                        <li>核准 / 駁回按鈕；駁回原因必填</li>
+                        <li>已簽過的 Step 顯示歷程與意見</li>
+                    </ul>
+                    <h3>身分驗證</h3>
+                    <ul>
+                        <li>必須是 CurrentLevel 且為該班期該角色指定簽核人</li>
+                        <li>同一 Step 不能重複簽</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="approvals-index">
+                        <div class="ph-box">📷 待辦清單</div>
+                        <figcaption>/Approvals</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="approval-details">
+                        <div class="ph-box">📷 簽核詳情</div>
+                        <figcaption>/Approvals/Details/1</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: 紀錄查詢與時數統計 -->
+        <section class="slide">
+            <h1>3.5 紀錄查詢與時數統計</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>學員視角</h3>
+                    <ul>
+                        <li><code>/Reports</code>：依 <strong>狀態 / 假別 / 日期</strong> 三條件篩選我的請假</li>
+                        <li><code>/Reports/Summary</code>：各假別累計時數 + 班期上限進度條</li>
+                        <li>統計口徑：<span class="badge success">僅計 Approved</span></li>
+                    </ul>
+                    <h3>行政視角</h3>
+                    <ul>
+                        <li><code>/Reports/Admin</code>：班期 × 學員 × 假別 × 年月 彙總</li>
+                        <li>四種篩選條件可組合</li>
+                        <li>學員誤入 → AccessDenied</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="reports-summary">
+                        <div class="ph-box">📷 學員累計時數</div>
+                        <figcaption>/Reports/Summary（含上限進度條）</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="reports-admin">
+                        <div class="ph-box">📷 行政彙總報表</div>
+                        <figcaption>/Reports/Admin</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: 曠課紀錄 -->
+        <section class="slide">
+            <h1>3.6 曠課紀錄</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>設計原則</h3>
+                    <ul>
+                        <li>曠課是行政事後登錄的既定事實</li>
+                        <li><strong>不走簽核流程</strong>，不影響請假單狀態</li>
+                        <li>時數規則：<strong>1~100 小時整數</strong>（不接受 0.5）</li>
+                    </ul>
+                    <h3>行政端</h3>
+                    <ul>
+                        <li>依班期 / 學員 / 日期查詢，顯示總時數</li>
+                        <li>只能選擇 Student 角色的使用者</li>
+                    </ul>
+                    <h3>學員端</h3>
+                    <ul>
+                        <li>僅查閱自己；累計時數不受日期篩選影響</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="absence-admin">
+                        <div class="ph-box">📷 行政曠課列表</div>
+                        <figcaption>/Admin/AbsenceRecords</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="absence-my">
+                        <div class="ph-box">📷 學員自查</div>
+                        <figcaption>/AbsenceRecords</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10: 通知 -->
+        <section class="slide">
+            <h1>3.7 站內通知 + Email</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>觸發時機（4 事件）</h3>
+                    <ol>
+                        <li>學員送單 → 通知第一關簽核人</li>
+                        <li>逐級通過 → 通知下一關簽核人</li>
+                        <li>全部通過 → 通知申請人「已核准」</li>
+                        <li>任一駁回 → 通知申請人「被駁回」+ 原因</li>
+                    </ol>
+                    <h3>雙通道</h3>
+                    <ul>
+                        <li><strong>站內通知</strong>：導覽列 🔔 未讀徽章、通知中心</li>
+                        <li><strong>Email</strong>：MailKit；開發用 PickupDirectory，正式可切 SMTP</li>
+                        <li>Email 失敗容錯：不影響簽核主流程</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="notification-badge">
+                        <div class="ph-box">📷 🔔 未讀徽章</div>
+                        <figcaption>_Layout 導覽列</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="notification-list">
+                        <div class="ph-box">📷 通知中心</div>
+                        <figcaption>/Notifications</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 11: CSV / Excel 匯出 -->
+        <section class="slide">
+            <h1>3.8 報表匯出（CSV / Excel）</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>授權範圍</h3>
+                    <p><span class="badge">Staff</span><span class="badge">Admin</span> 專用；學員自查頁不含匯出按鈕。</p>
+                    <h3>兩種格式</h3>
+                    <ul>
+                        <li><strong>CSV</strong>：UTF-8 BOM、RFC 4180 跳脫</li>
+                        <li><strong>Excel</strong>：ClosedXML 0.105.1，支援單 sheet 與多 sheet</li>
+                    </ul>
+                    <h3>匯出頁 <code>/Admin/Export</code></h3>
+                    <ul>
+                        <li>班期必選 + 學生（單人或全部）+ 日期起迄</li>
+                        <li>一鍵匯出多 sheet Excel：<strong>請假明細 / 曠課明細 / 彙總</strong></li>
+                        <li>或分別下載 CSV</li>
+                    </ul>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="export-page">
+                        <div class="ph-box">📷 匯出設定頁</div>
+                        <figcaption>/Admin/Export</figcaption>
+                    </figure>
+                    <figure class="screenshot-placeholder small" data-shot="export-excel">
+                        <div class="ph-box">📷 多 sheet Excel</div>
+                        <figcaption>下載後的實際檔案</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 12: 章末 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 03 · 小結</div>
+            <h1>八大功能完成度</h1>
+            <div style="margin-top:20px;">
+                <p style="font-size:22px;">
+                    <span class="badge success">Phase 0~8 完成</span>
+                    <span class="badge success">TDD 87/87 全綠</span>
+                    <span class="badge">v0.9-phase8</span>
+                </p>
+                <ul style="font-size:20px;">
+                    <li>Phase 0 ~ 6：帳號、組織、請假、簽核、報表、曠課</li>
+                    <li>Phase 7：站內通知 + Email</li>
+                    <li>Phase 8：CSV / Excel 匯出</li>
+                    <li>Phase 9：LINE 通知（因 API 免費配額限制暫緩，設計已凍結）</li>
+                </ul>
+                <p style="margin-top:16px;">
+                    <a href="04-usage.html" style="font-size:22px; color:var(--accent-dark); font-weight:700;">
+                        → 進入第 04 章：使用說明
+                    </a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="02-introduction.html">◀ 上一章</a>
+        <span class="page-indicator">1 / 12</span>
+        <div>
+            <button data-action="prev">◀</button>
+            <button data-action="next">▶</button>
+            <button data-action="fullscreen">⛶</button>
+            <a href="04-usage.html">下一章 ▶</a>
+        </div>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>

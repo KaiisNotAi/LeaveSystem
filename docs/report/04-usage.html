@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>04 使用說明 — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 專題報告</a></div>
+        <div class="chapter">第 04 章 — 使用說明</div>
+    </header>
+
+    <main class="deck">
+        <!-- Slide 1: 章封面 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 04</div>
+            <h1>使用說明</h1>
+            <p class="lead">
+                怎麼把系統跑起來？三個角色分別怎麼操作？<br>
+                本章提供環境建置步驟、預設帳號，以及學員 / 簽核人 / 行政的完整操作流程。
+            </p>
+        </section>
+
+        <!-- Slide 2: 環境需求 -->
+        <section class="slide">
+            <h1>4.1 環境需求</h1>
+            <div class="content">
+                <table>
+                    <thead><tr><th>項目</th><th>版本 / 說明</th></tr></thead>
+                    <tbody>
+                        <tr><td>作業系統</td><td>Windows 10 / 11（macOS、Linux 亦可）</td></tr>
+                        <tr><td>.NET SDK</td><td><strong>.NET 10 SDK</strong>（含 EF Core CLI）</td></tr>
+                        <tr><td>資料庫</td><td>SQL Server 2019+ 或 SQL Server LocalDB / Express</td></tr>
+                        <tr><td>開發工具</td><td>Visual Studio 2026 Community 或 VS Code</td></tr>
+                        <tr><td>瀏覽器</td><td>Edge / Chrome / Firefox 最新版</td></tr>
+                        <tr><td>選用</td><td>Git（版本控管）、MailKit PickupDirectory 資料夾（開發時檢視 Email）</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Slide 3: 安裝步驟 -->
+        <section class="slide">
+            <h1>4.2 安裝步驟（4 步驟）</h1>
+            <div class="content">
+                <ol style="font-size:21px; line-height:2;">
+                    <li>
+                        <strong>取得原始碼</strong><br>
+                        <code>git clone https://github.com/KaiisNotAi/LeaveSystem.git</code>
+                    </li>
+                    <li>
+                        <strong>還原套件</strong><br>
+                        <code>cd LeaveSystem</code>　→　<code>dotnet restore</code>
+                    </li>
+                    <li>
+                        <strong>建立資料庫</strong>（會自動套用 Migration 並塞入預設資料）<br>
+                        <code>dotnet ef database update</code>
+                    </li>
+                    <li>
+                        <strong>啟動系統</strong><br>
+                        <code>dotnet run</code>　→　瀏覽 <code>https://localhost:5001</code>
+                    </li>
+                </ol>
+                <p class="hint" style="margin-top:16px;">
+                    💡 若使用 Visual Studio：直接按 <kbd>F5</kbd> 即可完成建置與啟動。
+                </p>
+            </div>
+        </section>
+
+        <!-- Slide 4: 預設管理員 -->
+        <section class="slide">
+            <h1>4.3 首次登入</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>預設管理員</h3>
+                    <table>
+                        <tbody>
+                            <tr><th style="width:100px;">帳號</th><td><code>Admin</code></td></tr>
+                            <tr><th>密碼</th><td><code>Admin@123</code></td></tr>
+                            <tr><th>角色</th><td>系統管理員（Admin）</td></tr>
+                        </tbody>
+                    </table>
+                    <p style="margin-top:12px;">⚠️ <strong>正式部署前務必變更密碼</strong>。</p>
+                    <h3>建議首次操作</h3>
+                    <ol>
+                        <li>登入後至 <code>/Admin/Users</code> 建立行政、導師、學員帳號</li>
+                        <li>至 <code>/Admin/Cohorts</code> 建立班期並指派簽核人</li>
+                        <li>至 <code>/Admin/LeaveTypes</code> 確認假別</li>
+                        <li>至 <code>/Admin/ApprovalRules</code> 檢視三條預設簽核門檻</li>
+                    </ol>
+                </div>
+                <div>
+                    <figure class="screenshot-placeholder small" data-shot="first-login">
+                        <div class="ph-box">📷 首次登入畫面</div>
+                        <figcaption>/Account/Login</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: 學員流程 -->
+        <section class="slide">
+            <h1>4.4 學員操作流程</h1>
+            <div class="content">
+                <div class="flow">
+                    <div class="node start">登入</div>
+                    <span class="arrow">→</span>
+                    <div class="node">請假申請<br>/LeaveRequests/Create</div>
+                    <span class="arrow">→</span>
+                    <div class="node pending">等待簽核</div>
+                    <span class="arrow">→</span>
+                    <div class="node">🔔 收通知</div>
+                    <span class="arrow">→</span>
+                    <div class="node approved">結果通知</div>
+                </div>
+                <h3 style="margin-top:20px;">操作要點</h3>
+                <ul>
+                    <li>選擇假別 → 選日期與時段（整點）→ 填原因 → 送出</li>
+                    <li>系統即時顯示計算後時數，並告知是否超過班期上限</li>
+                    <li>可於 <code>/LeaveRequests</code> 追蹤每張單目前停在第幾關、誰簽的、意見</li>
+                    <li>於 <code>/Reports/Summary</code> 查看各假別累計時數與上限進度</li>
+                </ul>
+                <figure class="screenshot-placeholder small" data-shot="student-flow">
+                    <div class="ph-box">📷 學員完整流程截圖拼貼</div>
+                    <figcaption>建議：送單 → 查進度 → 收通知 三張拼圖</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <!-- Slide 6: 簽核人流程 -->
+        <section class="slide">
+            <h1>4.5 簽核人操作流程</h1>
+            <div class="content">
+                <div class="flow">
+                    <div class="node start">收 🔔 通知</div>
+                    <span class="arrow">→</span>
+                    <div class="node">/Approvals<br>待辦清單</div>
+                    <span class="arrow">→</span>
+                    <div class="node">Details 檢視</div>
+                    <span class="arrow">→</span>
+                    <div class="node approved">核准</div>
+                    <span style="width:20px;"></span>
+                    <span style="color:var(--text-muted);">或</span>
+                    <span style="width:20px;"></span>
+                    <div class="node rejected">駁回（填原因）</div>
+                </div>
+                <h3 style="margin-top:20px;">關鍵規則</h3>
+                <ul>
+                    <li>只看得到 <strong>目前輪到自己</strong> 的待辦（Level 必須等於 CurrentLevel）</li>
+                    <li>導師（Level 1）→ 科長（Level 2）→ 分署長（Level 3）逐級推進</li>
+                    <li>核准後系統自動通知下一關；最後一關通過 → 通知申請人</li>
+                    <li>駁回時 <strong>原因必填</strong>；整張單立即終止，後續關卡不再處理</li>
+                    <li>同一 Step 不能重複簽（防呆）</li>
+                </ul>
+                <figure class="screenshot-placeholder small" data-shot="approver-flow">
+                    <div class="ph-box">📷 簽核人流程截圖拼貼</div>
+                    <figcaption>建議：待辦 → 詳情 → 核准/駁回 三張拼圖</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <!-- Slide 7: 行政流程 + FAQ + 致謝 -->
+        <section class="slide">
+            <h1>4.6 行政操作流程 · 常見問題</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>行政日常</h3>
+                    <ol>
+                        <li>建立/停用帳號、指派班期</li>
+                        <li>登錄曠課紀錄 <code>/Admin/AbsenceRecords</code></li>
+                        <li>查看彙總報表 <code>/Reports/Admin</code></li>
+                        <li>匯出 Excel / CSV <code>/Admin/Export</code></li>
+                    </ol>
+                    <figure class="screenshot-placeholder small" data-shot="staff-flow">
+                        <div class="ph-box">📷 行政流程</div>
+                        <figcaption>建立 → 查詢 → 匯出</figcaption>
+                    </figure>
+                </div>
+                <div>
+                    <h3>常見問題 FAQ</h3>
+                    <p><strong>Q1：新增學員時「所屬班期」下拉是空的？</strong><br>
+                        A：先至 <code>/Admin/Cohorts</code> 建立班期後再回來新增學員。</p>
+                    <p><strong>Q2：忘記密碼怎麼辦？</strong><br>
+                        A：請行政 / 管理員至 <code>/Admin/Users</code> 使用「重設密碼」功能。</p>
+                    <p><strong>Q3：學員可以自己填曠課嗎？</strong><br>
+                        A：不行。曠課由行政事後登錄，學員僅能查閱。</p>
+                    <p><strong>Q4：Email 收不到通知？</strong><br>
+                        A：開發環境走 PickupDirectory，請至專案的 <code>./mail-pickup/</code> 資料夾檢視 .eml 檔。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: 全書總結 + 致謝 -->
+        <section class="slide cover">
+            <div>
+                <h1>Thank You</h1>
+                <div class="subtitle">感謝聆聽</div>
+                <div class="meta" style="margin-top:32px;">
+                    學生請假系統 · 專題作業報告<br>
+                    Repository: github.com/KaiisNotAi/LeaveSystem<br>
+                    2026 · v0.9-phase8
+                </div>
+                <div class="tech-row" style="margin-top:32px;">
+                    <span class="tech-pill">🎓 Made with .NET 10</span>
+                    <span class="tech-pill">📚 TDD 87/87 全綠</span>
+                    <span class="tech-pill">🌐 全繁體中文</span>
+                </div>
+                <p style="margin-top:32px;">
+                    <a href="index.html" style="color:#fff; font-size:20px; text-decoration:underline;">
+                        🏠 回目錄
+                    </a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="03-features.html">◀ 上一章</a>
+        <span class="page-indicator">1 / 8</span>
+        <div>
+            <button data-action="prev">◀</button>
+            <button data-action="next">▶</button>
+            <button data-action="fullscreen">⛶</button>
+            <a href="index.html">🏠 回目錄</a>
+        </div>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>

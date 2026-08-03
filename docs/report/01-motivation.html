@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>01 製作動機 — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 專題報告</a></div>
+        <div class="chapter">第 01 章 — 製作動機</div>
+    </header>
+
+    <main class="deck">
+        <!-- Slide 1: 章節封面 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 01</div>
+            <h1>製作動機</h1>
+            <p class="lead">
+                為什麼要做這個系統？從一份紙本假單、一則 LINE 訊息說起，
+                看看目前流程對學員、導師、行政三方所造成的具體困擾。
+            </p>
+        </section>
+
+        <!-- Slide 2: 現況流程 -->
+        <section class="slide">
+            <h1>1.1 現況：LINE + 紙本假單</h1>
+            <div class="content">
+                <p>某培訓機構目前的請假流程：</p>
+                <div class="flow">
+                    <div class="node start">學員</div>
+                    <span class="arrow">→</span>
+                    <div class="node">LINE 通知導師</div>
+                    <span class="arrow">→</span>
+                    <div class="node">寫紙本假單</div>
+                    <span class="arrow">→</span>
+                    <div class="node">實體傳遞簽核</div>
+                    <span class="arrow">→</span>
+                    <div class="node">行政人工輸入表格</div>
+                    <span class="arrow">→</span>
+                    <div class="node approved">完成</div>
+                </div>
+                <p style="margin-top:20px;">
+                    整條流程有 <strong>3 種載體</strong>（LINE、紙本、Excel）、<strong>4 個關卡</strong>、
+                    每個環節都可能延遲或遺失，最終還要花時間對表確認累計時數。
+                </p>
+                <figure class="screenshot-placeholder small" data-shot="paper-form">
+                    <div class="ph-box">📷 截圖佔位：紙本假單 / LINE 群組訊息示意</div>
+                    <figcaption>建議放入：舊紙本假單照片或 LINE 對話截圖（去識別化）</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <!-- Slide 3: 三方痛點 -->
+        <section class="slide">
+            <h1>1.2 三方痛點</h1>
+            <div class="content">
+                <table>
+                    <thead>
+                        <tr><th style="width:120px;">角色</th><th>面臨的困擾</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>學員</strong> 🎒</td>
+                            <td>
+                                要 LINE 通知導師、寫紙本假單、等簽核、等行政登記、再對表確認時數，
+                                流程冗長，中間狀態完全不透明。
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>導師</strong> 👨‍🏫</td>
+                            <td>
+                                LINE 訊息與紙本假單散落各處，同時帶多個班級時容易漏看，
+                                無法快速看累計請假狀況，也難以留下正式簽核意見。
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>行政（小華）</strong> 📋</td>
+                            <td>
+                                假單可能遺失、字跡潦草、人工輸入表格費時，
+                                每月統計各學員請假時數與班期上限比對非常吃力。
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Slide 4: 導入後預期效益 -->
+        <section class="slide">
+            <h1>1.3 導入後：三方 Before / After</h1>
+            <div class="content">
+                <div class="compare">
+                    <div class="side before">
+                        <h4>❌ 導入前</h4>
+                        <ul>
+                            <li>學員來回 LINE / 紙本 / 電話追蹤進度</li>
+                            <li>導師漏看訊息、無累計視圖</li>
+                            <li>行政手動抄寫、每月夜加班對表</li>
+                        </ul>
+                    </div>
+                    <div class="arrow-big">➜</div>
+                    <div class="side after">
+                        <h4>✅ 導入後</h4>
+                        <ul>
+                            <li>學員一站式送單、即時看簽核進度、時數自動累計</li>
+                            <li>簽核人集中待辦、意見留存、班期一目了然</li>
+                            <li>行政不再抄寫、隨時匯出 CSV / Excel 報表</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="margin-top:20px;">
+                    <span class="badge accent">目標</span>
+                    完全取代紙本與 LINE 通報，讓三方在同一平台合作。
+                </p>
+            </div>
+        </section>
+
+        <!-- Slide 5: 章末 -->
+        <section class="slide chapter-cover">
+            <div class="chapter-no">CHAPTER 01 · 小結</div>
+            <h1>需求已明確</h1>
+            <p class="lead">
+                痛點清楚、目標明確、三方利害關係人皆有收益。<br>
+                下一步：規劃「怎麼做」— 系統目標、架構與角色權限。
+            </p>
+            <p style="margin-top:24px;">
+                <a href="02-introduction.html" style="font-size:22px; color:var(--accent-dark); font-weight:700;">
+                    → 進入第 02 章：專題簡介
+                </a>
+            </p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="index.html">◀ 回目錄</a>
+        <span class="page-indicator">1 / 5</span>
+        <div>
+            <button data-action="prev">◀</button>
+            <button data-action="next">▶</button>
+            <button data-action="fullscreen">⛶</button>
+            <a href="02-introduction.html">下一章 ▶</a>
+        </div>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>

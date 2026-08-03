@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>使用案例圖 (Use Case Diagram) — 學生請假系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="assets/slides.css">
+    <style>
+        main.deck { max-width: 1720px; }
+        section.slide.uc-slide { max-width: 1680px; aspect-ratio: auto; min-height: auto; padding: 32px 40px 60px; }
+        .usecase-wrap { background: #fff; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); }
+        .usecase-wrap svg { display: block; width: 100%; height: auto; }
+        .legend { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 16px; font-size: 15px; }
+        .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+        .legend .swatch { width: 24px; height: 14px; border-radius: 3px; display: inline-block; }
+        text { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="title"><a href="index.html">🎓 學生請假系統 · UML 圖表</a></div>
+        <div class="chapter">使用案例圖 (Use Case Diagram)</div>
+    </header>
+
+    <main class="deck">
+        <section class="slide uc-slide">
+            <h1>使用案例圖 Use Case Diagram</h1>
+            <p style="color:var(--text-muted);">系統邊界內為所有使用案例，邊界外為六大 Actor；連線代表該 Actor 可執行的功能。</p>
+
+            <div class="usecase-wrap">
+                <svg viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#1e3a8a"/>
+                        </marker>
+                        <marker id="arrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+                        </marker>
+                    </defs>
+
+                    <!-- 系統邊界 -->
+                    <rect x="330" y="40" width="740" height="820" fill="#f8fafc" stroke="#1e3a8a" stroke-width="2.5" rx="16"/>
+                    <text x="700" y="70" text-anchor="middle" font-size="20" font-weight="700" fill="#1e3a8a">學生請假系統 Student Leave System</text>
+
+                    <!-- Use Cases (橢圓)  按功能分區 -->
+                    <!-- 帳號 -->
+                    <g fill="#dbeafe" stroke="#1e3a8a" stroke-width="1.5">
+                        <ellipse cx="500" cy="120" rx="90" ry="26"/>
+                        <ellipse cx="700" cy="120" rx="90" ry="26"/>
+                        <ellipse cx="900" cy="120" rx="90" ry="26"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="125">登入 / 登出</text>
+                        <text x="700" y="125">管理使用者帳號</text>
+                        <text x="900" y="125">維護簽核規則</text>
+                    </g>
+
+                    <!-- 組織資料 -->
+                    <g fill="#e0e7ff" stroke="#1e3a8a" stroke-width="1.5">
+                        <ellipse cx="500" cy="200" rx="90" ry="26"/>
+                        <ellipse cx="700" cy="200" rx="90" ry="26"/>
+                        <ellipse cx="900" cy="200" rx="90" ry="26"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="205">維護班期</text>
+                        <text x="700" y="205">維護假別</text>
+                        <text x="900" y="205">指派簽核人</text>
+                    </g>
+
+                    <!-- 請假 -->
+                    <g fill="#fef3c7" stroke="#d97706" stroke-width="1.5">
+                        <ellipse cx="500" cy="290" rx="100" ry="28"/>
+                        <ellipse cx="700" cy="290" rx="100" ry="28"/>
+                        <ellipse cx="900" cy="290" rx="100" ry="28"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="295">提交請假申請</text>
+                        <text x="700" y="295">查詢我的請假</text>
+                        <text x="900" y="295">追蹤簽核進度</text>
+                    </g>
+
+                    <!-- 簽核 -->
+                    <g fill="#fce7f3" stroke="#be185d" stroke-width="1.5">
+                        <ellipse cx="500" cy="380" rx="95" ry="28"/>
+                        <ellipse cx="700" cy="380" rx="95" ry="28"/>
+                        <ellipse cx="900" cy="380" rx="95" ry="28"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="385">檢視待辦清單</text>
+                        <text x="700" y="385">核准請假單</text>
+                        <text x="900" y="385">駁回請假單（填原因）</text>
+                    </g>
+
+                    <!-- 報表 -->
+                    <g fill="#d1fae5" stroke="#047857" stroke-width="1.5">
+                        <ellipse cx="500" cy="470" rx="100" ry="28"/>
+                        <ellipse cx="700" cy="470" rx="100" ry="28"/>
+                        <ellipse cx="900" cy="470" rx="100" ry="28"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="475">查看累計時數</text>
+                        <text x="700" y="475">彙總報表</text>
+                        <text x="900" y="475">匯出 CSV / Excel</text>
+                    </g>
+
+                    <!-- 曠課 -->
+                    <g fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5">
+                        <ellipse cx="500" cy="560" rx="95" ry="28"/>
+                        <ellipse cx="700" cy="560" rx="95" ry="28"/>
+                        <ellipse cx="900" cy="560" rx="95" ry="28"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="565">登錄曠課紀錄</text>
+                        <text x="700" y="565">編輯 / 刪除曠課</text>
+                        <text x="900" y="565">查詢我的曠課</text>
+                    </g>
+
+                    <!-- 通知 -->
+                    <g fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5">
+                        <ellipse cx="500" cy="650" rx="95" ry="28"/>
+                        <ellipse cx="700" cy="650" rx="95" ry="28"/>
+                        <ellipse cx="900" cy="650" rx="95" ry="28"/>
+                    </g>
+                    <g font-size="14" text-anchor="middle" fill="#111">
+                        <text x="500" y="655">收到站內通知</text>
+                        <text x="700" y="655">收到 Email</text>
+                        <text x="900" y="655">標記已讀</text>
+                    </g>
+
+                    <!-- «include» 例：提交請假申請 include 計算時數、檢查上限 -->
+                    <g fill="#fff7ed" stroke="#c2410c" stroke-width="1.5" stroke-dasharray="4 3">
+                        <ellipse cx="500" cy="740" rx="90" ry="26"/>
+                        <ellipse cx="700" cy="740" rx="90" ry="26"/>
+                        <ellipse cx="900" cy="740" rx="90" ry="26"/>
+                    </g>
+                    <g font-size="13" text-anchor="middle" fill="#111">
+                        <text x="500" y="745">«include» 計算請假時數</text>
+                        <text x="700" y="745">«include» 檢查班期上限</text>
+                        <text x="900" y="745">«include» 派送簽核關卡</text>
+                    </g>
+
+                    <!-- 提交請假 → include -->
+                    <line x1="500" y1="318" x2="500" y2="714" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+                    <line x1="500" y1="318" x2="700" y2="714" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+                    <line x1="500" y1="318" x2="900" y2="714" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+
+                    <!-- ============ Actors ============ -->
+                    <!-- 左側 Actors: Student, Approver（合併從 Tutor/SectionChief/BranchDirector） -->
+                    <!-- Student -->
+                    <g transform="translate(140,180)">
+                        <circle cx="0" cy="0" r="18" fill="#fff" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <line x1="0" y1="18" x2="0" y2="60" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <line x1="-25" y1="30" x2="25" y2="30" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="-20" y2="95" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="20" y2="95" stroke="#1e3a8a" stroke-width="2.5"/>
+                        <text x="0" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">🎒 學員</text>
+                        <text x="0" y="136" text-anchor="middle" font-size="12" fill="#6b7280">Student</text>
+                    </g>
+
+                    <!-- Approver（合併代表導師 / 科長 / 分署長） -->
+                    <g transform="translate(140,470)">
+                        <circle cx="0" cy="0" r="18" fill="#fff" stroke="#be185d" stroke-width="2.5"/>
+                        <line x1="0" y1="18" x2="0" y2="60" stroke="#be185d" stroke-width="2.5"/>
+                        <line x1="-25" y1="30" x2="25" y2="30" stroke="#be185d" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="-20" y2="95" stroke="#be185d" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="20" y2="95" stroke="#be185d" stroke-width="2.5"/>
+                        <text x="0" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#be185d">📝 簽核人</text>
+                        <text x="0" y="136" text-anchor="middle" font-size="12" fill="#6b7280">Approver</text>
+                        <!-- 備註：三種角色具同一組使用案例，只是簽核層級不同 -->
+                        <rect x="-108" y="152" width="216" height="66" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1" stroke-dasharray="3 3"/>
+                        <text x="0" y="170" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">包含三種層級：</text>
+                        <text x="0" y="188" text-anchor="middle" font-size="11" fill="#92400e">👨‍🏫 導師（L1）・👩‍💼 科長（L2）</text>
+                        <text x="0" y="206" text-anchor="middle" font-size="11" fill="#92400e">🧑‍⚖️ 分署長（L3）</text>
+                    </g>
+
+                    <!-- 右側 Actors: Staff, Admin -->
+                    <g transform="translate(1260,300)">
+                        <circle cx="0" cy="0" r="18" fill="#fff" stroke="#047857" stroke-width="2.5"/>
+                        <line x1="0" y1="18" x2="0" y2="60" stroke="#047857" stroke-width="2.5"/>
+                        <line x1="-25" y1="30" x2="25" y2="30" stroke="#047857" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="-20" y2="95" stroke="#047857" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="20" y2="95" stroke="#047857" stroke-width="2.5"/>
+                        <text x="0" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#047857">📋 行政</text>
+                        <text x="0" y="136" text-anchor="middle" font-size="12" fill="#6b7280">Staff</text>
+                    </g>
+
+                    <g transform="translate(1260,560)">
+                        <circle cx="0" cy="0" r="18" fill="#fff" stroke="#7c3aed" stroke-width="2.5"/>
+                        <line x1="0" y1="18" x2="0" y2="60" stroke="#7c3aed" stroke-width="2.5"/>
+                        <line x1="-25" y1="30" x2="25" y2="30" stroke="#7c3aed" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="-20" y2="95" stroke="#7c3aed" stroke-width="2.5"/>
+                        <line x1="0" y1="60" x2="20" y2="95" stroke="#7c3aed" stroke-width="2.5"/>
+                        <text x="0" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#7c3aed">🛡️ 系統管理員</text>
+                        <text x="0" y="136" text-anchor="middle" font-size="12" fill="#6b7280">Admin</text>
+                    </g>
+
+                    <!-- ========== 連線 (Actor - UseCase) ========== -->
+                    <g stroke="#1e3a8a" stroke-width="1.3" fill="none">
+                        <!-- Student -->
+                        <line x1="165" y1="200" x2="410" y2="120"/>
+                        <line x1="165" y1="210" x2="400" y2="290"/>
+                        <line x1="165" y1="220" x2="600" y2="290"/>
+                        <line x1="165" y1="230" x2="800" y2="290"/>
+                        <line x1="165" y1="240" x2="400" y2="470"/>
+                        <line x1="165" y1="250" x2="805" y2="560"/>
+                        <line x1="165" y1="260" x2="405" y2="650"/>
+                        <line x1="165" y1="270" x2="605" y2="650"/>
+                        <line x1="165" y1="275" x2="805" y2="650"/> <!-- 標記已讀 -->
+                    </g>
+
+                    <g stroke="#be185d" stroke-width="1.3" fill="none">
+                        <!-- Approver（合併後） -->
+                        <line x1="165" y1="490" x2="410" y2="120"/>
+                        <line x1="165" y1="495" x2="405" y2="380"/>
+                        <line x1="165" y1="500" x2="605" y2="380"/>
+                        <line x1="165" y1="505" x2="805" y2="380"/>
+                        <line x1="165" y1="510" x2="405" y2="650"/>
+                        <line x1="165" y1="515" x2="605" y2="650"/> <!-- 收 Email -->
+                        <line x1="165" y1="520" x2="805" y2="650"/> <!-- 標記已讀 -->
+                    </g>
+
+                    <g stroke="#047857" stroke-width="1.3" fill="none">
+                        <!-- Staff -->
+                        <line x1="1235" y1="315" x2="590" y2="120"/> <!-- 登入/登出 -->
+                        <line x1="1235" y1="320" x2="790" y2="120"/>
+                        <line x1="1235" y1="322" x2="590" y2="200"/> <!-- 維護班期 -->
+                        <line x1="1235" y1="325" x2="790" y2="200"/>
+                        <line x1="1235" y1="330" x2="990" y2="200"/>
+                        <line x1="1235" y1="335" x2="600" y2="470"/>
+                        <line x1="1235" y1="340" x2="800" y2="470"/>
+                        <line x1="1235" y1="345" x2="405" y2="560"/>
+                        <line x1="1235" y1="350" x2="605" y2="560"/>
+                    </g>
+
+                    <g stroke="#7c3aed" stroke-width="1.3" fill="none">
+                        <!-- Admin -->
+                        <line x1="1235" y1="575" x2="590" y2="120"/> <!-- 登入/登出 -->
+                        <line x1="1235" y1="580" x2="990" y2="120"/>
+                        <line x1="1235" y1="585" x2="790" y2="120"/>
+                        <line x1="1235" y1="588" x2="590" y2="200"/> <!-- 維護班期 -->
+                        <line x1="1235" y1="590" x2="790" y2="200"/>
+                        <line x1="1235" y1="595" x2="990" y2="200"/>
+                        <line x1="1235" y1="600" x2="600" y2="470"/>
+                        <line x1="1235" y1="605" x2="800" y2="470"/>
+                        <line x1="1235" y1="610" x2="595" y2="560"/> <!-- 登錄曠課 -->
+                        <line x1="1235" y1="615" x2="795" y2="560"/> <!-- 編輯/刪除曠課 -->
+                    </g>
+                </svg>
+            </div>
+
+            <div class="legend">
+                <span class="item"><span class="swatch" style="background:#dbeafe;border:1px solid #1e3a8a;"></span>帳號 / 規則</span>
+                <span class="item"><span class="swatch" style="background:#e0e7ff;border:1px solid #1e3a8a;"></span>組織資料</span>
+                <span class="item"><span class="swatch" style="background:#fef3c7;border:1px solid #d97706;"></span>請假</span>
+                <span class="item"><span class="swatch" style="background:#fce7f3;border:1px solid #be185d;"></span>簽核</span>
+                <span class="item"><span class="swatch" style="background:#d1fae5;border:1px solid #047857;"></span>報表</span>
+                <span class="item"><span class="swatch" style="background:#fee2e2;border:1px solid #b91c1c;"></span>曠課</span>
+                <span class="item"><span class="swatch" style="background:#ede9fe;border:1px solid #6d28d9;"></span>通知</span>
+                <span class="item"><span class="swatch" style="background:#fff7ed;border:1px dashed #c2410c;"></span>«include»</span>
+            </div>
+
+            <h2 style="margin-top:24px;">Actor 與主要使用案例對照</h2>
+            <table>
+                <thead><tr><th>Actor</th><th>可執行的使用案例</th></tr></thead>
+                <tbody>
+                    <tr><td>🎒 學員 Student</td><td>登入 / 登出、提交請假申請、查詢我的請假、追蹤簽核進度、查看累計時數、查詢我的曠課、收站內通知、Email</td></tr>
+                    <tr>
+                        <td>📝 簽核人 Approver<br/><span style="font-size:13px;color:var(--text-muted);">（導師 / 科長 / 分署長）</span></td>
+                        <td>
+                            登入、檢視待辦清單、核准 / 駁回請假單、收通知。<br/>
+                            <span class="badge">Tutor L1</span>
+                            <span class="badge">Section Chief L2</span>
+                            <span class="badge">Branch Director L3</span>
+                            — 三種角色具相同使用案例，僅簽核層級不同（依請假時數自動派送）。
+                        </td>
+                    </tr>
+                    <tr><td>📋 行政 Staff</td><td>登入、管理使用者、維護班期 / 假別 / 指派簽核人、彙總報表、匯出 CSV / Excel、登錄與管理曠課</td></tr>
+                    <tr><td>🛡️ 系統管理員 Admin</td><td>Staff 全部權限 + 維護簽核規則、系統參數調整</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="index.html">🏠 回目錄</a>
+        <span class="page-indicator">Use Case Diagram</span>
+        <a href="er-diagram.html">實體關聯圖 (ER) ▶</a>
+    </footer>
+
+    <script src="assets/slides.js"></script>
+</body>
+</html>
