@@ -1,5 +1,46 @@
+/* =====================================================================
+   墨韻靛藍・典雅書卷風 — 全站設計語彙
+   ===================================================================== */
+:root {
+  --ink-primary: #1f3a68;
+  --ink-primary-hover: #172c50;
+  --ink-primary-soft: rgba(31, 58, 104, 0.08);
+  --ink-accent: #c9a961;
+  --ink-accent-soft: rgba(201, 169, 97, 0.15);
+  --paper-bg: #f7f3ea;
+  --paper-surface: #fffdf7;
+  --paper-surface-alt: #faf6ec;
+  --ink-text: #2b2b2b;
+  --ink-muted: #6b6558;
+  --ink-border: rgba(31, 58, 104, 0.12);
+  --ink-border-strong: rgba(31, 58, 104, 0.22);
+
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  --shadow-soft: 0 4px 16px rgba(31, 58, 104, 0.06);
+  --shadow-lift: 0 10px 28px rgba(31, 58, 104, 0.12);
+  --shadow-navbar: 0 2px 20px rgba(31, 58, 104, 0.05);
+
+  --font-serif-tc: "Noto Serif TC", "Songti TC", "PMingLiU", "SimSun", Georgia, "Times New Roman", serif;
+
+  /* Bootstrap 變數覆蓋 */
+  --bs-primary: var(--ink-primary);
+  --bs-primary-rgb: 31, 58, 104;
+  --bs-body-bg: var(--paper-bg);
+  --bs-body-color: var(--ink-text);
+  --bs-border-color: var(--ink-border);
+  --bs-border-color-translucent: var(--ink-border);
+  --bs-link-color: var(--ink-primary);
+  --bs-link-hover-color: var(--ink-primary-hover);
+  --bs-body-font-family: var(--font-serif-tc);
+}
+
 html {
   font-size: 14px;
+  position: relative;
+  min-height: 100%;
 }
 
 @media (min-width: 768px) {
@@ -8,24 +49,443 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
-  margin-bottom: 60px;
+  margin-bottom: 0;
+  min-height: 100vh;
+  font-family: var(--font-serif-tc);
+  color: var(--ink-text);
+  background-color: var(--paper-bg);
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(201, 169, 97, 0.05), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(31, 58, 104, 0.04), transparent 55%);
+  background-attachment: fixed;
+  letter-spacing: 0.01em;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--font-serif-tc);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-primary);
+}
+
+a {
+  color: var(--ink-primary);
+  text-decoration: none;
+  transition: color .2s ease;
+}
+
+a:hover {
+  color: var(--ink-primary-hover);
+}
+
+/* =====================================================================
+   Focus Ring — 靛藍柔光
+   ===================================================================== */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-select:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(31, 58, 104, 0.18);
+  border-color: var(--ink-primary);
+}
+
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
   text-align: start;
+}
+
+/* =====================================================================
+   主容器
+   ===================================================================== */
+.main-container {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
+}
+
+/* =====================================================================
+   Navbar — 半透明玻璃霧化
+   ===================================================================== */
+.navbar-elegant {
+  background-color: rgba(255, 253, 247, 0.72);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--ink-border);
+  box-shadow: var(--shadow-navbar);
+  margin-bottom: 0;
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+}
+
+.navbar-elegant .navbar-brand {
+  font-family: var(--font-serif-tc);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-primary);
+  position: relative;
+  padding-left: 0.25rem;
+}
+
+.navbar-elegant .navbar-brand::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 22px;
+  margin-right: 0.6rem;
+  vertical-align: -4px;
+  background: linear-gradient(180deg, var(--ink-accent), var(--ink-primary));
+  border-radius: 2px;
+}
+
+.navbar-elegant .nav-link {
+  position: relative;
+  color: var(--ink-text) !important;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  transition: color .2s ease;
+}
+
+.navbar-elegant .nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: 0.35rem;
+  height: 1.5px;
+  background: var(--ink-primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .28s ease;
+}
+
+.navbar-elegant .nav-link:hover,
+.navbar-elegant .nav-link.active,
+.navbar-elegant .nav-link.show {
+  color: var(--ink-primary) !important;
+}
+
+.navbar-elegant .nav-link:hover::after,
+.navbar-elegant .nav-link.active::after,
+.navbar-elegant .nav-link.show::after {
+  transform: scaleX(1);
+}
+
+.navbar-elegant .dropdown-menu {
+  border: 1px solid var(--ink-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lift);
+  padding: 0.5rem;
+  background-color: var(--paper-surface);
+  margin-top: 0.4rem;
+}
+
+.navbar-elegant .dropdown-item {
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.85rem;
+  color: var(--ink-text);
+  transition: background-color .18s ease, color .18s ease;
+}
+
+.navbar-elegant .dropdown-item:hover,
+.navbar-elegant .dropdown-item:focus {
+  background-color: var(--ink-primary-soft);
+  color: var(--ink-primary);
+}
+
+.navbar-elegant .dropdown-divider {
+  border-color: var(--ink-border);
+  margin: 0.4rem 0;
+}
+
+/* =====================================================================
+   Card — 大圓角 + 微陰影 + hover 微浮起
+   ===================================================================== */
+.card {
+  background-color: var(--paper-surface);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+.card-header {
+  background-color: var(--paper-surface-alt);
+  border-bottom: 1px solid var(--ink-border);
+  font-family: var(--font-serif-tc);
+  font-weight: 500;
+  color: var(--ink-primary);
+  border-top-left-radius: var(--radius-lg) !important;
+  border-top-right-radius: var(--radius-lg) !important;
+}
+
+.card-footer {
+  background-color: var(--paper-surface-alt);
+  border-top: 1px solid var(--ink-border);
+  border-bottom-left-radius: var(--radius-lg) !important;
+  border-bottom-right-radius: var(--radius-lg) !important;
+}
+
+/* =====================================================================
+   Table — 米白底、靛藍表頭、hover 米色暈染
+   ===================================================================== */
+.table {
+  --bs-table-bg: transparent;
+  color: var(--ink-text);
+  border-color: var(--ink-border);
+}
+
+.table > thead {
+  background-color: var(--paper-surface-alt);
+}
+
+.table > thead th {
+  color: var(--ink-primary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--ink-border-strong);
+  letter-spacing: 0.04em;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+}
+
+.table > tbody > tr {
+  transition: background-color .18s ease;
+}
+
+.table-hover > tbody > tr:hover > * {
+  background-color: var(--ink-accent-soft);
+  color: var(--ink-text);
+}
+
+.table-bordered,
+.table-bordered > :not(caption) > * {
+  border-color: var(--ink-border);
+}
+
+/* =====================================================================
+   Button
+   ===================================================================== */
+.btn {
+  border-radius: var(--radius-md);
+  font-family: var(--font-serif-tc);
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1.1rem;
+  transition: background-color .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background-color: var(--ink-primary);
+  border-color: var(--ink-primary);
+  color: #fff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--ink-primary-hover);
+  border-color: var(--ink-primary-hover);
+  color: #fff;
+}
+
+.btn-outline-primary {
+  color: var(--ink-primary);
+  border: 1px solid var(--ink-primary);
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background-color: var(--ink-primary);
+  border-color: var(--ink-primary);
+  color: #fff;
+}
+
+.btn-secondary {
+  background-color: var(--ink-muted);
+  border-color: var(--ink-muted);
+  color: #fff;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus {
+  background-color: #524d43;
+  border-color: #524d43;
+  color: #fff;
+}
+
+.btn-link {
+  color: var(--ink-primary);
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: var(--ink-primary-hover);
+  text-decoration: underline;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: var(--ink-primary);
+  color: #fff;
+}
+
+/* =====================================================================
+   Form controls
+   ===================================================================== */
+.form-control,
+.form-select {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--ink-border-strong);
+  background-color: var(--paper-surface);
+  color: var(--ink-text);
+  padding: 0.5rem 0.75rem;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.form-control::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.7;
+}
+
+.form-label {
+  color: var(--ink-primary);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.input-group-text {
+  background-color: var(--paper-surface-alt);
+  border: 1px solid var(--ink-border-strong);
+  color: var(--ink-primary);
+}
+
+/* =====================================================================
+   Badge / Alert
+   ===================================================================== */
+.badge {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 0.35em 0.65em;
+}
+
+.badge.bg-primary,
+.badge.text-bg-primary {
+  background-color: var(--ink-primary) !important;
+  color: #fff !important;
+}
+
+.alert {
+  border: 1px solid var(--ink-border);
+  border-radius: var(--radius-md);
+  background-color: var(--paper-surface);
+  color: var(--ink-text);
+}
+
+.alert-primary {
+  background-color: var(--ink-primary-soft);
+  border-color: var(--ink-border-strong);
+  color: var(--ink-primary);
+}
+
+/* =====================================================================
+   Modal / List group
+   ===================================================================== */
+.modal-content {
+  border: 1px solid var(--ink-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--paper-surface);
+  box-shadow: var(--shadow-lift);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--ink-border);
+}
+
+.modal-footer {
+  border-top: 1px solid var(--ink-border);
+}
+
+.list-group-item {
+  background-color: var(--paper-surface);
+  border-color: var(--ink-border);
+  color: var(--ink-text);
+}
+
+.pagination .page-link {
+  color: var(--ink-primary);
+  border-color: var(--ink-border);
+  background-color: var(--paper-surface);
+}
+
+.pagination .page-item.active .page-link {
+  background-color: var(--ink-primary);
+  border-color: var(--ink-primary);
+  color: #fff;
+}
+
+/* =====================================================================
+   Footer
+   ===================================================================== */
+.footer {
+  position: static;
+  width: 100%;
+  padding: 1.5rem 0;
+  margin-top: 3rem;
+  border-top: 1px solid var(--ink-border);
+  background-color: rgba(255, 253, 247, 0.5);
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  line-height: 1.6;
+  white-space: normal;
+}
+
+.footer a {
+  color: var(--ink-primary);
+}
+
+/* =====================================================================
+   Hero (可選：首頁大標區塊)
+   ===================================================================== */
+.hero-elegant {
+  padding: 4rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.hero-elegant h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--ink-primary);
+  letter-spacing: 0.08em;
+  margin-bottom: 1.25rem;
+}
+
+.hero-elegant p {
+  color: var(--ink-muted);
+  font-size: 1.05rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.hero-elegant::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 2px;
+  margin: 1.5rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--ink-accent), transparent);
 }
