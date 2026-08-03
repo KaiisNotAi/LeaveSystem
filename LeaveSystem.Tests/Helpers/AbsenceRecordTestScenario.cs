@@ -15,6 +15,7 @@ namespace LeaveSystem.Tests.Helpers;
 /// <code>
 ///   班期 A (Id=1, "A班-2026春") — 學員 A (Id=100, "小明")
 ///   班期 B (Id=2, "B班-2026春") — 學員 B (Id=101, "小華")
+///   未指派班期 (CohortId=null) — 學員 C (Id=102, "小陳", Student 角色但尚未歸班)
 ///   行政人員 (Id=200, "行政小姐")
 ///   路人甲 (Id=999, 未指派任何角色)                ← 用來測「Create 給非學員 UserId 應失敗」
 ///
@@ -23,6 +24,7 @@ namespace LeaveSystem.Tests.Helpers;
 ///     A2 學員 A  2026-06-15 13:00   4h  "下午未到"     ← 6 月
 ///     A3 學員 A  2026-07-10 08:00   1h  null            ← 7 月
 ///     B1 學員 B  2026-06-20 08:00   8h  "整天未到"     ← 6 月
+///     （小陳沒有任何曠課紀錄，用來測「未指派班期的學員不能被登錄」邊界）
 /// </code>
 ///
 /// 統計快速查表（供測試斷言用）：
@@ -51,6 +53,15 @@ public sealed class AbsenceRecordTestScenario : IDisposable
     public const int CohortIdB = 2;
     public const int StudentUserIdA = 100;
     public const int StudentUserIdB = 101;
+
+    /// <summary>
+    /// 具 Student 角色但 <c>CohortId = null</c> 的學員（小陳）。
+    /// Phase 6 業務規則：未指派班期的學員不可登錄曠課，因此本 Id 用來驗證：
+    ///   ‧ <c>IsValidStudentAsync</c> 對其回傳 <c>false</c>
+    ///   ‧ <c>GetStudentOptionsAsync</c> 不會把其列入下拉
+    /// </summary>
+    public const int UnassignedStudentUserId = 102;
+
     public const int StaffUserId = 200;
     public const int OutsiderUserId = 999;
 
@@ -109,18 +120,20 @@ public sealed class AbsenceRecordTestScenario : IDisposable
             }
         );
 
-        // ─── 使用者：兩位學員 + 一位行政 + 一位路人（無 Student 角色）───
+        // ─── 使用者：兩位學員 + 一位未歸班學員 + 一位行政 + 一位路人（無 Student 角色）───
         db.UserAccounts.AddRange(
-            new UserAccount { Id = StudentUserIdA, Username = "studentA", PasswordHash = "x", DisplayName = "小明",   CohortId = CohortIdA },
-            new UserAccount { Id = StudentUserIdB, Username = "studentB", PasswordHash = "x", DisplayName = "小華",   CohortId = CohortIdB },
-            new UserAccount { Id = StaffUserId,    Username = "staff01",  PasswordHash = "x", DisplayName = "行政小姐" },
-            new UserAccount { Id = OutsiderUserId, Username = "outsider", PasswordHash = "x", DisplayName = "路人甲" }
+            new UserAccount { Id = StudentUserIdA,          Username = "studentA",  PasswordHash = "x", DisplayName = "小明",   CohortId = CohortIdA },
+            new UserAccount { Id = StudentUserIdB,          Username = "studentB",  PasswordHash = "x", DisplayName = "小華",   CohortId = CohortIdB },
+            new UserAccount { Id = UnassignedStudentUserId, Username = "studentC",  PasswordHash = "x", DisplayName = "小陳",   CohortId = null },
+            new UserAccount { Id = StaffUserId,             Username = "staff01",   PasswordHash = "x", DisplayName = "行政小姐" },
+            new UserAccount { Id = OutsiderUserId,          Username = "outsider",  PasswordHash = "x", DisplayName = "路人甲" }
         );
 
         db.UserRoles.AddRange(
-            new UserRole { UserId = StudentUserIdA, RoleId = (int)UserRoleEnum.Student },
-            new UserRole { UserId = StudentUserIdB, RoleId = (int)UserRoleEnum.Student },
-            new UserRole { UserId = StaffUserId,    RoleId = (int)UserRoleEnum.Staff }
+            new UserRole { UserId = StudentUserIdA,          RoleId = (int)UserRoleEnum.Student },
+            new UserRole { UserId = StudentUserIdB,          RoleId = (int)UserRoleEnum.Student },
+            new UserRole { UserId = UnassignedStudentUserId, RoleId = (int)UserRoleEnum.Student },
+            new UserRole { UserId = StaffUserId,             RoleId = (int)UserRoleEnum.Staff }
             // 路人 OutsiderUserId 刻意「不」指派角色，用來測 Service 的角色檢查
         );
 

@@ -98,4 +98,14 @@ public class UserOption
     public int Id { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 該使用者所屬班期 Id；未指派班期時為 <c>null</c>。
+    /// <para>
+    /// 目前只有 Phase 6「新增/編輯曠課紀錄」的兩層下拉會用到本欄位（View 端
+    /// 以 <c>data-cohort-id</c> 屬性掛出，讓前端 JS 依所選班期即時過濾學員選項）。
+    /// 其他用途（Cohort 指派 Tutor/SectionChief/BranchDirector）不會 populate，維持 null。
+    /// </para>
+    /// </summary>
+    public int? CohortId { get; set; }
 }

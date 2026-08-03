@@ -58,6 +58,16 @@ public class AbsenceRecordCreateInput : IValidatableObject
     public List<UserOption> StudentOptions { get; set; } = new();
 
     /// <summary>
+    /// 班期下拉選項（由 Controller 填入）。
+    /// <para>
+    /// Phase 6 UX 優化：表單上新增一個「班期」下拉，並以前端 JS 依選取班期
+    /// 過濾學員下拉（兩層下拉）。本欄位只負責選項來源，本身**不會被 POST 回伺服器**
+    /// （View 端的 <c>select</c> 不給任何 <c>name</c>/<c>asp-for</c>），因為伺服器只認最終選定的 <c>StudentId</c>。
+    /// </para>
+    /// </summary>
+    public List<CohortOption> CohortOptions { get; set; } = new();
+
+    /// <summary>
     /// 額外驗證：曠課時數必須為整數（§3.1「最小單位 1 小時」）。
     /// <see cref="Range"/> 只能擋 1~100 的範圍，擋不掉 1.5 這種小數，
     /// 因此以 <see cref="IValidatableObject"/> 補一條伺服器端規則。
@@ -104,6 +114,11 @@ public class AbsenceRecordEditInput : IValidatableObject
     public string? Note { get; set; }
 
     public List<UserOption> StudentOptions { get; set; } = new();
+
+    /// <summary>
+    /// 班期下拉選項（由 Controller 填入），用途同 <see cref="AbsenceRecordCreateInput.CohortOptions"/>。
+    /// </summary>
+    public List<CohortOption> CohortOptions { get; set; } = new();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

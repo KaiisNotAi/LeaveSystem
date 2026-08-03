@@ -26,6 +26,8 @@ public interface IAbsenceRecordService
     /// 驗證：
     ///   ‧ <paramref name="input"/> 的 <c>StudentId</c> 必須存在且擁有 Student 角色，
     ///     否則回傳 <see cref="AbsenceRecordActionResult.Success"/> = false。
+    ///   ‧ 該學員必須已指派班期（<c>CohortId</c> 非 null），Phase 6 規則：
+    ///     未歸班的學員不得登錄曠課，否則同樣回傳失敗。
     ///   ‧ <c>Note</c> 若全為空白，會被寫入為 <c>null</c>；否則會 <c>Trim()</c> 後寫入。
     ///
     /// 稽核：<c>CreatedByUserId</c> 由 <paramref name="createdByUserId"/> 帶入，
@@ -78,13 +80,29 @@ public interface IAbsenceRecordService
     /// <summary>
     /// 依 Id 載入一筆曠課紀錄，轉為編輯表單模型。
     /// 找不到時回傳 <c>null</c>；找到時同時填入 <see cref="AbsenceRecordEditInput.StudentOptions"/>
-    /// 讓 Controller 可直接把物件交給 View（一次查完不必二次呼叫）。
+    /// 與 <see cref="AbsenceRecordEditInput.CohortOptions"/>，讓 Controller 可直接把物件交給 View
+    /// （一次查完不必二次呼叫）。
     /// </summary>
     Task<AbsenceRecordEditInput?> GetForEditAsync(int id);
 
     /// <summary>
-    /// 取得學員下拉選項（所有擁有 Student 角色的使用者，含停用者，
+    /// 取得班期下拉選項（依名稱排序）。
+    /// <para>
+    /// 供 Phase 6 新增/編輯曠課頁面的「班期」下拉（兩層下拉中的上層）使用；
+    /// 與 <see cref="GetStudentOptionsAsync"/> 鍵對鍵搭配（學員選項屬性 <c>CohortId</c>
+    /// 會對應到本方法回傳的 <c>Id</c>）。
+    /// </para>
+    /// </summary>
+    Task<List<CohortOption>> GetCohortOptionsAsync();
+
+    /// <summary>
+    /// 取得學員下拉選項（擁有 Student 角色且已指派班期的使用者，含停用者，
     /// 因為歷史紀錄可能綁在已停用的學員身上）。
+    /// <para>
+    /// 未指派班期的學員依 Phase 6 規則不可登錄曠課，因此本方法一併過濾。學員選項的
+    /// <see cref="UserOption.CohortId"/> 也會回填，供前端 JS 以 <c>data-cohort-id</c>
+    /// 屬性額外過濾。
+    /// </para>
     /// 供 Controller 在 <c>Create GET</c> 或 <c>ModelState.IsValid == false</c>
     /// 需要重補下拉時呼叫。
     /// </summary>

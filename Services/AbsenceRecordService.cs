@@ -26,6 +26,12 @@ public class AbsenceRecordService : IAbsenceRecordService
     private const string RoleNameStudent = "Student";
 
     private const string ErrorStudentNotFound = "找不到指定的學員，或該使用者不是學員身分。";
+    /// <summary>
+    /// Phase 6 業務規則：未指派班期的學員不可登錄曠課（兩層下拉前提）。
+    /// UI 端以兩層下拉預先過濾；Service 端仍會在 <see cref="IsValidStudentAsync"/>
+    /// 又一次把關，避免直接 POST <c>StudentId</c> 繞過前端。
+    /// </summary>
+    private const string ErrorStudentNoCohort = "找不到指定的學員，或該學員尚未指派班期（未歸班的學員不能登錄曠課）。";
     private const string ErrorRecordNotFoundForUpdate = "找不到要更新的曠課紀錄。";
     private const string ErrorRecordNotFoundForDelete = "找不到要刪除的曠課紀錄。";
 
@@ -39,9 +45,10 @@ public class AbsenceRecordService : IAbsenceRecordService
     /// <inheritdoc />
     public async Task<AbsenceRecordActionResult> CreateAsync(AbsenceRecordCreateInput input, int createdByUserId)
     {
-        if (!await IsValidStudentAsync(input.StudentId))
+        var studentCheck = await CheckStudentAsync(input.StudentId);
+        if (studentCheck is not null)
         {
-            return new AbsenceRecordActionResult(false, ErrorStudentNotFound);
+            return new AbsenceRecordActionResult(false, studentCheck);
         }
 
         var record = new AbsenceRecord
@@ -69,9 +76,10 @@ public class AbsenceRecordService : IAbsenceRecordService
             return new AbsenceRecordActionResult(false, ErrorRecordNotFoundForUpdate);
         }
 
-        if (!await IsValidStudentAsync(input.StudentId))
+        var studentCheck = await CheckStudentAsync(input.StudentId);
+        if (studentCheck is not null)
         {
-            return new AbsenceRecordActionResult(false, ErrorStudentNotFound);
+            return new AbsenceRecordActionResult(false, studentCheck);
         }
 
         // 更新業務欄位；CreatedByUserId 與 CreatedAt 刻意保留，維持原稽核資訊
@@ -150,7 +158,7 @@ public class AbsenceRecordService : IAbsenceRecordService
             Query = query,
             Items = items,
             TotalHours = items.Sum(i => i.Hours),
-            CohortOptions = await LoadCohortOptionsAsync(),
+            CohortOptions = await GetCohortOptionsAsync(),
             StudentOptions = await GetStudentOptionsAsync()
         };
     }
@@ -216,7 +224,8 @@ public class AbsenceRecordService : IAbsenceRecordService
             OccurredAt = record.OccurredAt,
             Hours = record.Hours,
             Note = record.Note,
-            StudentOptions = await GetStudentOptionsAsync()
+            StudentOptions = await GetStudentOptionsAsync(),
+            CohortOptions = await GetCohortOptionsAsync()
         };
     }
 
@@ -246,20 +255,42 @@ public class AbsenceRecordService : IAbsenceRecordService
     }
 
     /// <summary>
-    /// 檢查該 UserId 是否存在，且擁有 Student 角色。
+    /// 檢查該 UserId 是否可以被登錄曠課：
+    ///   1. 存在且擁有 Student 角色
+    ///   2. 已指派班期（<c>CohortId</c> 非 null）
     /// </summary>
-    private Task<bool> IsValidStudentAsync(int userId)
+    /// <returns>
+    /// 失敗原因的錯誤訊息；若通過則回 <c>null</c>。
+    /// 這樣呼叫端可直接用取回的錯誤訊息作為 <c>AbsenceRecordActionResult.ErrorMessage</c>，
+    /// 而不用在呼叫端自己判斷採哪一條訊息。
+    /// </returns>
+    private async Task<string?> CheckStudentAsync(int userId)
     {
-        return _db.UserAccounts
+        var info = await _db.UserAccounts
             .AsNoTracking()
-            .AnyAsync(u => u.Id == userId
-                && u.UserRoles.Any(ur => ur.Role.Name == RoleNameStudent));
+            .Where(u => u.Id == userId
+                && u.UserRoles.Any(ur => ur.Role.Name == RoleNameStudent))
+            .Select(u => new { u.CohortId })
+            .FirstOrDefaultAsync();
+
+        if (info is null)
+        {
+            return ErrorStudentNotFound;
+        }
+        if (info.CohortId is null)
+        {
+            return ErrorStudentNoCohort;
+        }
+        return null;
     }
 
     /// <summary>
     /// 載入班期下拉選項（依名稱排序）。
+    /// 對外公開以支援：
+    ///   ‧ Phase 6 新增/編輯曠課的「班期」下拉（兩層下拉中的上層）
+    ///   ‧ 行政清單頁範中的班期篩選下拉
     /// </summary>
-    private Task<List<CohortOption>> LoadCohortOptionsAsync()
+    public Task<List<CohortOption>> GetCohortOptionsAsync()
     {
         return _db.Cohorts
             .AsNoTracking()
@@ -269,22 +300,30 @@ public class AbsenceRecordService : IAbsenceRecordService
     }
 
     /// <summary>
-    /// 載入學員下拉選項（所有擁有 Student 角色的使用者，含停用者，
-    /// 因為歷史紀錄可能綁在已停用的學員身上）。
-    /// 也對外公開，讓 Controller 在 <c>Create GET</c> 或 <c>ModelState</c>
-    /// 驗證失敗需要重補下拉時可直接呼叫。
+    /// 載入學員下拉選項（擁有 Student 角色且已指派班期的使用者）。
+    /// <para>
+    /// 未指派班期的學員會被過濾掉，因為 Phase 6 業務規則：未歸班的學員不能登錄曠課（
+    /// 見 <see cref="CheckStudentAsync"/>）；與其讓行政從下拉選到后才报錯，不如一開始就不顯示。
+    /// 回傳項包含停用學員（只要 <c>CohortId</c> 非 null），因為歷史紀錄可能綁在已停用的學員身上。
+    /// </para>
+    /// <para>
+    /// <c>CohortId</c> 一併回填，供 Phase 6 兩層下拉的前端 JS 以 <c>data-cohort-id</c> 屬性
+    /// 額外過濾學員下拉。
+    /// </para>
     /// </summary>
     public Task<List<UserOption>> GetStudentOptionsAsync()
     {
         return _db.UserAccounts
             .AsNoTracking()
-            .Where(u => u.UserRoles.Any(ur => ur.Role.Name == RoleNameStudent))
+            .Where(u => u.CohortId != null
+                && u.UserRoles.Any(ur => ur.Role.Name == RoleNameStudent))
             .OrderBy(u => u.DisplayName)
             .Select(u => new UserOption
             {
                 Id = u.Id,
                 DisplayName = u.DisplayName,
-                Username = u.Username
+                Username = u.Username,
+                CohortId = u.CohortId
             })
             .ToListAsync();
     }

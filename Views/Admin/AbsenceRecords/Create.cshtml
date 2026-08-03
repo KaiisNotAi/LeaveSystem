@@ -5,27 +5,56 @@
 
 <h3>@ViewData["Title"]</h3>
 
+@* ─────────────────────────────────────────────────────────────
+   Phase 6 UX 優化：學員下拉採「班期 → 學員」兩層過濾。
+     ‧「班期」下拉純為前端 UX 輔助，不 POST 回伺服器（未給 name/asp-for）
+     ‧ 每個學員 <option> 掛 data-cohort-id，前端 JS 依所選班期即時顯示/隱藏
+     ‧ 若 JS 停用也不影響正確性：學員下拉會顯示全部（回歸原本 Phase 6 行為）
+   ───────────────────────────────────────────────────────────── *@
+
+@if (!Model.CohortOptions.Any())
+{
+    <div class="alert alert-warning">
+        目前系統沒有任何班期，請先到<a asp-controller="Cohorts" asp-action="Index">班期管理</a>建立。
+    </div>
+}
+else if (!Model.StudentOptions.Any())
+{
+    <div class="alert alert-warning">
+        目前沒有「已指派班期的 Student 使用者」。<br />
+        請先到<a asp-controller="Users" asp-action="Index">使用者管理</a>建立 Student 角色的帳號，
+        並到<a asp-controller="Cohorts" asp-action="Index">班期管理</a>將其指派至班期。
+    </div>
+}
+
 <form asp-action="Create" method="post" class="mt-3">
     <div asp-validation-summary="ModelOnly" class="alert alert-danger"
          style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
 
     <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-3">
+            @* 純 UX 輔助欄位：不掛 asp-for、不給 name，不會被 Model Binding *@
+            <label for="CohortFilter" class="form-label">班期</label>
+            <select id="CohortFilter" class="form-select">
+                <option value="">— 全部班期 —</option>
+                @foreach (var c in Model.CohortOptions)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+            <div class="form-text">先選班期，下方學員將只顯示該班學員。</div>
+        </div>
+
+        <div class="col-md-3">
             <label asp-for="StudentId" class="form-label"></label>
             <select asp-for="StudentId" class="form-select">
                 <option value="">— 請選擇學員 —</option>
                 @foreach (var s in Model.StudentOptions)
                 {
-                    <option value="@s.Id">@s.DisplayName（@s.Username）</option>
+                    <option value="@s.Id" data-cohort-id="@s.CohortId">@s.DisplayName（@s.Username）</option>
                 }
             </select>
             <span asp-validation-for="StudentId" class="text-danger small"></span>
-            @if (!Model.StudentOptions.Any())
-            {
-                <div class="form-text text-warning">
-                    目前沒有具「Student」角色的使用者，請先到<a asp-controller="Users" asp-action="Index">使用者管理</a>建立。
-                </div>
-            }
         </div>
 
         <div class="col-md-3">
@@ -57,4 +86,31 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Phase 6 兩層下拉：班期改變時，動態顯示/隱藏對應學員 option。
+        // 純 DOM 操作，無 AJAX、無相依；停用 JS 時退化為單一學員下拉，資料仍完整。
+        (function () {
+            const cohortSel = document.getElementById('CohortFilter');
+            const studentSel = document.getElementById('StudentId');
+            if (!cohortSel || !studentSel) return;
+
+            function applyFilter() {
+                const cohortId = cohortSel.value; // '' = 不限
+                let currentStillVisible = false;
+                for (const opt of studentSel.options) {
+                    if (!opt.value) { opt.hidden = false; continue; } // placeholder 保留
+                    const optCohort = opt.getAttribute('data-cohort-id') || '';
+                    const show = !cohortId || optCohort === cohortId;
+                    opt.hidden = !show;
+                    if (show && opt.selected) currentStillVisible = true;
+                }
+                // 若目前選中的學員被隱藏了，重設為「請選擇」避免送出隱藏的選項
+                if (!currentStillVisible) studentSel.value = '';
+            }
+
+            cohortSel.addEventListener('change', applyFilter);
+            applyFilter(); // 初始套用一次
+        })();
+    </script>
 }
+

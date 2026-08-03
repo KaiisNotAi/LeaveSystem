@@ -337,4 +337,69 @@ public class AbsenceRecordServiceTests
 
         Assert.Null(input);
     }
+
+    // ═════════════════════════════════════════════════════════════════
+    // 群組 7：兩層下拉相關規則（Phase 6 UX 優化）
+    //   規則:
+    //     ‧ 未指派班期的學員不可被登錄曠課(UI 擋 + Service 擋)
+    //     ‧ GetStudentOptionsAsync 也預先過濾未指派班期
+    //     ‧ 新增公開 GetCohortOptionsAsync 供表單「班期」下拉使用
+    // ═════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task Create_未指派班期的Student_應回傳失敗()
+    {
+        using var scenario = await AbsenceRecordTestScenario.CreateAsync();
+        var sut = new AbsenceRecordService(scenario.Db);
+
+        var input = new AbsenceRecordCreateInput
+        {
+            StudentId = AbsenceRecordTestScenario.UnassignedStudentUserId,  // 有 Student 角色但 CohortId=null
+            OccurredAt = new DateTime(2026, 9, 1, 8, 0, 0),
+            Hours = 2m
+        };
+
+        var result = await sut.CreateAsync(input, createdByUserId: AbsenceRecordTestScenario.StaffUserId);
+
+        Assert.False(result.Success);
+        Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+        Assert.Null(result.RecordId);
+    }
+
+    [Fact]
+    public async Task GetStudentOptionsAsync_應排除未指派班期的學員_並回填CohortId()
+    {
+        using var scenario = await AbsenceRecordTestScenario.CreateAsync();
+        var sut = new AbsenceRecordService(scenario.Db);
+
+        var options = await sut.GetStudentOptionsAsync();
+
+        // 只該有小明、小華，沒有小陳(未指派班期)
+        Assert.Equal(2, options.Count);
+        Assert.Contains(options, o => o.Id == AbsenceRecordTestScenario.StudentUserIdA);
+        Assert.Contains(options, o => o.Id == AbsenceRecordTestScenario.StudentUserIdB);
+        Assert.DoesNotContain(options, o => o.Id == AbsenceRecordTestScenario.UnassignedStudentUserId);
+
+        // 每一個 option 都要帶 CohortId,前端才能依此過濾學員下拉
+        var optionA = options.Single(o => o.Id == AbsenceRecordTestScenario.StudentUserIdA);
+        var optionB = options.Single(o => o.Id == AbsenceRecordTestScenario.StudentUserIdB);
+        Assert.Equal(AbsenceRecordTestScenario.CohortIdA, optionA.CohortId);
+        Assert.Equal(AbsenceRecordTestScenario.CohortIdB, optionB.CohortId);
+    }
+
+    [Fact]
+    public async Task GetCohortOptionsAsync_應回傳全部班期依名稱排序()
+    {
+        using var scenario = await AbsenceRecordTestScenario.CreateAsync();
+        var sut = new AbsenceRecordService(scenario.Db);
+
+        var options = await sut.GetCohortOptionsAsync();
+
+        Assert.Equal(2, options.Count);
+        // 名稱升序:「A班-2026春」在前,「B班-2026春」在後
+        Assert.Equal(AbsenceRecordTestScenario.CohortIdA, options[0].Id);
+        Assert.Equal(AbsenceRecordTestScenario.CohortIdB, options[1].Id);
+        Assert.Equal("A班-2026春", options[0].Name);
+        Assert.Equal("B班-2026春", options[1].Name);
+    }
 }

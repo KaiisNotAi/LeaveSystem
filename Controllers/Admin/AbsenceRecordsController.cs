@@ -42,14 +42,22 @@ public class AbsenceRecordsController : Controller
     // ─────────────────────────────────────────────────────────────
     // 建立
     // ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 顯示新增曠課紀錄表單。
+    /// <para>
+    /// 表單欄位的預設值（如 <c>OccurredAt = 今天 08:00</c>、<c>Hours = 1</c>）
+    /// 一律由 <see cref="AbsenceRecordCreateInput"/> 的屬性初始式決定，
+    /// Controller 只負責補上下拉選項；避免雙邊預設值不同步。
+    /// </para>
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> Create()
     {
         var vm = new AbsenceRecordCreateInput
         {
-            OccurredAt = DateTime.Today,
-            Hours = 1,
-            StudentOptions = await _service.GetStudentOptionsAsync()
+            StudentOptions = await _service.GetStudentOptionsAsync(),
+            CohortOptions = await _service.GetCohortOptionsAsync()
         };
         return View(vm);
     }
@@ -61,6 +69,7 @@ public class AbsenceRecordsController : Controller
         if (!ModelState.IsValid)
         {
             input.StudentOptions = await _service.GetStudentOptionsAsync();
+            input.CohortOptions = await _service.GetCohortOptionsAsync();
             return View(input);
         }
 
@@ -75,6 +84,7 @@ public class AbsenceRecordsController : Controller
         {
             ModelState.AddModelError(nameof(input.StudentId), result.ErrorMessage ?? "新增失敗");
             input.StudentOptions = await _service.GetStudentOptionsAsync();
+            input.CohortOptions = await _service.GetCohortOptionsAsync();
             return View(input);
         }
 
@@ -100,6 +110,7 @@ public class AbsenceRecordsController : Controller
         if (!ModelState.IsValid)
         {
             input.StudentOptions = await _service.GetStudentOptionsAsync();
+            input.CohortOptions = await _service.GetCohortOptionsAsync();
             return View(input);
         }
 
@@ -108,6 +119,7 @@ public class AbsenceRecordsController : Controller
         {
             ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "更新失敗");
             input.StudentOptions = await _service.GetStudentOptionsAsync();
+            input.CohortOptions = await _service.GetCohortOptionsAsync();
             return View(input);
         }
 
