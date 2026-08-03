@@ -28,13 +28,14 @@
                 <th class="text-end">時數</th>
                 <th>狀態</th>
                 <th>建立時間</th>
+                <th class="text-end">操作</th>
             </tr>
         </thead>
         <tbody>
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">目前尚無請假申請紀錄</td>
+                    <td colspan="7" class="text-center text-muted py-4">目前尚無請假申請紀錄</td>
                 </tr>
             }
 
@@ -60,8 +61,65 @@
                     <td class="text-end">@item.TotalHours</td>
                     <td><span class="badge @badgeClass">@statusText</span></td>
                     <td>@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="text-end">
+                        @if (item.CanModify)
+                        {
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary">編輯</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#cancelModal"
+                                    data-request-id="@item.Id"
+                                    data-request-summary="#@item.Id @item.LeaveTypeName @item.TotalHours h">
+                                取消
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">—</span>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
 </div>
+
+@* 取消確認 Modal（表單 POST 到 Cancel/{id}） *@
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="cancelForm" method="post">
+            @Html.AntiForgeryToken()
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">取消請假申請</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>確定要取消以下請假申請嗎？此操作無法復原。</p>
+                    <p class="fw-bold" id="cancelSummary"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">保留</button>
+                    <button type="submit" class="btn btn-danger">確定取消</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var modal = document.getElementById('cancelModal');
+            if (!modal) return;
+            modal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                var id = button.getAttribute('data-request-id');
+                var summary = button.getAttribute('data-request-summary');
+                document.getElementById('cancelSummary').textContent = summary || '';
+                document.getElementById('cancelForm').action = '@Url.Action("Cancel", "LeaveRequests")/' + id;
+            });
+        })();
+    </script>
+}

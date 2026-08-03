@@ -45,6 +45,46 @@ public class LeaveRequestCreateViewModel
 }
 
 /// <summary>
+/// 學員編輯尚未簽核請假申請表單。
+/// 欄位對齊 Create + <see cref="Id"/>；若時數變動可能觸發 Steps 重建。
+/// </summary>
+public class LeaveRequestEditViewModel
+{
+    public int Id { get; set; }
+
+    [Required(ErrorMessage = "請選擇假別")]
+    [Display(Name = "假別")]
+    public int LeaveTypeId { get; set; }
+
+    [Required(ErrorMessage = "請選擇開始日期")]
+    [DataType(DataType.Date)]
+    [Display(Name = "開始日期")]
+    public DateTime StartDate { get; set; } = DateTime.Today;
+
+    [Required(ErrorMessage = "請選擇開始時間")]
+    [Display(Name = "開始時間")]
+    public int? StartHour { get; set; }
+
+    [Required(ErrorMessage = "請選擇結束日期")]
+    [DataType(DataType.Date)]
+    [Display(Name = "結束日期")]
+    public DateTime EndDate { get; set; } = DateTime.Today;
+
+    [Required(ErrorMessage = "請選擇結束時間")]
+    [Display(Name = "結束時間")]
+    public int? EndHour { get; set; }
+
+    [Required(ErrorMessage = "請輸入請假原因")]
+    [StringLength(500, ErrorMessage = "請假原因最長 500 字")]
+    [Display(Name = "請假原因")]
+    public string Reason { get; set; } = string.Empty;
+
+    public List<LeaveTypeOption> LeaveTypeOptions { get; set; } = new();
+    public List<HourOption> StartHourOptions { get; set; } = HourOptionCatalog.StartHours;
+    public List<HourOption> EndHourOptions { get; set; } = HourOptionCatalog.EndHours;
+}
+
+/// <summary>
 /// 學員查看「我的請假申請」列表列資料。
 /// </summary>
 public class LeaveRequestListItemViewModel
@@ -57,6 +97,11 @@ public class LeaveRequestListItemViewModel
     public LeaveStatus Status { get; set; }
     public int CurrentLevel { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// 是否允許學員編輯／取消（Status = Pending 且所有 Steps 皆 Pending）。
+    /// </summary>
+    public bool CanModify { get; set; }
 }
 
 public class LeaveTypeOption

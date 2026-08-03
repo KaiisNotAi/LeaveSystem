@@ -123,6 +123,26 @@ public class NotificationDispatcherTests
     }
 
     [Fact]
+    public async Task NotifyCancelledAsync_應通知目前CurrentLevel對應簽核人()
+    {
+        using var scenario = await ApprovalTestScenario.CreateAsync();
+        var tutor = await scenario.Db.UserAccounts.FirstAsync(u => u.Id == ApprovalTestScenario.TutorUserId);
+        tutor.Email = "tutor@test.local";
+        await scenario.Db.SaveChangesAsync();
+
+        var sut = CreateSut(scenario.Db, out var notifications, out var emails);
+
+        await sut.NotifyCancelledAsync(ApprovalTestScenario.LeaveRequestId);
+
+        var tutorInbox = await notifications.GetForUserAsync(ApprovalTestScenario.TutorUserId);
+        Assert.Single(tutorInbox);
+        Assert.Contains("取消", tutorInbox[0].Title);
+
+        Assert.Single(emails.Sent);
+        Assert.Equal("tutor@test.local", emails.Sent[0].To);
+    }
+
+    [Fact]
     public async Task Email發送擲例外_不應影響站內通知也不擲例外()
     {
         using var scenario = await ApprovalTestScenario.CreateAsync();

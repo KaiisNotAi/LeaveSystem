@@ -50,7 +50,9 @@ public class LeaveRequestsController : Controller
                 TotalHours = r.TotalHours,
                 Status = r.Status,
                 CurrentLevel = r.CurrentLevel,
-                CreatedAt = r.CreatedAt
+                CreatedAt = r.CreatedAt,
+                CanModify = r.Status == LeaveStatus.Pending
+                    && r.Steps.All(s => s.Decision == ApprovalDecision.Pending)
             })
             .AsNoTracking()
             .ToListAsync();
@@ -194,7 +196,218 @@ public class LeaveRequestsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // ─────────────────────────────────────────
+    // Edit / Cancel（僅限學員本人 + 尚未任何一關簽核）
+    // ─────────────────────────────────────────
+
+    [HttpGet]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var studentId = GetCurrentUserId();
+        if (studentId is null) return Forbid();
+
+        var req = await _db.LeaveRequests
+            .Include(r => r.Steps)
+            .FirstOrDefaultAsync(r => r.Id == id && r.StudentId == studentId.Value);
+        if (req is null) return NotFound();
+
+        if (!CanBeModified(req))
+        {
+            TempData["Error"] = "此請假申請已有簽核紀錄或已結案，無法編輯。";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var vm = new LeaveRequestEditViewModel
+        {
+            Id = req.Id,
+            LeaveTypeId = req.LeaveTypeId,
+            StartDate = req.StartAt.Date,
+            StartHour = req.StartAt.Hour,
+            EndDate = req.EndAt.Date,
+            EndHour = req.EndAt.Hour,
+            Reason = req.Reason
+        };
+        await PopulateLeaveTypesAsync(vm);
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(LeaveRequestEditViewModel input)
+    {
+        var studentId = GetCurrentUserId();
+        if (studentId is null) return Forbid();
+
+        var req = await _db.LeaveRequests
+            .Include(r => r.Steps)
+            .FirstOrDefaultAsync(r => r.Id == input.Id && r.StudentId == studentId.Value);
+        if (req is null) return NotFound();
+
+        if (!CanBeModified(req))
+        {
+            TempData["Error"] = "此請假申請已有簽核紀錄或已結案，無法編輯。";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        var student = await _db.UserAccounts
+            .Include(u => u.Cohort)
+            .FirstOrDefaultAsync(u => u.Id == studentId.Value && u.IsActive);
+        if (student is null) return Forbid();
+        if (student.Cohort is null)
+        {
+            ModelState.AddModelError(string.Empty, "你的帳號尚未指派班期，暫時無法編輯請假申請。請聯絡行政人員。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        if (!input.StartHour.HasValue || !input.EndHour.HasValue)
+        {
+            ModelState.AddModelError(string.Empty, "請選擇完整的起訖時段。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        var leaveTypeExists = await _db.LeaveTypes.AnyAsync(t => t.Id == input.LeaveTypeId && t.IsActive);
+        if (!leaveTypeExists)
+        {
+            ModelState.AddModelError(nameof(input.LeaveTypeId), "選擇的假別不存在或已停用，請重新選擇。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        var startAt = input.StartDate.Date.AddHours(input.StartHour.Value);
+        var endAt = input.EndDate.Date.AddHours(input.EndHour.Value);
+
+        if (!_leaveCalculator.TryCalculate(startAt, endAt, out var totalHours, out var calcError))
+        {
+            ModelState.AddModelError(string.Empty, calcError ?? "請假時段計算失敗，請檢查輸入。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        // 班期上限檢查（排除本單自身；本單為 Pending 通常不影響 approved 累計，但為保險起見依然排除）。
+        var approvedHours = await _db.LeaveRequests
+            .Where(r => r.StudentId == student.Id
+                        && r.Status == LeaveStatus.Approved
+                        && r.Id != req.Id)
+            .SumAsync(r => (decimal?)r.TotalHours) ?? 0m;
+        if (approvedHours + totalHours > student.Cohort.LeaveLimitHours)
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                $"編輯後將超過班期請假上限 {student.Cohort.LeaveLimitHours} 小時（目前已核准 {approvedHours:0.##} 小時，本次 {totalHours:0.##} 小時）。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        // 找對應 ApprovalRule → 需要的角色序列
+        var matchedRule = await _db.ApprovalRules
+            .OrderBy(r => r.MinHours)
+            .FirstOrDefaultAsync(r =>
+                r.MinHours <= totalHours &&
+                (!r.MaxHours.HasValue || totalHours <= r.MaxHours.Value));
+        if (matchedRule is null)
+        {
+            ModelState.AddModelError(string.Empty, "找不到符合此請假時數的簽核規則，請聯絡行政人員檢查設定。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        var requiredRoles = ApprovalRoleJson.Deserialize(matchedRule.RequiredRoles);
+        if (!requiredRoles.Any())
+        {
+            ModelState.AddModelError(string.Empty, "簽核規則未設定有效角色，請聯絡行政人員。");
+            await PopulateLeaveTypesAsync(input);
+            return View(input);
+        }
+
+        var existingRoles = req.Steps.OrderBy(s => s.Level).Select(s => s.ApproverRole).ToList();
+        var rolesChanged = !existingRoles.SequenceEqual(requiredRoles);
+
+        req.LeaveTypeId = input.LeaveTypeId;
+        req.StartAt = startAt;
+        req.EndAt = endAt;
+        req.TotalHours = totalHours;
+        req.Reason = input.Reason.Trim();
+        req.UpdatedAt = DateTime.UtcNow;
+
+        if (rolesChanged)
+        {
+            _db.LeaveRequestSteps.RemoveRange(req.Steps);
+            req.Steps = requiredRoles
+                .Select((role, index) => new LeaveRequestStep
+                {
+                    Level = index + 1,
+                    ApproverRole = role,
+                    Decision = ApprovalDecision.Pending
+                })
+                .ToList();
+            req.CurrentLevel = 1;
+        }
+
+        await _db.SaveChangesAsync();
+        await _notifications.NotifySubmittedAsync(req.Id);
+
+        TempData["Success"] = rolesChanged
+            ? $"請假申請已更新（共 {totalHours:0.##} 小時，重新啟動 {requiredRoles.Count} 關簽核）。"
+            : $"請假申請已更新（共 {totalHours:0.##} 小時）。";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        var studentId = GetCurrentUserId();
+        if (studentId is null) return Forbid();
+
+        var req = await _db.LeaveRequests
+            .Include(r => r.Steps)
+            .FirstOrDefaultAsync(r => r.Id == id && r.StudentId == studentId.Value);
+        if (req is null) return NotFound();
+
+        if (!CanBeModified(req))
+        {
+            TempData["Error"] = "此請假申請已有簽核紀錄或已結案，無法取消。";
+            return RedirectToAction(nameof(Index));
+        }
+
+        req.Status = LeaveStatus.Cancelled;
+        req.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _notifications.NotifyCancelledAsync(req.Id);
+
+        TempData["Success"] = "請假申請已取消。";
+        return RedirectToAction(nameof(Index));
+    }
+
+    private static bool CanBeModified(LeaveRequest req)
+        => req.Status == LeaveStatus.Pending
+           && req.Steps.All(s => s.Decision == ApprovalDecision.Pending);
+
     private async Task PopulateLeaveTypesAsync(LeaveRequestCreateViewModel vm)
+    {
+        vm.LeaveTypeOptions = await _db.LeaveTypes
+            .Where(t => t.IsActive)
+            .OrderBy(t => t.SortOrder)
+            .ThenBy(t => t.Name)
+            .Select(t => new LeaveTypeOption
+            {
+                Id = t.Id,
+                Name = t.Name
+            })
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    private async Task PopulateLeaveTypesAsync(LeaveRequestEditViewModel vm)
     {
         vm.LeaveTypeOptions = await _db.LeaveTypes
             .Where(t => t.IsActive)
