@@ -62,6 +62,14 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">隱私權聲明</a>
                         </li>
                     </ul>
+                    @if (User.Identity != null && User.Identity.IsAuthenticated)
+                    {
+                        <ul class="navbar-nav">
+                            <li class="nav-item">
+                                @await Component.InvokeAsync("NotificationBadge")
+                            </li>
+                        </ul>
+                    }
                     <partial name="_LoginPartial" />
                 </div>
             </div>
