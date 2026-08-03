@@ -72,6 +72,35 @@ public class NotificationDispatcher : INotificationDispatcher
         }
     }
 
+    public async Task NotifyCancelledAsync(int leaveRequestId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var req = await LoadRequestAsync(leaveRequestId, cancellationToken);
+            if (req is null || req.Student.Cohort is null) return;
+
+            var currentStep = await _db.LeaveRequestSteps
+                .Where(s => s.LeaveRequestId == leaveRequestId && s.Level == req.CurrentLevel)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (currentStep is null) return;
+
+            var approverId = ResolveApproverUserId(req.Student.Cohort, currentStep.ApproverRole);
+            if (approverId is null) return;
+
+            var approver = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Id == approverId.Value, cancellationToken);
+            if (approver is null) return;
+
+            var url = BuildApprovalUrl(leaveRequestId);
+            var title = "學員已取消請假申請";
+            var message = $"學員 {req.Student.DisplayName} 已取消先前送出的請假申請（{req.LeaveType?.Name} {req.TotalHours:0.##}h），本關可略過。";
+            await DispatchAsync(approver, title, message, url, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "NotifyCancelledAsync 失敗（RequestId={Id}）", leaveRequestId);
+        }
+    }
+
     private async Task NotifyApproverAtCurrentLevelAsync(int leaveRequestId, bool isFirstSubmission, CancellationToken cancellationToken)
     {
         try
@@ -156,4 +185,5 @@ public class NullNotificationDispatcher : INotificationDispatcher
     public Task NotifyApprovedNextAsync(int leaveRequestId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task NotifyFullyApprovedAsync(int leaveRequestId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task NotifyRejectedAsync(int leaveRequestId, string rejectComment, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task NotifyCancelledAsync(int leaveRequestId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

@@ -1,0 +1,82 @@
+@model LeaveSystem.Models.ViewModels.LeaveRequestEditViewModel
+@{
+    ViewData["Title"] = "編輯請假申請";
+}
+
+<h3>@ViewData["Title"] #@Model.Id</h3>
+
+<div class="alert alert-warning small mb-3">
+    僅有 <strong>尚未進入任何一關簽核</strong> 的請假單可編輯。若時數變動導致簽核關卡改變，系統會重新啟動簽核流程並通知第一關簽核人。
+</div>
+<div class="alert alert-info small mb-3">
+    上課時段為 <strong>08:00~12:00、13:00~17:00</strong>，午休 <strong>12:00~13:00</strong> 不計入請假時數。
+</div>
+
+<form asp-action="Edit" method="post" class="mt-3">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label asp-for="LeaveTypeId" class="form-label"></label>
+            <select asp-for="LeaveTypeId" class="form-select">
+                <option value="">— 請選擇假別 —</option>
+                @foreach (var item in Model.LeaveTypeOptions)
+                {
+                    <option value="@item.Id">@item.Name</option>
+                }
+            </select>
+            <span asp-validation-for="LeaveTypeId" class="text-danger small"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label asp-for="StartDate" class="form-label"></label>
+            <input asp-for="StartDate" class="form-control" type="date" />
+            <span asp-validation-for="StartDate" class="text-danger small"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="StartHour" class="form-label"></label>
+            <select asp-for="StartHour" class="form-select">
+                <option value="">— 請選擇開始時間 —</option>
+                @foreach (var hour in Model.StartHourOptions)
+                {
+                    <option value="@hour.Hour">@hour.Label</option>
+                }
+            </select>
+            <span asp-validation-for="StartHour" class="text-danger small"></span>
+        </div>
+
+        <div class="col-md-4">
+            <label asp-for="EndDate" class="form-label"></label>
+            <input asp-for="EndDate" class="form-control" type="date" />
+            <span asp-validation-for="EndDate" class="text-danger small"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="EndHour" class="form-label"></label>
+            <select asp-for="EndHour" class="form-select">
+                <option value="">— 請選擇結束時間 —</option>
+                @foreach (var hour in Model.EndHourOptions)
+                {
+                    <option value="@hour.Hour">@hour.Label</option>
+                }
+            </select>
+            <span asp-validation-for="EndHour" class="text-danger small"></span>
+        </div>
+
+        <div class="col-12">
+            <label asp-for="Reason" class="form-label"></label>
+            <textarea asp-for="Reason" class="form-control" rows="3" placeholder="請簡述請假原因"></textarea>
+            <span asp-validation-for="Reason" class="text-danger small"></span>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">儲存變更</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">返回列表</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

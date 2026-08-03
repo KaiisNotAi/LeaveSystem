@@ -17,4 +17,7 @@ public interface INotificationDispatcher
 
     /// <summary>任一關駁回，通知學員（含駁回原因）。</summary>
     Task NotifyRejectedAsync(int leaveRequestId, string rejectComment, CancellationToken cancellationToken = default);
+
+    /// <summary>學員自行取消（軟刪除）尚未簽核的請假單時，通知目前應簽核的簽核人。</summary>
+    Task NotifyCancelledAsync(int leaveRequestId, CancellationToken cancellationToken = default);
 }
