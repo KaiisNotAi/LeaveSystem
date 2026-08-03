@@ -29,6 +29,14 @@ public class AdminExportQuery
     [Display(Name = "學員（未選＝該班期全部）")]
     public int? StudentId { get; set; }
 
+    /// <summary>
+    /// 請假單狀態過濾（僅影響請假明細 sheet 與請假 CSV）：
+    ///   ‧ 未選 → 全狀態
+    ///   ‧ 有選 → 只匯出該狀態的請假單（曠課明細不受影響）
+    /// </summary>
+    [Display(Name = "假單狀態")]
+    public LeaveStatus? Status { get; set; }
+
     [DataType(DataType.Date)]
     [Display(Name = "日期起")]
     public DateTime? DateFrom { get; set; }

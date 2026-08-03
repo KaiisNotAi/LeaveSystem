@@ -1,4 +1,5 @@
 @model LeaveSystem.Models.ViewModels.AdminExportPageViewModel
+@using LeaveSystem.Models.Enums
 @{
     ViewData["Title"] = "匯出報表";
     var q = Model.Query;
@@ -43,6 +44,32 @@
                     </option>
                 }
             </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">假單狀態</label>
+            <select name="Status" class="form-select">
+                <option value="">— 不限 —</option>
+                @foreach (var st in new[] { LeaveStatus.Pending, LeaveStatus.Approved, LeaveStatus.Rejected, LeaveStatus.Cancelled })
+                {
+                    var label = st switch
+                    {
+                        LeaveStatus.Pending => "進行中",
+                        LeaveStatus.Approved => "已核准",
+                        LeaveStatus.Rejected => "已駁回",
+                        LeaveStatus.Cancelled => "已取消",
+                        _ => st.ToString()
+                    };
+                    if (q.Status == st)
+                    {
+                        <option value="@((int)st)" selected>@label</option>
+                    }
+                    else
+                    {
+                        <option value="@((int)st)">@label</option>
+                    }
+                }
+            </select>
+            <span class="form-text text-muted small">僅影響請假明細</span>
         </div>
         <div class="col-md-2">
             <label class="form-label">日期起</label>

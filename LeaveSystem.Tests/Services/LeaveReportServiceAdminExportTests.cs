@@ -132,4 +132,24 @@ public class LeaveReportServiceAdminExportTests
             Assert.False(string.IsNullOrEmpty(r.LeaveTypeName));
         });
     }
+
+    [Theory]
+    [InlineData(LeaveStatus.Approved, 4)]  // 情境內 CohortA 已核准：RA1/RA2/RA3/RA6
+    [InlineData(LeaveStatus.Pending, 1)]   // RA4
+    [InlineData(LeaveStatus.Rejected, 1)]  // RA5
+    public async Task GetLeaveDetailsForAdminAsync_WithStatusFilter_ShouldReturnOnlyMatchingRows(
+        LeaveStatus status, int expectedCount)
+    {
+        using var scenario = await ReportTestScenario.CreateAsync();
+        var sut = new LeaveReportService(scenario.Db);
+
+        var rows = await sut.GetLeaveDetailsForAdminAsync(new AdminExportQuery
+        {
+            CohortId = ReportTestScenario.CohortIdA,
+            Status = status
+        });
+
+        Assert.Equal(expectedCount, rows.Count);
+        Assert.All(rows, r => Assert.Equal(status, r.Status));
+    }
 }

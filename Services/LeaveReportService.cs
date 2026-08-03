@@ -263,6 +263,10 @@ public class LeaveReportService : ILeaveReportService
         {
             q = q.Where(r => r.StudentId == query.StudentId.Value);
         }
+        if (query.Status.HasValue)
+        {
+            q = q.Where(r => r.Status == query.Status.Value);
+        }
         if (query.DateFrom.HasValue)
         {
             var from = query.DateFrom.Value;
