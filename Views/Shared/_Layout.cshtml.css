@@ -1,5 +1,8 @@
 ﻿/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-for details on configuring this project to bundle and minify static web assets. */
+   for details on configuring this project to bundle and minify static web assets.
+
+   基礎樣式已由 wwwroot/css/site.css 的設計語彙統一控制，
+   此檔僅保留必要的 Layout scoped 覆蓋。 */
 
 a.navbar-brand {
   white-space: normal;
@@ -8,30 +11,31 @@ a.navbar-brand {
 }
 
 a {
-  color: #0077cc;
+  color: var(--ink-primary, #1f3a68);
 }
 
 .btn-primary {
   color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
+  background-color: var(--ink-primary, #1f3a68);
+  border-color: var(--ink-primary, #1f3a68);
 }
 
 .nav-pills .nav-link.active, .nav-pills .show > .nav-link {
   color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
+  background-color: var(--ink-primary, #1f3a68);
+  border-color: var(--ink-primary, #1f3a68);
 }
 
 .border-top {
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid var(--ink-border, rgba(31, 58, 104, 0.12));
 }
+
 .border-bottom {
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid var(--ink-border, rgba(31, 58, 104, 0.12));
 }
 
 .box-shadow {
-  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+  box-shadow: var(--shadow-soft, 0 4px 16px rgba(31, 58, 104, 0.06));
 }
 
 button.accept-policy {
@@ -39,10 +43,3 @@ button.accept-policy {
   line-height: inherit;
 }
 
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  white-space: nowrap;
-  line-height: 60px;
-}
