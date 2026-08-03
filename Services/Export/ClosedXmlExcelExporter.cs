@@ -79,9 +79,21 @@ public sealed class ClosedXmlExcelExporter : IExcelExporter
             rowIndex++;
         }
 
-        // 首列凍結 + 自動欄寬
+        // 首列凍結 + 自動欄寬（含中文加寬補償）
         ws.SheetView.FreezeRows(1);
         ws.Columns().AdjustToContents();
+
+        // ClosedXML 以 Calibri 半形字寬估算欄寬，中文全形字實際佔 2 個字寬，
+        // 因此 AdjustToContents 對中文明顯偏窄。這裡做兩件事：
+        //   1) 每欄寬度加 2 個字寬當作 padding（避免最後一個字被截）。
+        //   2) 上限 60 避免超長備註把版面撐爆；下限 8 讓短標題也不會太擠。
+        foreach (var col in ws.ColumnsUsed())
+        {
+            var w = col.Width + 2;
+            if (w < 8) w = 8;
+            if (w > 60) w = 60;
+            col.Width = w;
+        }
     }
 
     private static void WriteCell(IXLCell cell, object? value, ExportValueType type)
