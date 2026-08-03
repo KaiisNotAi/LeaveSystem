@@ -28,9 +28,11 @@
                     <tr>
                         <th>申請編號</th>
                         <th>學員</th>
+                        <th>班期</th>
                         <th>假別</th>
                         <th>請假區間</th>
                         <th class="text-end">時數</th>
+                        <th class="text-end">已請 / 上限</th>
                         <th>目前關卡</th>
                         <th>建立時間</th>
                         <th class="text-end">操作</th>
@@ -40,7 +42,7 @@
                     @if (!Model.PendingItems.Any())
                     {
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">目前沒有待你簽核的申請</td>
+                            <td colspan="10" class="text-center text-muted py-4">目前沒有待你簽核的申請</td>
                         </tr>
                     }
                     else
@@ -50,6 +52,7 @@
                             <tr>
                                 <td>#@item.LeaveRequestId</td>
                                 <td>@item.StudentDisplayName</td>
+                                <td>@(item.Usage.CohortName ?? "—")</td>
                                 <td>@item.LeaveTypeName</td>
                                 <td>
                                     @item.StartAt.ToString("yyyy-MM-dd HH:mm")
@@ -57,6 +60,21 @@
                                     @item.EndAt.ToString("yyyy-MM-dd HH:mm")
                                 </td>
                                 <td class="text-end">@item.TotalHours</td>
+                                <td class="text-end">
+                                    @if (item.Usage.CohortLeaveLimitHours.HasValue)
+                                    {
+                                        <span>@item.Usage.ApprovedHours / @item.Usage.CohortLeaveLimitHours</span>
+                                        @if (item.Usage.UsagePercent.HasValue)
+                                        {
+                                            <span class="text-muted small">（@item.Usage.UsagePercent.Value.ToString("0.#")%）</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span>@item.Usage.ApprovedHours</span>
+                                        <span class="text-muted"> / —</span>
+                                    }
+                                </td>
                                 <td><span class="badge bg-warning text-dark">第 @item.CurrentLevel 關</span></td>
                                 <td>@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                                 <td class="text-end">

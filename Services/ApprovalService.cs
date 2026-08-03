@@ -201,6 +201,34 @@ public class ApprovalService : IApprovalService
     }
 
     /// <summary>
+    /// 由 Cohort 與該學員的已核准時數，組出班期用量資訊。
+    /// 學員無班期時只帶已核准時數；上限為 0 或 null 時，剩餘/百分比皆為 null，避免除以零。
+    /// </summary>
+    private static StudentCohortUsage BuildUsage(Models.Entities.Cohort? cohort, decimal approvedHours)
+    {
+        var usage = new StudentCohortUsage { ApprovedHours = approvedHours };
+
+        if (cohort is null)
+        {
+            return usage;
+        }
+
+        usage.CohortName = cohort.Name;
+
+        var limit = cohort.LeaveLimitHours;
+        usage.CohortLeaveLimitHours = limit;
+
+        if (limit > 0)
+        {
+            var remaining = limit - approvedHours;
+            usage.RemainingHours = remaining < 0m ? 0m : remaining;
+            usage.UsagePercent = Math.Round(approvedHours / limit * 100m, 1, MidpointRounding.AwayFromZero);
+        }
+
+        return usage;
+    }
+
+    /// <summary>
     /// 依關卡角色取得班期指定簽核人 UserId。
     /// </summary>
     private static int? GetAssignedApproverId(Models.Entities.LeaveRequestStep step)
@@ -247,9 +275,21 @@ public class ApprovalService : IApprovalService
             .AsNoTracking()
             .ToListAsync();
 
-        return candidates
+        var filtered = candidates
             .Where(s => GetAssignedApproverId(s) == currentUserId)
             .OrderByDescending(s => s.LeaveRequest.CreatedAt)
+            .ToList();
+
+        // 一次批次查詢所有相關學員的已核准時數總和，避免 N+1。
+        var studentIds = filtered.Select(s => s.LeaveRequest.StudentId).Distinct().ToList();
+        var approvedByStudent = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(r => studentIds.Contains(r.StudentId) && r.Status == LeaveStatus.Approved)
+            .GroupBy(r => r.StudentId)
+            .Select(g => new { StudentId = g.Key, Sum = g.Sum(r => r.TotalHours) })
+            .ToDictionaryAsync(x => x.StudentId, x => x.Sum);
+
+        return filtered
             .Select(s => new PendingApprovalItem
             {
                 LeaveRequestId = s.LeaveRequestId,
@@ -260,7 +300,10 @@ public class ApprovalService : IApprovalService
                 StartAt = s.LeaveRequest.StartAt,
                 EndAt = s.LeaveRequest.EndAt,
                 TotalHours = s.LeaveRequest.TotalHours,
-                CreatedAt = s.LeaveRequest.CreatedAt
+                CreatedAt = s.LeaveRequest.CreatedAt,
+                Usage = BuildUsage(
+                    s.LeaveRequest.Student.Cohort,
+                    approvedByStudent.TryGetValue(s.LeaveRequest.StudentId, out var sum) ? sum : 0m)
             })
             .ToList();
     }
@@ -341,6 +384,12 @@ public class ApprovalService : IApprovalService
             Reason = request.Reason,
             CanActOnCurrentStep = canActOnCurrentStep,
             CurrentStepId = canActOnCurrentStep ? currentStep!.Id : null,
+            Usage = BuildUsage(
+                request.Student.Cohort,
+                await _db.LeaveRequests
+                    .AsNoTracking()
+                    .Where(r => r.StudentId == request.StudentId && r.Status == LeaveStatus.Approved)
+                    .SumAsync(r => (decimal?)r.TotalHours) ?? 0m),
             Steps = request.Steps
                 .OrderBy(s => s.Level)
                 .Select(s => new ApprovalStepViewModel
