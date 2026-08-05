@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>學生請假系統 — 操作使用說明書</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --primary:#2563eb; --primary-dark:#1e40af;
+    --student:#0ea5e9; --approver:#8b5cf6; --admin:#f59e0b;
+    --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+    --ok:#10b981; --warn:#f59e0b; --err:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.7}
+  header.hero{background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+              color:#fff;padding:48px 24px;text-align:center}
+  header.hero h1{margin:0 0 12px;font-size:36px}
+  header.hero p{margin:0;opacity:.9;font-size:16px}
+  nav.toc{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);
+          padding:12px 24px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.04)}
+  nav.toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px;
+             max-width:1100px;margin:0 auto}
+  nav.toc a{display:inline-block;padding:6px 14px;border-radius:20px;
+            background:#f1f5f9;color:var(--text);text-decoration:none;font-size:14px}
+  nav.toc a:hover{background:var(--primary);color:#fff}
+  main{max-width:1100px;margin:0 auto;padding:32px 24px 80px}
+  section{background:var(--card);border-radius:12px;padding:32px;margin-bottom:32px;
+          box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  section.role-student{border-top:6px solid var(--student)}
+  section.role-approver{border-top:6px solid var(--approver)}
+  section.role-admin{border-top:6px solid var(--admin)}
+  h2{margin-top:0;font-size:26px;display:flex;align-items:center;gap:12px}
+  h2 .badge{font-size:13px;padding:4px 12px;border-radius:12px;color:#fff;font-weight:normal}
+  .badge-student{background:var(--student)}
+  .badge-approver{background:var(--approver)}
+  .badge-admin{background:var(--admin)}
+  h3{margin-top:28px;font-size:19px;color:var(--primary-dark);
+     border-left:4px solid var(--primary);padding-left:10px}
+  h4{margin-top:20px;font-size:16px;color:#334155}
+  code{background:#f1f5f9;padding:2px 6px;border-radius:4px;
+       font-family:Consolas,Menlo,monospace;font-size:13px;color:#be185d}
+  kbd{background:#334155;color:#fff;padding:2px 6px;border-radius:4px;font-size:12px}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}
+  th,td{border:1px solid var(--border);padding:10px 12px;text-align:left;vertical-align:top}
+  th{background:#f8fafc;color:#334155;font-weight:600}
+  tr:nth-child(even) td{background:#fafbfc}
+  .note{background:#fef3c7;border-left:4px solid var(--warn);padding:12px 16px;
+        border-radius:6px;margin:12px 0}
+  .tip{background:#dcfce7;border-left:4px solid var(--ok);padding:12px 16px;
+       border-radius:6px;margin:12px 0}
+  .danger{background:#fee2e2;border-left:4px solid var(--err);padding:12px 16px;
+          border-radius:6px;margin:12px 0}
+  ol,ul{padding-left:22px}
+  ol li,ul li{margin:6px 0}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:16px 0;
+        padding:16px;background:#f8fafc;border-radius:8px}
+  .flow .step{background:#fff;border:2px solid var(--primary);border-radius:8px;
+              padding:8px 14px;font-size:14px;font-weight:600}
+  .flow .arrow{color:var(--primary);font-size:22px;font-weight:bold}
+  .status{display:inline-block;padding:2px 10px;border-radius:12px;
+          font-size:12px;font-weight:600;color:#fff}
+  .s-draft{background:#94a3b8} .s-pending{background:var(--warn)}
+  .s-approved{background:var(--ok)} .s-rejected{background:var(--err)}
+  .s-cancelled{background:#64748b}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .accounts{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px}
+  footer{text-align:center;color:var(--muted);padding:24px;font-size:13px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>📘 學生請假系統 — 操作使用說明書</h1>
+  <p>面向 學員 / 簽核者 / 行政人員（管理者）三種角色的完整操作指引</p>
+  <p style="margin-top:8px;font-size:13px;opacity:.85">.NET 10 · ASP.NET Core · 全繁體中文介面</p>
+</header>
+
+<nav class="toc">
+  <ul>
+    <li><a href="#overview">📖 系統概述</a></li>
+    <li><a href="#login">🔐 登入方式</a></li>
+    <li><a href="#student">🎓 學員操作</a></li>
+    <li><a href="#approver">✅ 簽核者操作</a></li>
+    <li><a href="#admin">⚙️ 行政人員操作</a></li>
+    <li><a href="#notify">🔔 通知機制</a></li>
+    <li><a href="#faq">❓ 常見問題</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- ============ 系統概述 ============ -->
+<section id="overview">
+  <h2>📖 系統概述</h2>
+  <p>本系統取代原本以 <strong>LINE + 紙本假單</strong> 處理學員請假的舊流程，讓學員、簽核者（導師 / 科長 / 分署長）、行政人員三方在同一平台上作業。</p>
+
+  <h3>核心功能</h3>
+  <div class="grid2">
+    <div>
+      <h4>🎓 學員端</h4>
+      <ul>
+        <li>線上填寫並送出請假申請</li>
+        <li>即時查看簽核進度與簽核意見</li>
+        <li>查詢個人歷史請假紀錄</li>
+        <li>檢視各假別累計時數與班期上限</li>
+        <li>查閱個人曠課紀錄（唯讀）</li>
+      </ul>
+    </div>
+    <div>
+      <h4>✅ 簽核者端</h4>
+      <ul>
+        <li>待辦清單集中檢視</li>
+        <li>逐級簽核（核准 / 駁回）</li>
+        <li>簽核意見留存供追溯</li>
+        <li>Email 與站內雙通知</li>
+      </ul>
+    </div>
+    <div>
+      <h4>⚙️ 行政 / 管理員端</h4>
+      <ul>
+        <li>使用者、班期、假別、簽核規則維護</li>
+        <li>曠課紀錄登錄與管理</li>
+        <li>行政彙總報表（班期 × 學員 × 假別 × 月份）</li>
+        <li>報表匯出（CSV / Excel）</li>
+      </ul>
+    </div>
+    <div>
+      <h4>🔔 通知機制</h4>
+      <ul>
+        <li>站內通知（🔔 圖示 + <code>/Notifications</code>）</li>
+        <li>Email 通知（開發環境走 PickupDirectory）</li>
+        <li>4 個觸發點：送單、逐級通過、全通過、駁回</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>角色與權限一覽</h3>
+  <table>
+    <thead><tr><th>角色</th><th>主要職責</th><th>可存取的關鍵路徑</th></tr></thead>
+    <tbody>
+      <tr><td>學員 Student</td><td>提交請假、追蹤進度、查詢紀錄</td><td><code>/LeaveRequests</code>、<code>/Reports</code>、<code>/AbsenceRecords</code></td></tr>
+      <tr><td>導師 Tutor（Level 1）</td><td>第一關簽核</td><td><code>/Approvals</code></td></tr>
+      <tr><td>科長 SectionChief（Level 2）</td><td>第二關簽核</td><td><code>/Approvals</code></td></tr>
+      <tr><td>分署長 BranchDirector（Level 3）</td><td>第三關簽核</td><td><code>/Approvals</code></td></tr>
+      <tr><td>行政 Staff</td><td>維護資料、登錄曠課、看報表</td><td><code>/Admin/*</code>、<code>/Reports/Admin</code></td></tr>
+      <tr><td>系統管理員 Admin</td><td>全權限，含簽核規則調整</td><td><code>/Admin/*</code>（含 ApprovalRules）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 登入方式 ============ -->
+<section id="login">
+  <h2>🔐 登入方式（共通）</h2>
+  <ol>
+    <li>開啟瀏覽器，前往系統首頁（例：<code>https://localhost:5001</code>）。</li>
+    <li>點擊右上角「登入」，前往 <code>/Account/Login</code>。</li>
+    <li>輸入行政人員配發給您的<strong>帳號</strong>與<strong>密碼</strong>。</li>
+    <li>登入成功後，系統會依您的角色顯示對應的功能選單。</li>
+    <li>操作完畢請點右上角「登出」以保護個人資料。</li>
+  </ol>
+
+  <div class="accounts">
+    <strong>🧪 開發／預設管理員帳號</strong>
+    <table>
+      <tr><th style="width:120px">帳號</th><td><code>Admin</code></td></tr>
+      <tr><th>密碼</th><td><code>Admin@123</code></td></tr>
+      <tr><th>角色</th><td>系統管理員</td></tr>
+    </table>
+    <div class="danger">⚠️ <strong>正式部署前務必立即變更預設密碼</strong>，避免系統遭未授權存取。</div>
+  </div>
+
+  <h3>忘記密碼</h3>
+  <p>目前系統未提供自助重設密碼功能，請聯絡行政人員 / 系統管理員至 <code>/Admin/Users</code> 使用「重設密碼」功能協助。</p>
+</section>
+
+<!-- ============ 學員 ============ -->
+<section id="student" class="role-student">
+  <h2>🎓 學員操作指南 <span class="badge badge-student">Student</span></h2>
+
+  <h3>1. 送出請假申請</h3>
+  <div class="flow">
+    <div class="step">登入</div><span class="arrow">→</span>
+    <div class="step">/LeaveRequests/Create</div><span class="arrow">→</span>
+    <div class="step">填寫表單</div><span class="arrow">→</span>
+    <div class="step">送出</div><span class="arrow">→</span>
+    <div class="step"><span class="status s-pending">Pending</span> 等待簽核</div>
+  </div>
+  <ol>
+    <li>從上方選單進入「我要請假」或直接前往 <code>/LeaveRequests/Create</code>。</li>
+    <li>選擇<strong>假別</strong>（病假 / 事假 / 喪假 / 公假…）。</li>
+    <li>選擇<strong>起訖日期</strong>與<strong>時段</strong>（下拉選單，最小單位 1 小時，僅可選整點）。</li>
+    <li>填寫<strong>請假原因</strong>（必填）。</li>
+    <li>系統會即時顯示：
+      <ul>
+        <li>計算後的<strong>總時數</strong>（扣除 12:00–13:00 午休、下班後 17:00 之後不計）</li>
+        <li>是否超過班期請假上限（若超過將無法送出）</li>
+        <li>依時數自動判斷需要幾關簽核</li>
+      </ul>
+    </li>
+    <li>確認無誤後按「送出」，狀態即變為 <span class="status s-pending">Pending</span>。</li>
+  </ol>
+  <div class="tip">💡 送出時系統會建立所有關卡的 Step（例如需三關則建立 3 筆），並將 <code>CurrentLevel = 1</code>，通知第一關簽核者。</div>
+
+  <h3>2. 查看我的請假紀錄與進度</h3>
+  <ol>
+    <li>前往 <code>/LeaveRequests</code> 檢視「我的請假清單」。</li>
+    <li>可依<strong>狀態、假別、日期</strong>篩選。</li>
+    <li>點擊單一列可看：目前停在第幾關、每一關的簽核人、簽核意見與時間戳。</li>
+  </ol>
+  <table>
+    <thead><tr><th>狀態</th><th>意義</th><th>可做的動作</th></tr></thead>
+    <tbody>
+      <tr><td><span class="status s-pending">Pending</span></td><td>簽核中</td><td>可撤銷（若尚未有人核准）</td></tr>
+      <tr><td><span class="status s-approved">Approved</span></td><td>全關通過</td><td>僅檢視</td></tr>
+      <tr><td><span class="status s-rejected">Rejected</span></td><td>任一關駁回</td><td>可重新申請新單</td></tr>
+      <tr><td><span class="status s-cancelled">Cancelled</span></td><td>學員自行撤銷</td><td>僅檢視</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3. 查看時數統計</h3>
+  <ul>
+    <li><code>/Reports/Index</code>：可依狀態、假別、日期篩選我的請假紀錄。</li>
+    <li><code>/Reports/Summary</code>：各假別已核准時數 + 班期上限進度條（<strong>只計 Approved 的單</strong>）。</li>
+  </ul>
+  <div class="note">📌 尚未指派班期的學員只會看到已核准時數，不顯示進度條並提示「尚未指派班期」。</div>
+
+  <h3>4. 查看個人曠課紀錄</h3>
+  <ol>
+    <li>前往 <code>/AbsenceRecords</code>。</li>
+    <li>可依日期範圍篩選，並看到<strong>個人總曠課時數</strong>（此數字不受日期篩選影響，作為固定警惕值）。</li>
+  </ol>
+  <div class="danger">❗ 曠課紀錄僅由行政人員登錄，學員<strong>無法自行新增 / 修改 / 刪除</strong>。若有疑義請洽行政。</div>
+</section>
+
+<!-- ============ 簽核者 ============ -->
+<section id="approver" class="role-approver">
+  <h2>✅ 簽核者操作指南 <span class="badge badge-approver">Tutor / SectionChief / BranchDirector</span></h2>
+
+  <h3>1. 處理待辦</h3>
+  <div class="flow">
+    <div class="step">收 🔔 通知</div><span class="arrow">→</span>
+    <div class="step">/Approvals 待辦清單</div><span class="arrow">→</span>
+    <div class="step">點入 Details</div><span class="arrow">→</span>
+    <div class="step">核准 或 駁回（填原因）</div>
+  </div>
+  <ol>
+    <li>登入後點右上角 🔔 圖示，或直接進入 <code>/Approvals</code>。</li>
+    <li>清單只會顯示<strong>目前輪到您</strong>的單（<code>Step.Level == CurrentLevel</code> 且您是該關指定角色）。</li>
+    <li>點擊某筆進入 Details，檢視：申請人、假別、時段、總時數、請假原因、前一關的簽核意見。</li>
+    <li>選擇動作：
+      <ul>
+        <li><strong>核准</strong>：可填意見（選填）。若還有下一關，系統自動推進 <code>CurrentLevel</code> 並通知下一位；若是最後一關，整單變 <span class="status s-approved">Approved</span> 並通知申請人。</li>
+        <li><strong>駁回</strong>：<strong>意見必填</strong>。整單立即變 <span class="status s-rejected">Rejected</span>，後續關卡不再處理，同時通知申請人並附上原因。</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>2. 誰能看到哪些單？</h3>
+  <table>
+    <thead><tr><th>角色</th><th>可見待辦條件</th></tr></thead>
+    <tbody>
+      <tr><td>導師</td><td>所屬班期學員的單 · <code>CurrentLevel = 1</code> · 該關 Role = Tutor</td></tr>
+      <tr><td>科長</td><td>所屬班期學員的單 · <code>CurrentLevel = 2</code> · 該關 Role = SectionChief</td></tr>
+      <tr><td>分署長</td><td>所屬班期學員的單 · <code>CurrentLevel = 3</code> · 該關 Role = BranchDirector</td></tr>
+    </tbody>
+  </table>
+  <div class="note">🔑 關鍵規則：<strong>前一關未核准前，下一關不會看到該單</strong>。</div>
+
+  <h3>3. 簽核規則對照（預設）</h3>
+  <table>
+    <thead><tr><th>請假時數</th><th>需經過的關卡</th></tr></thead>
+    <tbody>
+      <tr><td>≤ 8 小時</td><td>導師（1 關）</td></tr>
+      <tr><td>8.01 ~ 24 小時</td><td>導師 → 科長（2 關）</td></tr>
+      <tr><td>&gt; 24 小時</td><td>導師 → 科長 → 分署長（3 關）</td></tr>
+    </tbody>
+  </table>
+  <p>規則由 <code>ApprovalRule</code> 表決定，可由系統管理員於 <code>/Admin/ApprovalRules</code> 調整。</p>
+
+  <div class="tip">💡 <strong>防呆</strong>：同一 Step 不能重複簽核；簽完會立刻寫入 <code>ApproverUserId</code> 與 <code>DecidedAt</code>，供追溯。</div>
+</section>
+
+<!-- ============ 行政 / 管理員 ============ -->
+<section id="admin" class="role-admin">
+  <h2>⚙️ 行政人員 / 系統管理員操作指南 <span class="badge badge-admin">Staff / Admin</span></h2>
+
+  <h3>1. 使用者管理（<code>/Admin/Users</code>）</h3>
+  <ol>
+    <li>建立新帳號：填寫姓名、Email、初始密碼、角色（可多選）。</li>
+    <li>指派學員的<strong>所屬班期</strong>（<code>CohortId</code>）— 未指派班期的學員無法被登錄曠課，也不會出現在多數彙總。</li>
+    <li>停用 / 啟用帳號（不建議直接刪除，以保留歷史紀錄）。</li>
+    <li>重設使用者密碼。</li>
+  </ol>
+  <div class="note">📌 建立學員前請<strong>先建立班期</strong>，否則「所屬班期」下拉將為空。</div>
+
+  <h3>2. 班期管理（<code>/Admin/Cohorts</code>）</h3>
+  <ul>
+    <li>建立班期名稱、起訖日期。</li>
+    <li>設定<strong>班期請假上限時數</strong>（<code>LeaveLimitHours</code>），例如班期總上課時數 × 10%。</li>
+    <li>指派該班期的<strong>導師 / 科長 / 分署長</strong>，決定學員送單後由誰簽核。</li>
+  </ul>
+
+  <h3>3. 假別管理（<code>/Admin/LeaveTypes</code>）</h3>
+  <p>維護病假、事假、喪假、公假…等假別。此清單直接對應學員申請時的下拉選單。</p>
+
+  <h3>4. 簽核規則管理（<code>/Admin/ApprovalRules</code>，僅 Admin）</h3>
+  <p>調整時數區間對應的簽核角色鏈。每筆規則含：</p>
+  <ul>
+    <li><code>MinHours</code> / <code>MaxHours</code>：時數區間（<code>MaxHours</code> 可為空表示無上限）</li>
+    <li><code>RequiredRoles</code>：JSON 陣列，例如 <code>["Tutor","SectionChief"]</code></li>
+  </ul>
+
+  <h3>5. 曠課紀錄管理（<code>/Admin/AbsenceRecords</code>）</h3>
+  <div class="flow">
+    <div class="step">選班期</div><span class="arrow">→</span>
+    <div class="step">選學員（自動過濾）</div><span class="arrow">→</span>
+    <div class="step">填曠課時間 / 時數 / 備註</div><span class="arrow">→</span>
+    <div class="step">送出</div>
+  </div>
+  <ol>
+    <li>Create：<strong>兩層下拉</strong>先選班期，再選該班學員；<strong>時數必為正整數 1–100</strong>（不接受 1.5 這種小數）。</li>
+    <li>Edit：進入時會自動反推該學員所屬班期；編輯不會覆寫原始建立者與建立時間，保留追溯。</li>
+    <li>Delete：以 POST 方式刪除，並會請求二次確認。</li>
+    <li>清單支援日期篩選（<code>DateFrom</code> / <code>DateTo</code>，<code>DateTo</code> 語意為「含當天」）。</li>
+  </ol>
+  <div class="danger">❗ 曠課紀錄與請假單<strong>完全獨立</strong>，不會影響任何簽核狀態；同一天可同時存在「已核准請假」與「曠課紀錄」（例：上午請假、下午未到）。</div>
+
+  <h3>6. 行政彙總報表（<code>/Reports/Admin</code>）</h3>
+  <ul>
+    <li>維度：<strong>Cohort × Student × LeaveType × YearMonth</strong>（四層 GroupBy）。</li>
+    <li>只統計 <span class="status s-approved">Approved</span> 的請假單，維持與班期上限檢查一致。</li>
+    <li><strong>跨月切法</strong>：跨月請假整筆歸入「開始月」，不拆分（與人工判讀一致）。</li>
+    <li>可依<strong>班期、學員、假別、日期範圍</strong>篩選；日期篩選僅決定納入計算的單，不影響月份分組。</li>
+  </ul>
+
+  <h3>7. 資料匯出（<code>/Admin/Export</code>）</h3>
+  <p>依目前報表的篩選條件匯出 CSV / Excel，方便貼進機構自有的統計工具。</p>
+
+  <h3>行政操作最佳實踐</h3>
+  <div class="tip">
+    ✅ 建議流程：<br>
+    ① 開學前建 <strong>班期</strong>並指派簽核人 →
+    ② 建<strong>學員帳號</strong>並指派班期 →
+    ③ 上線期間每週或每日登錄<strong>曠課</strong> →
+    ④ 月底看 <strong>Reports/Admin</strong>彙總、匯出報表存檔。
+  </div>
+</section>
+
+<!-- ============ 通知 ============ -->
+<section id="notify">
+  <h2>🔔 通知機制</h2>
+  <table>
+    <thead><tr><th>觸發事件</th><th>站內通知對象</th><th>Email 對象</th></tr></thead>
+    <tbody>
+      <tr><td>學員送出請假單</td><td>第一關簽核人</td><td>第一關簽核人</td></tr>
+      <tr><td>單關核准（推進下一關）</td><td>下一關簽核人</td><td>下一關簽核人</td></tr>
+      <tr><td>整單全部通過</td><td>申請人</td><td>申請人</td></tr>
+      <tr><td>單關駁回</td><td>申請人</td><td>申請人（含駁回原因）</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>站內通知：右上角 🔔 圖示會顯示未讀數，點擊或前往 <code>/Notifications</code> 檢視。</li>
+    <li>Email 通知：需使用者 <code>UserAccount.Email</code> 有值才會寄出。</li>
+    <li>開發環境 <code>Email:Mode = PickupDirectory</code>：不真的寄出，而是把 <code>.eml</code> 檔寫到 <code>./mail-pickup/</code>；可用 Outlook / Thunderbird 開啟預覽。</li>
+    <li>正式環境切換為 <code>Smtp</code> 並於 User Secrets / 環境變數提供 SMTP 帳密（勿寫死於 <code>appsettings.json</code>）。</li>
+  </ul>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section id="faq">
+  <h2>❓ 常見問題 FAQ</h2>
+
+  <h4>Q1：學員送單時系統擋住「將超過班期上限」怎麼辦？</h4>
+  <p>代表<strong>已核准時數 + 本次申請</strong>超過該班期 <code>LeaveLimitHours</code>。請縮短本次請假時數，或洽行政確認上限是否需調整。</p>
+
+  <h4>Q2：明明送單了，簽核人卻說沒看到？</h4>
+  <p>請確認：<br>
+    (1) 該學員是否<strong>已指派班期</strong>；<br>
+    (2) 該班期是否<strong>已指派對應層級的簽核人</strong>；<br>
+    (3) 目前是否停在該簽核人這一關（<code>CurrentLevel</code> 是否等於他的 Level）。
+  </p>
+
+  <h4>Q3：簽核駁回後可以撤銷嗎？</h4>
+  <p>不可以。整單狀態為 <span class="status s-rejected">Rejected</span> 後為終態；學員需要時請重新建立新單。</p>
+
+  <h4>Q4：新增學員時「所屬班期」下拉是空的？</h4>
+  <p>請先至 <code>/Admin/Cohorts</code> 建立班期，再回來新增學員。</p>
+
+  <h4>Q5：學員可以自己填曠課嗎？</h4>
+  <p>不行。曠課由行政事後登錄，學員僅能於 <code>/AbsenceRecords</code> 查閱自己的紀錄。</p>
+
+  <h4>Q6：Email 收不到通知？</h4>
+  <p>開發環境是 PickupDirectory，不會真的寄信，請到專案 <code>./mail-pickup/</code> 檢視 <code>.eml</code>。正式環境請確認：<br>
+    (1) <code>appsettings.Production.json</code> 或環境變數已設定 SMTP；<br>
+    (2) 使用者 <code>Email</code> 欄位有值；<br>
+    (3) 檢查 SMTP 服務是否可連線（防火牆 / 埠號）。
+  </p>
+
+  <h4>Q7：跨月請假在報表中歸哪個月？</h4>
+  <p>整筆歸入<strong>開始月</strong>，不拆分。例：6/28 08:00 ~ 7/2 17:00 全部歸 6 月。</p>
+
+  <h4>Q8：忘記密碼？</h4>
+  <p>請洽行政 / 系統管理員至 <code>/Admin/Users</code> 使用「重設密碼」。</p>
+</section>
+
+</main>
+
+<footer>
+  學生請假系統 · 操作使用說明書 · Made with .NET 10<br>
+  Repository: github.com/KaiisNotAi/LeaveSystem
+</footer>
+
+</body>
+</html>
