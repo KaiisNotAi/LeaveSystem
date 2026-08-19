@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>04 簽核引擎：核准與駁回 — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html" class="current">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 04 · Approval Engine</div>
+    <h1 class="page-title">簽核引擎：核准與駁回</h1>
+
+    <p class="lead">
+        <a href="03-leave-submit.html">03 送單</a>把 N 關空白的 <code>LeaveRequestStep</code> 建好了，
+        這條流程負責<strong>一關一關把它填完</strong>。核心只有兩個問題：
+        <strong>「這個人有沒有資格簽這一關？」</strong>（<code>EnsureCanActAsync</code> 五道防線）與
+        <strong>「簽完之後是轉下一關還是整張結案？」</strong>（<code>ApprovalOutcome</code>）。
+    </p>
+
+    <section class="block">
+        <h2>循序圖：核准 Approve</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="簽核核准流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="90" y1="52" x2="90" y2="775"/>
+                <line class="lifeline" x1="330" y1="52" x2="330" y2="775"/>
+                <line class="lifeline" x1="590" y1="52" x2="590" y2="775"/>
+                <line class="lifeline" x1="850" y1="52" x2="850" y2="775"/>
+                <line class="lifeline" x1="1110" y1="52" x2="1110" y2="775"/>
+
+                <g class="actor client">
+                    <rect x="12" y="8" width="156" height="44"/>
+                    <text x="90" y="26">簽核人</text>
+                    <text class="sub" x="90" y="42">導師/科長/分署長</text>
+                </g>
+                <g class="actor controller">
+                    <rect x="242" y="8" width="176" height="44"/>
+                    <text x="330" y="26">ApprovalsController</text>
+                    <text class="sub" x="330" y="42">Approve(POST)</text>
+                </g>
+                <g class="actor service">
+                    <rect x="502" y="8" width="176" height="44"/>
+                    <text x="590" y="26">ApprovalService</text>
+                    <text class="sub" x="590" y="42">IApprovalService</text>
+                </g>
+                <g class="actor data">
+                    <rect x="762" y="8" width="176" height="44"/>
+                    <text x="850" y="26">AppDbContext</text>
+                    <text class="sub" x="850" y="42">EF Core</text>
+                </g>
+                <g class="actor external">
+                    <rect x="1022" y="8" width="176" height="44"/>
+                    <text x="1110" y="26">Dispatcher</text>
+                    <text class="sub" x="1110" y="42">通知 + Email</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="104" x2="322" y2="104"/>
+                    <text class="label" x="206" y="96">POST /Approvals/Approve（StepId, Comment）</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="162" x2="582" y2="162"/>
+                    <text class="label" x="456" y="154">ApproveAsync(stepId, currentUserId, comment)</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="220" x2="842" y2="220"/>
+                    <text class="label" x="716" y="212">LoadStepForActionAsync(stepId)</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <path class="selfpath" d="M590,266 h80 v22 h-72"/>
+                    <text class="label left" x="684" y="284">EnsureCanActAsync(step, currentUserId) — 五道防線</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="336" x2="842" y2="336"/>
+                    <text class="label" x="716" y="328">UserRoles.AnyAsync(角色相符？)</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <path class="selfpath" d="M590,382 h80 v22 h-72"/>
+                    <text class="label left" x="684" y="400">GetAssignedApproverId(step) == currentUserId？</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M590,440 h80 v22 h-72"/>
+                    <text class="label left" x="684" y="458">step.Decision = Approved / ApproverUserId / DecidedAt</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="510" x2="842" y2="510"/>
+                    <text class="label" x="716" y="502">查有沒有 Level 更大的下一關</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <path class="selfpath" d="M590,556 h80 v22 h-72"/>
+                    <text class="label left" x="684" y="574">有 → CurrentLevel 前進；沒有 → Status = Approved</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <g class="msg" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="626" x2="842" y2="626"/>
+                    <text class="label" x="716" y="618">SaveChangesAsync()</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+                <g class="msg" data-step="11">
+                    <rect class="hit" x="8" y="656" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="684" x2="1102" y2="684"/>
+                    <text class="label" x="846" y="676">NotifyApprovedNextAsync / NotifyFullyApprovedAsync</text>
+                    <circle class="numbg" cx="24" cy="684" r="10"/>
+                    <text class="num" x="24" y="688" text-anchor="middle">11</text>
+                </g>
+                <g class="msg ret" data-step="12">
+                    <rect class="hit" x="8" y="714" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="742" x2="98" y2="742"/>
+                    <text class="label" x="214" y="734">302 → 成功回 /Approvals，失敗回該單詳情頁</text>
+                    <circle class="numbg" cx="24" cy="742" r="10"/>
+                    <text class="num" x="24" y="746" text-anchor="middle">12</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 簽核人</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-external)"></i> 通知派送</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">[Authorize(Roles = "Tutor,SectionChief,BranchDirector")] Approve(ApprovalActionInputModel input)</span>
+                    <span class="loc">ApprovalsController.cs:14, 60–62</span>
+                </div>
+                <p class="desc">
+                    Controller 層的 <code>[Authorize]</code> 只擋掉「連簽核人都不是」的人，
+                    <strong>擋不住「是導師、但不是這個班期的導師」</strong>。
+                    真正的把關在第 4~6 步的 Service 裡。
+                </p>
+                <pre><code>[Authorize(Roles = <span class="str">"Tutor,SectionChief,BranchDirector"</span>)]
+<span class="kw">public class</span> ApprovalsController : Controller
+
+[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Approve(ApprovalActionInputModel input)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">_approvalService.ApproveAsync(input.StepId, currentUserId, input.Comment)</span>
+                    <span class="loc">Services/ApprovalService.cs:54</span>
+                </div>
+                <p class="desc">
+                    參數只有三個，而且<strong>沒有一個來自使用者可以偽造的身分資訊</strong>：
+                    <code>currentUserId</code> 是從 Cookie 的 Claim 取的，不是表單欄位。
+                    這是「不要相信前端」的具體做法。
+                </p>
+                <pre><code><span class="kw">public async</span> Task&lt;ApprovalActionResult&gt; ApproveAsync(<span class="kw">int</span> stepId, <span class="kw">int</span> currentUserId, <span class="kw">string</span>? comment)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">LoadStepForActionAsync(stepId)</span>
+                    <span class="loc">Services/ApprovalService.cs:148–155</span>
+                </div>
+                <p class="desc">
+                    一次把<strong>三層關聯</strong>載進來：Step → LeaveRequest → Student → Cohort。
+                    因為第 6 步要拿 <code>Cohort.TutorUserId</code> 比對，
+                    分開查會變成 N+1 次往返。
+                </p>
+                <pre><code><span class="kw">return</span> _db.LeaveRequestSteps
+    .Include(s =&gt; s.LeaveRequest)
+        .ThenInclude(r =&gt; r.Student)
+            .ThenInclude(u =&gt; u.Cohort)
+    .FirstOrDefaultAsync(s =&gt; s.Id == stepId);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">EnsureCanActAsync(step, currentUserId)</span>
+                    <span class="loc">Services/ApprovalService.cs:166–201</span>
+                </div>
+                <p class="desc">
+                    <strong>整條流程最重要的方法。</strong>五道防線依序檢查，任何一道不過就回傳失敗訊息：
+                </p>
+                <table class="doc" style="margin:10px 0;">
+                    <thead><tr><th style="width:56px;">#</th><th>檢查</th><th>擋掉什麼</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td><code>request.Status == Pending</code></td><td>對已核准／已駁回／已取消的單再簽一次</td></tr>
+                        <tr><td>2</td><td><code>step.Level == request.CurrentLevel</code></td><td>科長跳過導師先簽（插隊）</td></tr>
+                        <tr><td>3</td><td><code>step.Decision == Pending</code></td><td>同一關重複送出（例如連點兩下按鈕）</td></tr>
+                        <tr><td>4</td><td>使用者<strong>具備</strong>該 Step 的角色</td><td>學員拿到 StepId 直接 POST</td></tr>
+                        <tr><td>5</td><td>使用者<strong>正是該班期指定</strong>的那位簽核人</td><td>A 班導師去簽 B 班的單</td></tr>
+                    </tbody>
+                </table>
+                <pre><code><span class="kw">if</span> (request.Status != LeaveStatus.Pending)      <span class="kw">return</span> …ErrorRequestNotPending…;
+<span class="kw">if</span> (step.Level != request.CurrentLevel)         <span class="kw">return</span> …ErrorNotCurrentLevel…;
+<span class="kw">if</span> (step.Decision != ApprovalDecision.Pending)  <span class="kw">return</span> …ErrorAlreadyDecided…;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">_db.UserRoles.Include(ur =&gt; ur.Role).AnyAsync(…)</span>
+                    <span class="loc">Services/ApprovalService.cs:185–192</span>
+                </div>
+                <p class="desc">
+                    第 4 道防線。刻意<strong>重新查資料庫</strong>而不是信 Cookie 裡的角色 Claim——
+                    因為 Claim 是登入當下的快照，帳號被停權或降級後，
+                    <strong>舊 Cookie 在 8 小時內都還帶著舊角色</strong>。
+                </p>
+                <pre><code><span class="kw">var</span> hasRequiredRole = <span class="kw">await</span> _db.UserRoles
+    .Include(ur =&gt; ur.Role)
+    .AnyAsync(ur =&gt; ur.UserId == currentUserId &amp;&amp; ur.Role.Name == step.ApproverRole);
+
+<span class="kw">if</span> (!hasRequiredRole)
+    <span class="kw">return new</span> ApprovalActionResult(<span class="kw">false</span>, ErrorRoleMismatch, ApprovalOutcome.None);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">GetAssignedApproverId(step)</span>
+                    <span class="loc">Services/ApprovalService.cs:194–198, 234–249</span>
+                </div>
+                <p class="desc">
+                    第 5 道防線，也是<a href="03-leave-submit.html">送單時故意不寫死簽核人</a>的收成點：
+                    Step 只記角色字串，<strong>「誰」在簽核當下才從班期查出來</strong>。
+                    班期換導師，所有在途的單立刻轉給新導師，不用改任何一筆歷史資料。
+                </p>
+                <pre><code><span class="kw">private static int</span>? GetAssignedApproverId(LeaveRequestStep step)
+{
+    <span class="kw">var</span> cohort = step.LeaveRequest.Student.Cohort;
+    <span class="kw">if</span> (cohort <span class="kw">is null</span>) <span class="kw">return null</span>;
+
+    <span class="kw">return</span> step.ApproverRole <span class="kw">switch</span>
+    {
+        RoleTutor          =&gt; cohort.TutorUserId,
+        RoleSectionChief   =&gt; cohort.SectionChiefUserId,
+        RoleBranchDirector =&gt; cohort.BranchDirectorUserId,
+        _ =&gt; <span class="kw">null</span>
+    };
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">step.Decision = Approved; step.ApproverUserId = currentUserId; step.DecidedAt = now;</span>
+                    <span class="loc">Services/ApprovalService.cs:68–74</span>
+                </div>
+                <p class="desc">
+                    <strong>簽核紀錄是「寫上去」而不是「改掉」。</strong>
+                    每一關都留下誰簽的、什麼時候簽的、意見是什麼，
+                    <code>/Approvals/Details/{id}</code> 的簽核歷程就是把這些 Step 依 Level 排出來。
+                </p>
+                <pre><code><span class="kw">var</span> now = DateTime.UtcNow;
+<span class="kw">var</span> request = step.LeaveRequest;
+
+step.Decision       = ApprovalDecision.Approved;
+step.ApproverUserId = currentUserId;
+step.Comment        = <span class="kw">string</span>.IsNullOrWhiteSpace(comment) ? <span class="kw">null</span> : comment.Trim();
+step.DecidedAt      = now;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">_db.LeaveRequestSteps.Where(Level &gt; CurrentLevel).OrderBy(Level).FirstOrDefaultAsync()</span>
+                    <span class="loc">Services/ApprovalService.cs:76–79</span>
+                </div>
+                <p class="desc">
+                    「還有沒有下一關」不是用 <code>Count</code> 算，而是<strong>直接找 Level 更大的第一筆</strong>。
+                    這樣即使中間某一關被資料異常刪掉，也不會誤判。
+                </p>
+                <pre><code><span class="kw">var</span> nextStep = <span class="kw">await</span> _db.LeaveRequestSteps
+    .Where(s =&gt; s.LeaveRequestId == request.Id &amp;&amp; s.Level &gt; request.CurrentLevel)
+    .OrderBy(s =&gt; s.Level)
+    .FirstOrDefaultAsync();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">ApprovalOutcome.AdvancedToNextLevel / FullyApproved</span>
+                    <span class="loc">Services/ApprovalService.cs:81–93</span>
+                </div>
+                <p class="desc">
+                    <strong>狀態機的岔路口。</strong>有下一關就只把 <code>CurrentLevel</code> 往前推，
+                    整張單仍是 <code>Pending</code>；沒有下一關才把 <code>Status</code> 改成 <code>Approved</code>。
+                    <code>outcome</code> 這個變數的唯一用途，就是決定第 11 步要發哪一種通知。
+                </p>
+                <pre><code>ApprovalOutcome outcome;
+<span class="kw">if</span> (nextStep <span class="kw">is not null</span>)
+{
+    request.CurrentLevel = nextStep.Level;              <span class="cmt">// 轉下一關，Status 仍是 Pending</span>
+    outcome = ApprovalOutcome.AdvancedToNextLevel;
+}
+<span class="kw">else</span>
+{
+    request.Status = LeaveStatus.Approved;              <span class="cmt">// 最後一關 → 整張核准</span>
+    outcome = ApprovalOutcome.FullyApproved;
+}
+request.UpdatedAt = now;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">await _db.SaveChangesAsync()</span>
+                    <span class="loc">Services/ApprovalService.cs:94</span>
+                </div>
+                <p class="desc">
+                    <code>step</code> 與 <code>request</code> 都是<strong>被 EF Core 追蹤中的</strong>實體
+                    （第 3 步查出來時就開始追蹤），所以這裡不需要 <code>Update()</code>，
+                    <code>SaveChangesAsync()</code> 會自己算出要更新哪些欄位。
+                </p>
+                <pre><code><span class="kw">await</span> _db.SaveChangesAsync();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="11">
+                <div class="head">
+                    <span class="badge-num">11</span>
+                    <span class="sig">NotifyApprovedNextAsync(request.Id) / NotifyFullyApprovedAsync(request.Id)</span>
+                    <span class="loc">Services/ApprovalService.cs:96–103</span>
+                </div>
+                <p class="desc">
+                    兩種結局通知的<strong>對象完全不同</strong>：
+                    轉下一關 → 通知<strong>下一位簽核人</strong>；
+                    全部核准 → 通知<strong>學員本人</strong>。
+                    細節見 <a href="05-notification.html">05 通知流程</a>。
+                </p>
+                <pre><code><span class="kw">if</span> (outcome == ApprovalOutcome.AdvancedToNextLevel)
+    <span class="kw">await</span> _notifications.NotifyApprovedNextAsync(request.Id);   <span class="cmt">// → 下一關簽核人</span>
+<span class="kw">else if</span> (outcome == ApprovalOutcome.FullyApproved)
+    <span class="kw">await</span> _notifications.NotifyFullyApprovedAsync(request.Id);  <span class="cmt">// → 學員</span>
+
+<span class="kw">return new</span> ApprovalActionResult(<span class="kw">true</span>, <span class="kw">null</span>, outcome);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="12">
+                <div class="head">
+                    <span class="badge-num">12</span>
+                    <span class="sig">result.Success ? TempData["Success"] : TempData["Error"]</span>
+                    <span class="loc">ApprovalsController.cs:62–86</span>
+                </div>
+                <p class="desc">
+                    Controller 拿到 <code>ApprovalActionResult</code> 只做兩件事：翻譯成畫面訊息、決定轉去哪。
+                    <strong>錯誤訊息的文字全都是 Service 裡的常數</strong>，Controller 不自己編。
+                    失敗時轉回<strong>那張單的詳情頁</strong>（使用者才看得到單子現在的狀態），
+                    成功才回待辦清單。
+                </p>
+                <pre><code><span class="kw">var</span> result = <span class="kw">await</span> _approvalService.ApproveAsync(input.StepId, userId.Value, input.Comment);
+
+<span class="kw">if</span> (!result.Success)
+{
+    TempData[<span class="str">"Error"</span>] = result.ErrorMessage ?? <span class="str">"核准失敗，請稍後再試。"</span>;
+    <span class="kw">return await</span> RedirectToDetailsByStepIdAsync(input.StepId);   <span class="cmt">// 回單子詳情</span>
+}
+
+TempData[<span class="str">"Success"</span>] = result.Outcome <span class="kw">switch</span>
+{
+    ApprovalOutcome.AdvancedToNextLevel =&gt; <span class="str">"簽核成功，已推進到下一關。"</span>,
+    ApprovalOutcome.FullyApproved       =&gt; <span class="str">"簽核成功，整張請假單已核准。"</span>,
+    _ =&gt; <span class="str">"簽核成功。"</span>
+};
+
+<span class="kw">return</span> RedirectToAction(nameof(Index));   <span class="cmt">// 回待辦清單</span></code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>駁回 Reject：差在哪裡</h2>
+        <p>
+            <code>RejectAsync</code>（<code>ApprovalService.cs:108</code>）跟核准共用第 3~6 步的載入與五道防線，
+            只有三個地方不同：
+        </p>
+        <table class="doc">
+            <thead><tr><th style="width:230px;">差異</th><th>核准 ApproveAsync</th><th>駁回 RejectAsync</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>意見是否必填</td>
+                    <td>可留白</td>
+                    <td><strong>必填</strong>（<code>:110–113</code> 最先檢查，空白直接退回）</td>
+                </tr>
+                <tr>
+                    <td>對整張單的效果</td>
+                    <td>轉下一關 <em>或</em> 結案為 Approved</td>
+                    <td><strong>直接 <code>Status = Rejected</code></strong>，不管還剩幾關</td>
+                </tr>
+                <tr>
+                    <td>通知對象</td>
+                    <td>下一關簽核人 <em>或</em> 學員</td>
+                    <td>一律通知<strong>學員</strong>，並附上駁回原因</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="callout">
+            <div class="t">為什麼駁回不用「退回上一關」</div>
+            三級簽核的實務是「任一關不同意即結束」，學員修正後<strong>重新送一張新單</strong>，
+            比在同一張單上來回改狀態單純，也留得下完整的歷史紀錄。
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>待辦清單是怎麼算出來的</h2>
+        <p>
+            <code>/Approvals</code> 的「待我簽核」不是簡單的 <code>WHERE ApproverUserId = 我</code>——
+            因為 Step 在被簽之前 <code>ApproverUserId</code> 是 <code>null</code>。
+            <code>GetPendingCoreAsync</code>（<code>ApprovalService.cs:251–309</code>）分兩段做：
+        </p>
+        <pre style="background:var(--code-bg); color:var(--code-text); border-radius:8px; padding:14px; overflow-x:auto; font-size:13px;"><code><span class="cmt">// ① 在資料庫端篩出「角色對得上、且正好停在這一關」的候選</span>
+<span class="kw">var</span> candidates = <span class="kw">await</span> _db.LeaveRequestSteps
+    .Include(…)
+    .Where(s =&gt;
+        s.Decision == ApprovalDecision.Pending &amp;&amp;
+        s.LeaveRequest.Status == LeaveStatus.Pending &amp;&amp;
+        s.Level == s.LeaveRequest.CurrentLevel &amp;&amp;      <span class="cmt">// ← 只有「當前這一關」才算待辦</span>
+        roleNames.Contains(s.ApproverRole))
+    .AsNoTracking().ToListAsync();
+
+<span class="cmt">// ② 在記憶體端用班期指派過濾（switch 運算式翻不成 SQL）</span>
+<span class="kw">var</span> filtered = candidates.Where(s =&gt; GetAssignedApproverId(s) == currentUserId).ToList();
+
+<span class="cmt">// ③ 一次批次查所有相關學員的已核准時數，避免 N+1</span>
+<span class="kw">var</span> approvedByStudent = <span class="kw">await</span> _db.LeaveRequests
+    .Where(r =&gt; studentIds.Contains(r.StudentId) &amp;&amp; r.Status == LeaveStatus.Approved)
+    .GroupBy(r =&gt; r.StudentId)
+    .Select(g =&gt; <span class="kw">new</span> { StudentId = g.Key, Sum = g.Sum(r =&gt; r.TotalHours) })
+    .ToDictionaryAsync(x =&gt; x.StudentId, x =&gt; x.Sum);</code></pre>
+        <div class="callout warn">
+            <div class="t">第 ③ 段為什麼要特別寫成批次查詢</div>
+            待辦清單每一列都要顯示「這位學員已請 X / 上限 Y」。
+            若在迴圈裡逐一 <code>SumAsync</code>，20 筆待辦就是 20 次資料庫往返（<strong>N+1 問題</strong>）。
+            先收集 <code>studentIds</code> 一次查完再查字典，永遠只有 1 次。
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>用<strong>非該班期</strong>的導師帳號登入，把 URL 直接改成別班的
+                <code>/Approvals/Details/{id}</code>，看第 5 道防線把它擋下來。</li>
+            <li>在 <code>ApprovalService.cs:82</code>（<code>if (nextStep is not null)</code>）設中斷點，
+                分別簽一張<strong>1 關</strong>與一張<strong>3 關</strong>的單，
+                觀察 <code>outcome</code> 走進不同分支。</li>
+            <li>開兩個瀏覽器分頁，同一張單的簽核頁按兩次核准——
+                第二次會被第 3 道防線擋成「本關已簽核」。</li>
+            <li>駁回時把意見留空送出，看 <code>RejectAsync</code> 在<strong>連資料都還沒查</strong>之前就回錯誤。</li>
+            <li>在 <code>/Admin/Cohorts/Edit</code> 把班期導師換成另一個人，
+                重新整理原導師的 <code>/Approvals</code>——待辦立刻消失，出現在新導師那邊。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="03-leave-submit.html">◀ 03 學員送出請假單</a>
+        <span class="spacer"></span>
+        <a href="05-notification.html">05 站內通知 + Email ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

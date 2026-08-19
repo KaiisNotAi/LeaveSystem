@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>03 學員送出請假單 — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html" class="current">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 03 · Submit Leave Request</div>
+    <h1 class="page-title">學員送出請假單</h1>
+
+    <p class="lead">
+        全系統<strong>最長的一條路</strong>。一次 POST 裡串了五道業務規則：
+        時段轉時數 → 班期上限檢查 → 找出對應的簽核規則 → 依規則<strong>動態展開 N 關簽核步驟</strong> → 發通知。
+        每一道不過就 <code>return View(input)</code> 退回表單，全部通過才真正寫進資料庫。
+    </p>
+
+    <section class="block">
+        <h2>循序圖</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="學員送出請假單流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="90" y1="52" x2="90" y2="775"/>
+                <line class="lifeline" x1="330" y1="52" x2="330" y2="775"/>
+                <line class="lifeline" x1="590" y1="52" x2="590" y2="775"/>
+                <line class="lifeline" x1="850" y1="52" x2="850" y2="775"/>
+                <line class="lifeline" x1="1110" y1="52" x2="1110" y2="775"/>
+
+                <g class="actor client">
+                    <rect x="12" y="8" width="156" height="44"/>
+                    <text x="90" y="26">學員瀏覽器</text>
+                    <text class="sub" x="90" y="42">Create 表單</text>
+                </g>
+                <g class="actor controller">
+                    <rect x="242" y="8" width="176" height="44"/>
+                    <text x="330" y="26">LeaveRequestsController</text>
+                    <text class="sub" x="330" y="42">Create(POST)</text>
+                </g>
+                <g class="actor service">
+                    <rect x="502" y="8" width="176" height="44"/>
+                    <text x="590" y="26">LeaveCalculator</text>
+                    <text class="sub" x="590" y="42">ILeaveCalculator</text>
+                </g>
+                <g class="actor data">
+                    <rect x="762" y="8" width="176" height="44"/>
+                    <text x="850" y="26">AppDbContext</text>
+                    <text class="sub" x="850" y="42">EF Core</text>
+                </g>
+                <g class="actor external">
+                    <rect x="1022" y="8" width="176" height="44"/>
+                    <text x="1110" y="26">Dispatcher</text>
+                    <text class="sub" x="1110" y="42">通知 + Email</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="104" x2="322" y2="104"/>
+                    <text class="label" x="206" y="96">POST /LeaveRequests/Create</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,150 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="168">[Authorize(Roles = "Student")] + ModelState 檢查</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="220" x2="842" y2="220"/>
+                    <text class="label" x="586" y="212">載入學員（Include(u =&gt; u.Cohort)）</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="278" x2="582" y2="278"/>
+                    <text class="label" x="456" y="270">TryCalculate(startAt, endAt, out totalHours, …)</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="336" x2="842" y2="336"/>
+                    <text class="label" x="586" y="328">SumAsync(已核准時數) → 班期上限檢查</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="394" x2="842" y2="394"/>
+                    <text class="label" x="586" y="386">找出符合時數的 ApprovalRule</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,440 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="458">ApprovalRoleJson.Deserialize → 展開 N 個 LeaveRequestStep</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="510" x2="842" y2="510"/>
+                    <text class="label" x="586" y="502">LeaveRequests.Add(request)</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="568" x2="842" y2="568"/>
+                    <text class="label" x="586" y="560">SaveChangesAsync()（單 + N 關一起入庫）</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <g class="msg" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="626" x2="1102" y2="626"/>
+                    <text class="label" x="716" y="618">NotifySubmittedAsync(leaveRequest.Id)</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+                <g class="msg ret" data-step="11">
+                    <rect class="hit" x="8" y="656" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="684" x2="98" y2="684"/>
+                    <text class="label" x="214" y="676">302 → /LeaveRequests（TempData 成功訊息）</text>
+                    <circle class="numbg" cx="24" cy="684" r="10"/>
+                    <text class="num" x="24" y="688" text-anchor="middle">11</text>
+                </g>
+
+                <g class="note">
+                    <rect x="470" y="712" width="700" height="52"/>
+                    <text x="486" y="734">任何一道檢查沒過 → PopulateLeaveTypesAsync(input) + return View(input)，</text>
+                    <text x="486" y="752">把錯誤訊息與使用者填過的內容一起送回表單，完全不碰資料庫。</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 瀏覽器</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-external)"></i> 通知派送</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">[HttpPost] Create(LeaveRequestCreateViewModel input)</span>
+                    <span class="loc">LeaveRequestsController.cs:71–73</span>
+                </div>
+                <p class="desc">
+                    表單送出的是<strong>日期 + 整點下拉</strong>兩個欄位（<code>StartDate</code> + <code>StartHour</code>），
+                    不是一個完整的 <code>DateTime</code>。第 4 步之前才會把它們組起來。
+                </p>
+                <pre><code>[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveRequestCreateViewModel input)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">[Authorize(Roles = "Student")] · ModelState.IsValid</span>
+                    <span class="loc">LeaveRequestsController.cs:19, 75–79</span>
+                </div>
+                <p class="desc">
+                    <code>[Authorize]</code> 掛在<strong>整個 Controller</strong> 上，
+                    所以這個檔案裡每個 Action 都只有學員能進。
+                    它比對的就是 <a href="02-auth.html">02 認證流程</a>第 9 步寫進 Cookie 的角色 Claim。
+                </p>
+                <pre><code>[Authorize(Roles = <span class="str">"Student"</span>)]     <span class="cmt">// ← 掛在 class 上</span>
+<span class="kw">public class</span> LeaveRequestsController : Controller
+
+<span class="cmt">// Action 內：</span>
+<span class="kw">if</span> (!ModelState.IsValid)
+{
+    <span class="kw">await</span> PopulateLeaveTypesAsync(input);   <span class="cmt">// 下拉選項要重填，不然回去是空的</span>
+    <span class="kw">return</span> View(input);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">_db.UserAccounts.Include(u =&gt; u.Cohort).FirstOrDefaultAsync(…)</span>
+                    <span class="loc">LeaveRequestsController.cs:81–100</span>
+                </div>
+                <p class="desc">
+                    先用 Cookie 裡的 <code>NameIdentifier</code> 取得目前使用者 Id，
+                    再連<strong>班期一起載入</strong>——第 5 步的上限檢查需要 <code>Cohort.LeaveLimitHours</code>。
+                    沒有班期的學員在這裡就被擋下來，訊息會叫他去找行政。
+                </p>
+                <pre><code><span class="kw">var</span> studentId = GetCurrentUserId();
+<span class="kw">if</span> (studentId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+<span class="kw">var</span> student = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.Cohort)
+    .FirstOrDefaultAsync(u =&gt; u.Id == studentId.Value &amp;&amp; u.IsActive);
+
+<span class="kw">if</span> (student.Cohort <span class="kw">is null</span>)
+{
+    ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"你的帳號尚未指派班期，暫時無法送出請假申請。…"</span>);
+    <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+    <span class="kw">return</span> View(input);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">_leaveCalculator.TryCalculate(startAt, endAt, out totalHours, out calcError)</span>
+                    <span class="loc">LeaveRequestsController.cs:118–126 · Services/LeaveCalculator.cs:14</span>
+                </div>
+                <p class="desc">
+                    <strong>時段 ≠ 時數。</strong>上課時段是 08:00–12:00 與 13:00–17:00，
+                    午休 12:00–13:00 不計。<code>LeaveCalculator</code> 用「逐日與兩個上課區段求交集」
+                    的方式計算，所以自然支援跨日。
+                </p>
+                <pre><code><span class="cmt">// Controller：把日期 + 整點下拉組成 DateTime</span>
+<span class="kw">var</span> startAt = input.StartDate.Date.AddHours(input.StartHour.Value);
+<span class="kw">var</span> endAt   = input.EndDate.Date.AddHours(input.EndHour.Value);
+
+<span class="kw">if</span> (!_leaveCalculator.TryCalculate(startAt, endAt, <span class="kw">out var</span> totalHours, <span class="kw">out var</span> calcError))
+{
+    ModelState.AddModelError(<span class="kw">string</span>.Empty, calcError ?? <span class="str">"請假時段計算失敗，請檢查輸入。"</span>);
+    <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+    <span class="kw">return</span> View(input);
+}
+
+<span class="cmt">// LeaveCalculator.cs：逐日求交集</span>
+<span class="kw">for</span> (<span class="kw">var</span> day = startAt.Date; day &lt;= endAt.Date; day = day.AddDays(1))
+{
+    totalHours += OverlapHours(requestRange, (day.AddHours(8),  day.AddHours(12)));  <span class="cmt">// 上午</span>
+    totalHours += OverlapHours(requestRange, (day.AddHours(13), day.AddHours(17)));  <span class="cmt">// 下午</span>
+}</code></pre>
+                <div class="callout">
+                    <div class="t">為什麼用 TryCalculate 而不是丟例外</div>
+                    「使用者填錯時段」是<strong>預期內</strong>的情況，不是程式錯誤。
+                    <code>bool</code> + <code>out errorMessage</code> 的形式讓 Controller 可以直接把訊息塞回
+                    <code>ModelState</code> 顯示給使用者，不必寫 <code>try/catch</code>。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">SumAsync(r =&gt; r.TotalHours) 與 Cohort.LeaveLimitHours 比較</span>
+                    <span class="loc">LeaveRequestsController.cs:128–141</span>
+                </div>
+                <p class="desc">
+                    統計口徑：<strong>只累計 <code>Status == Approved</code></strong>。
+                    還在簽核中的單不算，所以理論上可能同時送出多張、全部核准後才超標——
+                    這是刻意的取捨（見下方設計決策）。
+                    <code>LeaveLimitHours</code> 是 <code>Cohort</code> 上的計算屬性：
+                    <code>TotalHours × LeaveLimitPercent / 100</code> 無條件捨去。
+                </p>
+                <pre><code><span class="kw">var</span> approvedHours = <span class="kw">await</span> _db.LeaveRequests
+    .Where(r =&gt; r.StudentId == student.Id &amp;&amp; r.Status == LeaveStatus.Approved)
+    .SumAsync(r =&gt; (<span class="kw">decimal</span>?)r.TotalHours) ?? 0m;
+
+<span class="kw">var</span> wouldBeTotal = approvedHours + totalHours;
+<span class="kw">if</span> (wouldBeTotal &gt; student.Cohort.LeaveLimitHours)
+{
+    ModelState.AddModelError(<span class="kw">string</span>.Empty,
+        $<span class="str">"送出後將超過班期請假上限 {student.Cohort.LeaveLimitHours} 小時（…）"</span>);
+    <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+    <span class="kw">return</span> View(input);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">_db.ApprovalRules.OrderBy(MinHours).FirstOrDefaultAsync(區間比對)</span>
+                    <span class="loc">LeaveRequestsController.cs:143–155</span>
+                </div>
+                <p class="desc">
+                    <strong>簽核層級不是寫死在程式裡的。</strong>
+                    它是查 <code>ApprovalRules</code> 資料表，找出 <code>MinHours ≤ 時數 ≤ MaxHours</code> 的那一條。
+                    <code>MaxHours</code> 為 <code>null</code> 代表「無上限」，對應最高那一級。
+                    Admin 在 <code>/Admin/ApprovalRules</code> 改門檻，<strong>不用改程式、不用重啟</strong>就生效。
+                </p>
+                <pre><code><span class="kw">var</span> matchedRule = <span class="kw">await</span> _db.ApprovalRules
+    .OrderBy(r =&gt; r.MinHours)
+    .FirstOrDefaultAsync(r =&gt;
+        r.MinHours &lt;= totalHours &amp;&amp;
+        (!r.MaxHours.HasValue || totalHours &lt;= r.MaxHours.Value));</code></pre>
+                <table class="doc" style="margin-top:10px;">
+                    <thead><tr><th>時數區間</th><th>RequiredRoles（JSON）</th><th>展開幾關</th></tr></thead>
+                    <tbody>
+                        <tr><td>0 ~ 8</td><td><code>["Tutor"]</code></td><td>1 關</td></tr>
+                        <tr><td>8.01 ~ 24</td><td><code>["Tutor","SectionChief"]</code></td><td>2 關</td></tr>
+                        <tr><td>24.01 ~ 無上限</td><td><code>["Tutor","SectionChief","BranchDirector"]</code></td><td>3 關</td></tr>
+                    </tbody>
+                </table>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">ApprovalRoleJson.Deserialize(rule.RequiredRoles) → List&lt;LeaveRequestStep&gt;</span>
+                    <span class="loc">LeaveRequestsController.cs:157–172</span>
+                </div>
+                <p class="desc">
+                    <strong>整個簽核流程就是在這幾行「長」出來的。</strong>
+                    JSON 陣列的<strong>順序即關卡順序</strong>：索引 0 → Level 1、索引 1 → Level 2……
+                    每一關先建成 <code>Decision = Pending</code>、<code>ApproverUserId = null</code>——
+                    「這關由誰簽」不在這裡決定，而是<a href="04-approval.html">簽核當下</a>再依班期查出來。
+                </p>
+                <pre><code><span class="kw">var</span> requiredRoles = ApprovalRoleJson.Deserialize(matchedRule.RequiredRoles);
+<span class="kw">if</span> (!requiredRoles.Any()) { <span class="cmt">/* 規則設定壞掉 → 退回表單 */</span> }
+
+<span class="kw">var</span> pendingSteps = requiredRoles
+    .Select((role, index) =&gt; <span class="kw">new</span> LeaveRequestStep
+    {
+        Level = index + 1,                    <span class="cmt">// 陣列順序 = 關卡順序</span>
+        ApproverRole = role,                  <span class="cmt">// "Tutor" / "SectionChief" / "BranchDirector"</span>
+        Decision = ApprovalDecision.Pending
+    })
+    .ToList();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">_db.LeaveRequests.Add(leaveRequest)</span>
+                    <span class="loc">LeaveRequestsController.cs:174–190</span>
+                </div>
+                <p class="desc">
+                    <code>Steps</code> 直接掛在 <code>LeaveRequest</code> 上一起 <code>Add</code>。
+                    EF Core 認得這是導覽屬性，會自動把父子一併插入並回填外鍵，
+                    <strong>不需要先存父再存子</strong>。<code>CurrentLevel = 1</code> 代表現在停在第 1 關。
+                </p>
+                <pre><code><span class="kw">var</span> leaveRequest = <span class="kw">new</span> LeaveRequest
+{
+    StudentId   = student.Id,
+    LeaveTypeId = input.LeaveTypeId,
+    StartAt = startAt, EndAt = endAt,
+    TotalHours = totalHours,
+    Reason = input.Reason.Trim(),
+    Status = LeaveStatus.Pending,
+    CurrentLevel = 1,                 <span class="cmt">// 停在第 1 關</span>
+    CreatedAt = now, UpdatedAt = now,
+    Steps = pendingSteps              <span class="cmt">// ← 父子一起入庫</span>
+};
+
+_db.LeaveRequests.Add(leaveRequest);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">await _db.SaveChangesAsync()</span>
+                    <span class="loc">LeaveRequestsController.cs:191</span>
+                </div>
+                <p class="desc">
+                    在這一行之前，前面所有 <code>Add</code> 都只是在記憶體裡標記。
+                    這行才真正開一個交易，把 1 筆 <code>LeaveRequests</code> 與 N 筆 <code>LeaveRequestSteps</code>
+                    <strong>一起</strong>寫進去：要嘛全成功，要嘛全失敗。
+                </p>
+                <pre><code><span class="kw">await</span> _db.SaveChangesAsync();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">await _notifications.NotifySubmittedAsync(leaveRequest.Id)</span>
+                    <span class="loc">LeaveRequestsController.cs:193</span>
+                </div>
+                <p class="desc">
+                    <strong>順序很重要：一定在 <code>SaveChangesAsync()</code> 之後。</strong>
+                    通知只傳 <code>leaveRequest.Id</code>，而 Id 是資料庫在存檔那一刻才產生的；
+                    存檔前呼叫會傳出 <code>0</code>，通知內容跟連結全都會是錯的。
+                    後續怎麼找到「這一關該通知誰」，見 <a href="05-notification.html">05 通知流程</a>。
+                </p>
+                <pre><code><span class="kw">await</span> _db.SaveChangesAsync();
+
+<span class="kw">await</span> _notifications.NotifySubmittedAsync(leaveRequest.Id);   <span class="cmt">// ← Id 這時候才有值</span></code></pre>
+            </article>
+
+            <article class="step-card" data-step="11">
+                <div class="head">
+                    <span class="badge-num">11</span>
+                    <span class="sig">TempData["Success"] = … ; return RedirectToAction(nameof(Index));</span>
+                    <span class="loc">LeaveRequestsController.cs:195–196</span>
+                </div>
+                <p class="desc">
+                    成功後<strong>轉址而不是直接 <code>return View()</code></strong>（POST-Redirect-GET）：
+                    這樣使用者按 F5 重新整理時，重送的是 GET 清單頁而不是那筆 POST，
+                    避免不小心送出兩張一樣的假單。<code>TempData</code> 的內容只存活到下一次請求，剛好夠顯示一次成功訊息。
+                </p>
+                <pre><code>TempData[<span class="str">"Success"</span>] = $<span class="str">"請假申請已送出（共 {totalHours:0.##} 小時，{pendingSteps.Count} 關簽核）。"</span>;
+<span class="kw">return</span> RedirectToAction(nameof(Index));</code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>關鍵設計決策</h2>
+        <table class="doc">
+            <thead><tr><th style="width:270px;">決策</th><th>為什麼</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>簽核層級查表而非寫死</td>
+                    <td>機構的簽核門檻會改（例如把 8 小時改成 4 小時）。
+                        做成 <code>ApprovalRules</code> 資料表後，Admin 自己改，程式不用動。</td>
+                </tr>
+                <tr>
+                    <td>送單時不決定「誰簽」，只決定「哪個角色簽」</td>
+                    <td>若送單當下就把導師的 UserId 寫死進 Step，之後班期換導師，
+                        舊的單就會卡在離職的人身上。改成簽核當下再查
+                        <code>Cohort.TutorUserId</code>，換人立即生效。</td>
+                </tr>
+                <tr>
+                    <td>上限只算已核准時數</td>
+                    <td>若把 Pending 也算進去，學員送了單又被駁回，額度會被莫名其妙佔住。
+                        代價是同時送多張、事後全核准有機會超標——實務上由簽核人把關。</td>
+                </tr>
+                <tr>
+                    <td>整點下拉而非自由輸入時間</td>
+                    <td><code>LeaveCalculator</code> 最小單位是 1 小時。
+                        前端限制 08~17 整點，<code>IsOnTheHour</code> / <code>IsSelectableHour</code>
+                        在<strong>伺服器端再擋一次</strong>，避免有人繞過前端直接送。</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>在 <code>LeaveRequestsController.cs:165</code>（<code>pendingSteps</code> 那段）設中斷點，
+                分別送出 <strong>4 小時</strong>與 <strong>3 天</strong>的假，
+                觀察 <code>pendingSteps.Count</code> 從 1 變成 3。</li>
+            <li>把起訖填成 <strong>12:00 ~ 13:00</strong>（只有午休），
+                看 <code>TryCalculate</code> 回 <code>false</code>、訊息是「請假區間未涵蓋任何上課時段」。</li>
+            <li>到 <code>/Admin/ApprovalRules</code> 把第一條的 <code>MaxHours</code> 從 8 改成 2，
+                再送一張 4 小時的假——<strong>不用重啟</strong>就會變成兩關。改完記得改回來。</li>
+            <li>把第 10 步的 <code>NotifySubmittedAsync</code> 搬到 <code>SaveChangesAsync()</code> 之前，
+                觀察通知連結變成 <code>/Approvals/Details/0</code>。<strong>看過就改回來。</strong></li>
+            <li>在 Output 視窗看 EF Core 實際送出的 SQL：一次 <code>INSERT</code> 進
+                <code>LeaveRequests</code>、一次批次 <code>INSERT</code> 進 <code>LeaveRequestSteps</code>。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="02-auth.html">◀ 02 登入認證</a>
+        <span class="spacer"></span>
+        <a href="04-approval.html">04 簽核引擎 ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

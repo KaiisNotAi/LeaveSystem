@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>02 登入認證與 Cookie — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html" class="current">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 02 · Authentication</div>
+    <h1 class="page-title">登入認證與 Cookie</h1>
+
+    <p class="lead">
+        「登入」這件事在程式裡其實是兩個獨立動作：
+        <strong>驗證（你是不是你）</strong>由 <code>AuthService.ValidateAsync</code> 負責，
+        <strong>簽入（把身分寫成 Cookie）</strong>由 <code>AuthService.SignInAsync</code> 負責。
+        之後每個請求的 <code>[Authorize(Roles = "Staff,Admin")]</code>，
+        比對的都是這裡寫進 Cookie 的 <code>ClaimTypes.Role</code>。
+    </p>
+
+    <section class="block">
+        <h2>循序圖</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="登入認證流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="90" y1="52" x2="90" y2="775"/>
+                <line class="lifeline" x1="290" y1="52" x2="290" y2="775"/>
+                <line class="lifeline" x1="500" y1="52" x2="500" y2="775"/>
+                <line class="lifeline" x1="710" y1="52" x2="710" y2="775"/>
+                <line class="lifeline" x1="920" y1="52" x2="920" y2="775"/>
+                <line class="lifeline" x1="1120" y1="52" x2="1120" y2="775"/>
+
+                <g class="actor client">
+                    <rect x="12" y="8" width="156" height="44"/>
+                    <text x="90" y="26">瀏覽器</text>
+                    <text class="sub" x="90" y="42">登入表單</text>
+                </g>
+                <g class="actor pipeline">
+                    <rect x="212" y="8" width="156" height="44"/>
+                    <text x="290" y="26">中介軟體管線</text>
+                    <text class="sub" x="290" y="42">Routing / Auth</text>
+                </g>
+                <g class="actor controller">
+                    <rect x="422" y="8" width="156" height="44"/>
+                    <text x="500" y="26">AccountController</text>
+                    <text class="sub" x="500" y="42">Login(POST)</text>
+                </g>
+                <g class="actor service">
+                    <rect x="632" y="8" width="156" height="44"/>
+                    <text x="710" y="26">AuthService</text>
+                    <text class="sub" x="710" y="42">IAuthService</text>
+                </g>
+                <g class="actor data">
+                    <rect x="842" y="8" width="156" height="44"/>
+                    <text x="920" y="26">AppDbContext</text>
+                    <text class="sub" x="920" y="42">EF Core</text>
+                </g>
+                <g class="actor db">
+                    <rect x="1042" y="8" width="156" height="44"/>
+                    <text x="1120" y="26">SQL Server</text>
+                    <text class="sub" x="1120" y="42">UserAccounts</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="104" x2="282" y2="104"/>
+                    <text class="label" x="186" y="96">POST /Account/Login</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <line class="arrow" x1="290" y1="162" x2="492" y2="162"/>
+                    <text class="label" x="391" y="154">模型繫結 + 防偽權杖驗證</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <path class="selfpath" d="M500,208 h80 v22 h-72"/>
+                    <text class="label left" x="594" y="226">if (!ModelState.IsValid) return View(input);</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="500" y1="278" x2="702" y2="278"/>
+                    <text class="label" x="601" y="270">ValidateAsync(username, password)</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="710" y1="336" x2="912" y2="336"/>
+                    <text class="label" x="811" y="328">Include(UserRoles).ThenInclude(Role)</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg ret" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <line class="arrow" x1="1120" y1="394" x2="718" y2="394"/>
+                    <text class="label" x="915" y="386">UserAccount（含角色）或 null</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M710,440 h80 v22 h-72"/>
+                    <text class="label left" x="804" y="458">IsActive 檢查 → BCrypt.Verify(password, hash)</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="500" y1="510" x2="702" y2="510"/>
+                    <text class="label" x="601" y="502">SignInAsync(HttpContext, user, …)</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <path class="selfpath" d="M710,556 h80 v22 h-72"/>
+                    <text class="label left" x="804" y="574">角色 → Claim(ClaimTypes.Role) → ClaimsPrincipal</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <g class="msg ret" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="710" y1="626" x2="98" y2="626"/>
+                    <text class="label" x="404" y="618">Set-Cookie: LeaveSystem.Auth（加密簽章、8 小時）</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+                <g class="msg ret" data-step="11">
+                    <rect class="hit" x="8" y="656" width="1184" height="46"/>
+                    <line class="arrow" x1="500" y1="684" x2="98" y2="684"/>
+                    <text class="label" x="299" y="676">302 Redirect → ReturnUrl 或 /Home/Index</text>
+                    <circle class="numbg" cx="24" cy="684" r="10"/>
+                    <text class="num" x="24" y="688" text-anchor="middle">11</text>
+                </g>
+                <g class="msg" data-step="12">
+                    <rect class="hit" x="8" y="714" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="742" x2="282" y2="742"/>
+                    <text class="label" x="186" y="734">後續每個請求都帶 Cookie</text>
+                    <circle class="numbg" cx="24" cy="742" r="10"/>
+                    <text class="num" x="24" y="746" text-anchor="middle">12</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 瀏覽器</span>
+                <span><i style="border-color:var(--layer-pipeline)"></i> 中介軟體</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-db)"></i> 資料庫</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">POST /Account/Login</span>
+                    <span class="loc">Views/Account/Login.cshtml</span>
+                </div>
+                <p class="desc">
+                    表單用 <code>asp-action="Login"</code> 送出，欄位名對應 <code>LoginViewModel</code> 的
+                    <code>Username</code> / <code>Password</code> / <code>RememberMe</code>。
+                    Tag Helper 會自動夾帶一個隱藏的防偽權杖欄位。
+                </p>
+                <pre><code>&lt;form method="post" asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl"&gt;
+    &lt;input asp-for="Username" class="form-control" autocomplete="username" autofocus /&gt;
+    &lt;input asp-for="Password" class="form-control" autocomplete="current-password" /&gt;
+&lt;/form&gt;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">[HttpPost] [ValidateAntiForgeryToken] Login(LoginViewModel input)</span>
+                    <span class="loc">AccountController.cs:42–44</span>
+                </div>
+                <p class="desc">
+                    路由把請求交給這個 Action 之前，管線已經做完兩件事：
+                    把表單欄位<strong>模型繫結</strong>成 <code>LoginViewModel</code>，
+                    以及驗證<strong>防偽權杖</strong>（擋 CSRF：別的網站沒辦法偽造這個一次性 token）。
+                </p>
+                <pre><code>[HttpPost]
+[ValidateAntiForgeryToken] <span class="cmt">// 防止 CSRF 攻擊</span>
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Login(LoginViewModel input)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">if (!ModelState.IsValid) return View(input);</span>
+                    <span class="loc">AccountController.cs:46–50（回傳於 :49）</span>
+                </div>
+                <p class="desc">
+                    第一道檢查只看<strong>欄位本身</strong>（<code>[Required]</code> 等資料註解），
+                    還沒碰到資料庫。這裡就擋掉，可以少一次無謂的查詢。
+                </p>
+                <pre><code><span class="cmt">// 步驟 1：先檢查表單欄位本身有沒有缺漏（[Required] 等）</span>
+<span class="kw">if</span> (!ModelState.IsValid)
+{
+    <span class="kw">return</span> View(input);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">_authService.ValidateAsync(input.Username, input.Password)</span>
+                    <span class="loc">AccountController.cs:53</span>
+                </div>
+                <p class="desc">
+                    Controller 只負責<strong>轉交與導頁</strong>，密碼比對的邏輯一行都不寫在這裡。
+                    <code>_authService</code> 的型別是介面 <code>IAuthService</code>，實作由
+                    <a href="01-startup-di.html">01 啟動流程</a>第 4 步的 DI 決定。
+                </p>
+                <pre><code><span class="cmt">// 步驟 2：交給 AuthService 驗證帳密 + 載入角色</span>
+<span class="kw">var</span> user = <span class="kw">await</span> _authService.ValidateAsync(input.Username, input.Password);
+<span class="kw">if</span> (user <span class="kw">is null</span>)
+{
+    <span class="cmt">// 故意不告知是「帳號錯」還是「密碼錯」，避免讓攻擊者列舉帳號</span>
+    ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"帳號或密碼錯誤，或帳號已停用"</span>);
+    <span class="kw">return</span> View(input);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">_db.UserAccounts.Include(u =&gt; u.UserRoles).ThenInclude(ur =&gt; ur.Role)</span>
+                    <span class="loc">Services/AuthService.cs:30–33</span>
+                </div>
+                <p class="desc">
+                    刻意<strong>一次把角色一起載入</strong>（Eager Loading）。
+                    因為第 9 步馬上就要用角色名稱產生 Claims，分兩次查會多跑一趟資料庫。
+                </p>
+                <pre><code><span class="cmt">// 步驟 1：查帳號（含 Roles 一起載入，登入後就能直接寫入 Claims）</span>
+<span class="kw">var</span> user = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.UserRoles)
+        .ThenInclude(ur =&gt; ur.Role)
+    .FirstOrDefaultAsync(u =&gt; u.Username == username);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">→ UserAccount? （查無帳號則為 null）</span>
+                    <span class="loc">Services/AuthService.cs:35</span>
+                </div>
+                <p class="desc">
+                    EF Core 把這段 LINQ 翻成一句含 <code>LEFT JOIN</code> 的 SQL。
+                    回傳型別是 <strong>可為 null 的</strong> <code>UserAccount?</code>——
+                    「查不到」在這裡是正常結果，不是例外。
+                </p>
+                <pre><code><span class="kw">if</span> (user <span class="kw">is null</span>) <span class="kw">return null</span>;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">IsActive 檢查 → _passwordHasher.Verify(password, user.PasswordHash)</span>
+                    <span class="loc">Services/AuthService.cs:37–43</span>
+                </div>
+                <p class="desc">
+                    三道檢查<strong>全部回傳同一個 <code>null</code></strong>，
+                    所以外面無從分辨是「查無此人」「已停用」還是「密碼錯」。
+                    <code>BcryptPasswordHasher</code> 內部呼叫 <code>BCrypt.Net.BCrypt.Verify</code>，
+                    雜湊本身含隨機 salt，所以同樣的密碼每次存進去的字串都不一樣。
+                </p>
+                <pre><code><span class="cmt">// 步驟 2：拒絕停用帳號</span>
+<span class="kw">if</span> (!user.IsActive) <span class="kw">return null</span>;
+
+<span class="cmt">// 步驟 3：比對密碼雜湊</span>
+<span class="kw">if</span> (!_passwordHasher.Verify(password, user.PasswordHash)) <span class="kw">return null</span>;
+
+<span class="kw">return</span> user;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">_authService.SignInAsync(HttpContext, user, input.RememberMe)</span>
+                    <span class="loc">AccountController.cs:62</span>
+                </div>
+                <p class="desc">
+                    驗證成功才進入「簽入」。注意這裡把 <code>HttpContext</code> 傳進 Service——
+                    因為寫 Cookie 需要當下這個回應物件。
+                </p>
+                <pre><code><span class="cmt">// 步驟 3：寫入 Cookie 完成登入</span>
+<span class="kw">await</span> _authService.SignInAsync(HttpContext, user, input.RememberMe);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">Claims → ClaimsIdentity → ClaimsPrincipal</span>
+                    <span class="loc">Services/AuthService.cs:52–70</span>
+                </div>
+                <p class="desc">
+                    <strong>這一段是整個授權系統的地基。</strong>
+                    每個角色被加成一筆 <code>ClaimTypes.Role</code>；
+                    之後所有 <code>[Authorize(Roles = "Tutor,SectionChief,BranchDirector")]</code>
+                    比對的就是這些字串。<code>NameIdentifier</code> 存的是 <code>user.Id</code>，
+                    後面每一條流程用來認「目前登入者是誰」的 <code>GetCurrentUserId()</code> 讀的也是它。
+                </p>
+                <pre><code><span class="kw">var</span> claims = <span class="kw">new</span> List&lt;Claim&gt;
+{
+    <span class="kw">new</span> Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+    <span class="kw">new</span> Claim(ClaimTypes.Name, user.DisplayName),
+    <span class="kw">new</span> Claim(<span class="str">"Username"</span>, user.Username)
+};
+
+<span class="cmt">// 步驟 2：每個角色加一筆 Claim（[Authorize(Roles="Admin")] 會比對這些）</span>
+<span class="kw">foreach</span> (<span class="kw">var</span> ur <span class="kw">in</span> user.UserRoles)
+{
+    <span class="kw">if</span> (ur.Role <span class="kw">is not null</span>)
+        claims.Add(<span class="kw">new</span> Claim(ClaimTypes.Role, ur.Role.Name));
+}
+
+<span class="kw">var</span> identity = <span class="kw">new</span> ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+<span class="kw">var</span> principal = <span class="kw">new</span> ClaimsPrincipal(identity);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">context.SignInAsync(scheme, principal, properties)</span>
+                    <span class="loc">Services/AuthService.cs:73–83</span>
+                </div>
+                <p class="desc">
+                    ASP.NET Core 內建方法把 <code>ClaimsPrincipal</code>
+                    <strong>序列化 → 加密 → 簽章</strong>，寫成一個 <code>Set-Cookie</code> 回應標頭。
+                    因為有簽章，使用者<strong>沒辦法自己改 Cookie 把角色改成 Admin</strong>。
+                </p>
+                <pre><code><span class="kw">var</span> properties = <span class="kw">new</span> AuthenticationProperties
+{
+    IsPersistent = isPersistent,                    <span class="cmt">// 勾「記住我」才持久化</span>
+    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)  <span class="cmt">// Cookie 有效 8 小時</span>
+};
+
+<span class="kw">await</span> context.SignInAsync(
+    CookieAuthenticationDefaults.AuthenticationScheme, principal, properties);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="11">
+                <div class="head">
+                    <span class="badge-num">11</span>
+                    <span class="sig">Url.IsLocalUrl(input.ReturnUrl) ? Redirect(…) : RedirectToAction("Index", "Home")</span>
+                    <span class="loc">AccountController.cs:65–70</span>
+                </div>
+                <p class="desc">
+                    <code>Url.IsLocalUrl</code> 是必要的安全檢查：
+                    沒有它，攻擊者可以做出 <code>/Account/Login?returnUrl=https://evil.example</code> 這種連結，
+                    使用者登入成功後就被送到外部網站（<strong>Open Redirect</strong>）。
+                </p>
+                <pre><code><span class="cmt">// 步驟 4：導回原本要去的頁面（如果有）</span>
+<span class="kw">if</span> (!<span class="kw">string</span>.IsNullOrEmpty(input.ReturnUrl) &amp;&amp; Url.IsLocalUrl(input.ReturnUrl))
+{
+    <span class="kw">return</span> Redirect(input.ReturnUrl);
+}
+
+<span class="kw">return</span> RedirectToAction(<span class="str">"Index"</span>, <span class="str">"Home"</span>);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="12">
+                <div class="head">
+                    <span class="badge-num">12</span>
+                    <span class="sig">app.UseAuthentication() 每個請求還原身分</span>
+                    <span class="loc">Program.cs:122–123</span>
+                </div>
+                <p class="desc">
+                    之後每個請求，<code>UseAuthentication()</code> 都會解開 Cookie 還原成
+                    <code>HttpContext.User</code>，接著 <code>UseAuthorization()</code> 拿它去比對
+                    <code>[Authorize]</code>。<strong>登入狀態沒有存在伺服器記憶體裡</strong>——
+                    重啟網站不會把大家踢下線，因為身分完全帶在 Cookie 上。
+                </p>
+                <pre><code>app.UseAuthentication();   <span class="cmt">// Cookie → ClaimsPrincipal（你是誰）</span>
+app.UseAuthorization();    <span class="cmt">// 比對 [Authorize(Roles=…)]（你能不能）</span></code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>關鍵設計決策</h2>
+        <table class="doc">
+            <thead><tr><th style="width:270px;">決策</th><th>為什麼</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>不用 ASP.NET Core Identity</td>
+                    <td>Identity 帶進來一整套使用者/角色/宣告資料表與 UI，
+                        對本專案（自訂 <code>UserAccount</code> + <code>Cohort</code> 關聯）反而是包袱。
+                        自己實作 3 個方法就夠，也比較容易讀懂發生了什麼事。</td>
+                </tr>
+                <tr>
+                    <td>登入失敗只給一句籠統訊息</td>
+                    <td>若分別回「查無此帳號」與「密碼錯誤」，攻擊者可以用它<strong>列舉出有效帳號</strong>。</td>
+                </tr>
+                <tr>
+                    <td>登出用 POST 不用 GET</td>
+                    <td>見 <code>AccountController.cs:77–80</code>。
+                        GET 版的登出網址可以被塞進 <code>&lt;img src&gt;</code>，讓別人一開頁面就被登出。</td>
+                </tr>
+                <tr>
+                    <td>角色寫進 Cookie 而非每次查 DB</td>
+                    <td>省下每個請求一次查詢。代價是<strong>改了角色要重新登入才生效</strong>——
+                        <code>/Admin/Users/Edit</code> 改完角色後請記得這件事。</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>在 <code>AuthService.cs:44</code>（<code>Verify</code> 那行）設中斷點，用 <code>Admin / Admin@123</code> 登入，
+                觀察 <code>user.PasswordHash</code> 長什麼樣（<code>$2a$…</code> 開頭就是 BCrypt）。</li>
+            <li>用同一組密碼替兩個帳號設密碼，比對它們的 <code>PasswordHash</code>——<strong>會不一樣</strong>，
+                因為每次都用了新的隨機 salt。</li>
+            <li>登入後按 F12 → Application → Cookies，找到 <code>LeaveSystem.Auth</code>，
+                試著改掉其中幾個字元再重新整理，會被當成未登入踢回登入頁（簽章驗證失敗）。</li>
+            <li>用學員帳號登入後直接開 <code>/Admin/Users</code>，看它轉到 <code>/Account/AccessDenied</code>——
+                這就是第 5 步 <code>AccessDeniedPath</code> 設定在起作用。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="01-startup-di.html">◀ 01 啟動與 DI</a>
+        <span class="spacer"></span>
+        <a href="03-leave-submit.html">03 學員送出請假單 ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

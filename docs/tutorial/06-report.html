@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>06 紀錄查詢與時數統計 — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html" class="current">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 06 · Query &amp; Statistics</div>
+    <h1 class="page-title">紀錄查詢與時數統計</h1>
+
+    <p class="lead">
+        <code>ReportsController</code> 有三個查詢 Action，全部轉給同一個
+        <code>LeaveReportService</code>。這條流程的重點不在「怎麼查」，而在兩個決策：
+        <strong>哪些資料在資料庫端過濾、哪些拉回記憶體再算</strong>，
+        以及<strong>學員與行政的權限怎麼在同一個 Controller 裡分流</strong>。
+    </p>
+
+    <section class="block">
+        <h2>循序圖：學員累計時數 /Reports/Summary</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 690" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="累計時數統計流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="100" y1="52" x2="100" y2="666"/>
+                <line class="lifeline" x1="380" y1="52" x2="380" y2="666"/>
+                <line class="lifeline" x1="660" y1="52" x2="660" y2="666"/>
+                <line class="lifeline" x1="940" y1="52" x2="940" y2="666"/>
+
+                <g class="actor client">
+                    <rect x="15" y="8" width="170" height="44"/>
+                    <text x="100" y="26">學員瀏覽器</text>
+                    <text class="sub" x="100" y="42">GET /Reports/Summary</text>
+                </g>
+                <g class="actor controller">
+                    <rect x="295" y="8" width="170" height="44"/>
+                    <text x="380" y="26">ReportsController</text>
+                    <text class="sub" x="380" y="42">Summary()</text>
+                </g>
+                <g class="actor service">
+                    <rect x="575" y="8" width="170" height="44"/>
+                    <text x="660" y="26">LeaveReportService</text>
+                    <text class="sub" x="660" y="42">ILeaveReportService</text>
+                </g>
+                <g class="actor data">
+                    <rect x="855" y="8" width="170" height="44"/>
+                    <text x="940" y="26">AppDbContext</text>
+                    <text class="sub" x="940" y="42">EF Core → SQL</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="100" y1="104" x2="372" y2="104"/>
+                    <text class="label" x="236" y="96">GET /Reports/Summary</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <path class="selfpath" d="M380,150 h80 v22 h-72"/>
+                    <text class="label left" x="474" y="168">[Authorize(Roles = "Student")] + GetCurrentUserId()</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="380" y1="220" x2="652" y2="220"/>
+                    <text class="label" x="516" y="212">GetMyLeaveTypeSummaryAsync(studentId)</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="660" y1="278" x2="932" y2="278"/>
+                    <text class="label" x="796" y="270">UserAccounts.Include(Cohort)（取上限）</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="660" y1="336" x2="932" y2="336"/>
+                    <text class="label" x="796" y="328">Where(Status == Approved).ToListAsync()</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg ret" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <line class="arrow" x1="940" y1="394" x2="668" y2="394"/>
+                    <text class="label" x="804" y="386">List&lt;LeaveRequest&gt;（已含 LeaveType）</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M660,440 h80 v22 h-72"/>
+                    <text class="label left" x="754" y="458">記憶體端 GroupBy 假別 → OrderBy(SortOrder)</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg ret" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="660" y1="510" x2="388" y2="510"/>
+                    <text class="label" x="524" y="502">MyLeaveSummaryViewModel（含上限與班期名）</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg ret" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <line class="arrow" x1="380" y1="568" x2="108" y2="568"/>
+                    <text class="label" x="244" y="560">View(vm) → 進度條 + 各假別明細</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+
+                <g class="note">
+                    <rect x="430" y="600" width="700" height="52"/>
+                    <text x="446" y="622">統計口徑與班期上限檢查一致：只累計 Status == Approved。</text>
+                    <text x="446" y="640">Pending 與 Rejected 的時數不佔額度，也不顯示在累計裡。</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 瀏覽器</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>三個 Action，三種權限</h2>
+        <table class="doc">
+            <thead>
+                <tr><th style="width:190px;">路由</th><th style="width:150px;">授權</th><th>對應 Service 方法</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/Reports</code><br><span style="font-size:12px;color:var(--text-muted)">ReportsController.cs:50</span></td>
+                    <td><code>[Authorize(Roles&nbsp;=&nbsp;"Student")]</code></td>
+                    <td><code>GetMyRequestsAsync(studentId, query)</code>（<code>LeaveReportService.cs:37</code>）<br>
+                        依<strong>狀態 / 假別 / 日期</strong>三條件篩選我的請假單</td>
+                </tr>
+                <tr>
+                    <td><code>/Reports/Summary</code><br><span style="font-size:12px;color:var(--text-muted)">ReportsController.cs:74</span></td>
+                    <td><code>[Authorize(Roles&nbsp;=&nbsp;"Student")]</code></td>
+                    <td><code>GetMyLeaveTypeSummaryAsync(studentId)</code>（<code>:96</code>）<br>
+                        各假別累計時數 + 班期上限進度條</td>
+                </tr>
+                <tr>
+                    <td><code>/Reports/Admin</code><br><span style="font-size:12px;color:var(--text-muted)">ReportsController.cs:92</span></td>
+                    <td><code>[Authorize(Roles&nbsp;=&nbsp;"Staff,Admin")]</code></td>
+                    <td><code>GetAdminReportAsync(query)</code>（<code>:134</code>）<br>
+                        班期 × 學員 × 假別 × 年月 四維彙總</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="callout">
+            <div class="t">為什麼 Controller 上只掛 [Authorize]，角色寫在每個 Action</div>
+            <code>ReportsController.cs:24</code> 的 <code>[Authorize]</code> 只要求「必須登入」，
+            因為同一個 Controller 裡<strong>學員與行政各有各的 Action</strong>。
+            若把角色寫在 class 上，就得拆成兩個 Controller。
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">GET /Reports/Summary</span>
+                    <span class="loc">Views/Reports/Summary.cshtml</span>
+                </div>
+                <p class="desc">
+                    純 GET，沒有查詢字串。「我是誰」完全靠 Cookie，
+                    <strong>網址上不帶 studentId</strong>——這樣就沒有「改網址看別人資料」的破口。
+                </p>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">[Authorize(Roles = "Student")] Summary()</span>
+                    <span class="loc">ReportsController.cs:72–74</span>
+                </div>
+                <p class="desc">
+                    使用者 Id 從 <code>ClaimTypes.NameIdentifier</code> 取得
+                    （<a href="02-auth.html">02 認證</a>第 9 步寫進去的那筆 Claim），
+                    再往下傳給 Service。
+                </p>
+                <pre><code>[HttpGet]
+[Authorize(Roles = <span class="str">"Student"</span>)]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Summary()
+{
+    <span class="kw">var</span> studentId = GetCurrentUserId();
+    <span class="kw">if</span> (studentId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+    <span class="kw">var</span> vm = <span class="kw">await</span> _reportService.GetMyLeaveTypeSummaryAsync(studentId.Value);
+    <span class="kw">return</span> View(vm);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">GetMyLeaveTypeSummaryAsync(int studentId)</span>
+                    <span class="loc">Services/LeaveReportService.cs:96</span>
+                </div>
+                <p class="desc">
+                    參數只有 <code>studentId</code>，<strong>沒有任何篩選條件</strong>——
+                    累計時數是「終身總計」，不隨畫面上的日期篩選改變。
+                    這跟 <code>/Reports</code> 的清單查詢是兩種不同語意。
+                </p>
+                <pre><code><span class="kw">public async</span> Task&lt;MyLeaveSummaryViewModel&gt; GetMyLeaveTypeSummaryAsync(<span class="kw">int</span> studentId)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">_db.UserAccounts.AsNoTracking().Include(u =&gt; u.Cohort).FirstOrDefaultAsync(…)</span>
+                    <span class="loc">Services/LeaveReportService.cs:99–102</span>
+                </div>
+                <p class="desc">
+                    <code>AsNoTracking()</code>：這是<strong>唯讀查詢</strong>，
+                    不需要 EF Core 建立變更追蹤快照，省記憶體也省時間。
+                    整個 <code>LeaveReportService</code> 的查詢都加了它。
+                    <code>Cohort</code> 可能是 <code>null</code>（學員還沒被指派班期），所以後面全用 <code>?.</code> 存取。
+                </p>
+                <pre><code><span class="cmt">// 先取學員（含班期），Cohort 可能為 null（尚未指派班期）</span>
+<span class="kw">var</span> student = <span class="kw">await</span> _db.UserAccounts
+    .AsNoTracking()
+    .Include(u =&gt; u.Cohort)
+    .FirstOrDefaultAsync(u =&gt; u.Id == studentId);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">.Where(r =&gt; r.StudentId == studentId &amp;&amp; r.Status == Approved).ToListAsync()</span>
+                    <span class="loc">Services/LeaveReportService.cs:106–110</span>
+                </div>
+                <p class="desc">
+                    <strong>篩選在資料庫端做</strong>（<code>WHERE</code> 進得了 SQL），
+                    但 <code>ToListAsync()</code> 之後就把資料拉回記憶體了。
+                    這是刻意的——原因見下一步。
+                </p>
+                <pre><code><span class="cmt">// 只累計 Approved（與 Phase 3 班期上限口徑一致）</span>
+<span class="cmt">// 撈完整實體到記憶體，方便同時做 group + 依 LeaveType.SortOrder 排序</span>
+<span class="kw">var</span> approved = <span class="kw">await</span> _db.LeaveRequests
+    .AsNoTracking()
+    .Include(r =&gt; r.LeaveType)
+    .Where(r =&gt; r.StudentId == studentId &amp;&amp; r.Status == LeaveStatus.Approved)
+    .ToListAsync();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">→ List&lt;LeaveRequest&gt;（每筆都帶著 LeaveType）</span>
+                    <span class="loc">Services/LeaveReportService.cs:110</span>
+                </div>
+                <p class="desc">
+                    <code>Include(r =&gt; r.LeaveType)</code> 讓假別的 <code>Name</code> 與 <code>SortOrder</code>
+                    一起被載入。若少了它，下一步在記憶體端存取 <code>r.LeaveType.Name</code>
+                    會因為<strong>沒有延遲載入</strong>而丟 <code>NullReferenceException</code>。
+                </p>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">approved.GroupBy(…).OrderBy(SortOrder).Select(…)</span>
+                    <span class="loc">Services/LeaveReportService.cs:112–122</span>
+                </div>
+                <p class="desc">
+                    <strong>這一段是 LINQ to Objects，不是 LINQ to Entities。</strong>
+                    因為前一步已經 <code>ToListAsync()</code>，這裡就跑在記憶體裡。
+                    這麼做的理由寫在原始碼註解裡：<code>GroupBy</code> 在不同資料庫 provider
+                    的翻譯行為有差異（尤其還要同時依 <code>LeaveType.SortOrder</code> 排序），
+                    <strong>拉回來算比較可預測</strong>——單一學員的假單量本來就不大。
+                </p>
+                <pre><code><span class="kw">var</span> items = approved
+    .GroupBy(r =&gt; <span class="kw">new</span> { r.LeaveTypeId, r.LeaveType.Name, r.LeaveType.SortOrder })
+    .OrderBy(g =&gt; g.Key.SortOrder)
+    .ThenBy(g =&gt; g.Key.LeaveTypeId)
+    .Select(g =&gt; <span class="kw">new</span> MyLeaveTypeSummaryItem
+    {
+        LeaveTypeName = g.Key.Name,
+        TotalHours    = g.Sum(r =&gt; r.TotalHours),
+        RequestCount  = g.Count()
+    })
+    .ToList();</code></pre>
+                <div class="callout warn">
+                    <div class="t">什麼時候不該這樣做</div>
+                    <code>GetAdminReportAsync</code>（<code>:134</code>）用了同樣的手法，
+                    但它的資料量是<strong>整個班期</strong>。目前規模沒問題，
+                    若學員數成長到數千人，就該把彙總改寫成資料庫端的 <code>GROUP BY</code>，
+                    或改用資料庫檢視表。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">→ MyLeaveSummaryViewModel</span>
+                    <span class="loc">Services/LeaveReportService.cs:124–130</span>
+                </div>
+                <p class="desc">
+                    Service <strong>回傳的是 ViewModel 而不是 Entity</strong>。
+                    View 拿到的只有它需要顯示的欄位，
+                    不會不小心把 <code>PasswordHash</code> 這類東西一起帶到畫面上。
+                    <code>CohortLeaveLimitHours</code> 為 <code>null</code> 時，View 就不畫進度條。
+                </p>
+                <pre><code><span class="kw">return new</span> MyLeaveSummaryViewModel
+{
+    Items                 = items,
+    TotalApprovedHours    = items.Sum(i =&gt; i.TotalHours),
+    CohortLeaveLimitHours = student?.Cohort?.LeaveLimitHours,   <span class="cmt">// 沒班期就是 null</span>
+    CohortName            = student?.Cohort?.Name
+};</code></pre>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">return View(vm)</span>
+                    <span class="loc">Views/Reports/Summary.cshtml</span>
+                </div>
+                <p class="desc">
+                    進度條的百分比 = <code>TotalApprovedHours / CohortLeaveLimitHours</code>。
+                    這個上限值就是<a href="03-leave-submit.html">送單時第 5 步</a>拿來擋人的同一個數字，
+                    學員因此能<strong>事先知道自己還剩多少額度</strong>，而不是送出去才被退。
+                </p>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>在 <code>LeaveReportService.cs:112</code>（<code>GroupBy</code> 那行）設中斷點，
+                觀察 <code>approved</code> 已經是一個 <code>List</code>——證明後面都在記憶體算。</li>
+            <li>用 <code>/Reports</code> 篩「已核准」與「進行中」，比對 <code>/Reports/Summary</code> 的總計——
+                <strong>只有已核准的會被算進去</strong>。</li>
+            <li>在 Output 視窗看 EF Core 送出的 SQL：<code>Summary</code> 只送兩句查詢，
+                <strong>沒有 <code>GROUP BY</code></strong>。</li>
+            <li>把某位學員的 <code>CohortId</code> 清成 <code>null</code>，開 <code>/Reports/Summary</code>——
+                明細照常顯示，但進度條消失（<code>CohortLeaveLimitHours == null</code>）。</li>
+            <li>用學員帳號直接開 <code>/Reports/Admin</code>，看它被導到 <code>/Account/AccessDenied</code>。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="05-notification.html">◀ 05 站內通知 + Email</a>
+        <span class="spacer"></span>
+        <a href="07-absence.html">07 曠課紀錄 CRUD ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

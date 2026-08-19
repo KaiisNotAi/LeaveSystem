@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>08 匯出 CSV / Excel — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html" class="current">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 08 · Export CSV / Excel</div>
+    <h1 class="page-title">匯出 CSV / Excel</h1>
+
+    <p class="lead">
+        一次 GET 就要吐出一個含<strong>三個工作表</strong>的 <code>.xlsx</code>。
+        關鍵設計是把「欄位長什麼樣」抽成 <code>ExportColumn&lt;T&gt;</code> 這個純資料定義，
+        <strong>同一份定義同時餵給 CSV 與 Excel 兩個輸出器</strong>——
+        改欄位只要改一個地方，兩種格式一起跟著變。
+    </p>
+
+    <section class="block">
+        <h2>循序圖：匯出多 sheet Excel</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 750" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="匯出多 sheet Excel 流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="90" y1="52" x2="90" y2="726"/>
+                <line class="lifeline" x1="330" y1="52" x2="330" y2="726"/>
+                <line class="lifeline" x1="590" y1="52" x2="590" y2="726"/>
+                <line class="lifeline" x1="850" y1="52" x2="850" y2="726"/>
+                <line class="lifeline" x1="1110" y1="52" x2="1110" y2="726"/>
+
+                <g class="actor client">
+                    <rect x="12" y="8" width="156" height="44"/>
+                    <text x="90" y="26">行政人員</text>
+                    <text class="sub" x="90" y="42">/Admin/Export</text>
+                </g>
+                <g class="actor controller">
+                    <rect x="242" y="8" width="176" height="44"/>
+                    <text x="330" y="26">ExportController</text>
+                    <text class="sub" x="330" y="42">ExportXlsx()</text>
+                </g>
+                <g class="actor service">
+                    <rect x="502" y="8" width="176" height="44"/>
+                    <text x="590" y="26">LeaveReportService</text>
+                    <text class="sub" x="590" y="42">+ AbsenceRecordService</text>
+                </g>
+                <g class="actor data">
+                    <rect x="762" y="8" width="176" height="44"/>
+                    <text x="850" y="26">AppDbContext</text>
+                    <text class="sub" x="850" y="42">EF Core → SQL</text>
+                </g>
+                <g class="actor external">
+                    <rect x="1022" y="8" width="176" height="44"/>
+                    <text x="1110" y="26">ClosedXML</text>
+                    <text class="sub" x="1110" y="42">IExcelExporter</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="104" x2="322" y2="104"/>
+                    <text class="label" x="206" y="96">GET /Admin/Export/ExportXlsx?CohortId=…</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,150 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="168">[Authorize(Roles = "Staff,Admin")] + CohortId 必填檢查</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="220" x2="582" y2="220"/>
+                    <text class="label" x="456" y="212">LoadAllAsync(query)</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="278" x2="842" y2="278"/>
+                    <text class="label" x="716" y="270">GetLeaveDetailsForAdminAsync(query)</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="590" y1="336" x2="842" y2="336"/>
+                    <text class="label" x="716" y="328">GetForAdminAsync(曠課篩選) + 班期名稱</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,382 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="400">BuildSummaryRows(leaves, absences) — 記憶體彙總</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,440 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="458">ExportSheet.Create × 3（請假明細 / 曠課明細 / 彙總）</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="510" x2="1102" y2="510"/>
+                    <text class="label" x="716" y="502">_excel.ExportWorkbook(sheets)</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg ret" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <line class="arrow" x1="1110" y1="568" x2="338" y2="568"/>
+                    <text class="label" x="724" y="560">byte[]（.xlsx 二進位）</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <g class="msg ret" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="626" x2="98" y2="626"/>
+                    <text class="label" x="214" y="618">File(bytes, mimeType, 檔名) → 瀏覽器下載</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+
+                <g class="note">
+                    <rect x="420" y="660" width="720" height="52"/>
+                    <text x="436" y="682">CSV 版（ExportLeavesCsv / ExportAbsencesCsv）走同一條路，</text>
+                    <text x="436" y="700">只是第 8 步改呼叫 _csv.Export(rows, columns)，欄位定義完全共用。</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 行政人員</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-external)"></i> ClosedXML</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">GET /Admin/Export/ExportXlsx?CohortId=…&amp;StudentId=…&amp;DateFrom=…</span>
+                    <span class="loc">Views/Export/Index.cshtml</span>
+                </div>
+                <p class="desc">
+                    匯出按鈕是<strong>三個獨立的 GET 連結</strong>，不是表單 POST。
+                    因為「下載一份報表」是<strong>唯讀查詢</strong>，用 GET 才能被加入書籤、被重新整理，
+                    也不用處理防偽權杖。
+                </p>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">[Authorize(Roles = "Staff,Admin")] ExportXlsx([FromQuery] AdminExportQuery query)</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:22, 60–66</span>
+                </div>
+                <p class="desc">
+                    <code>CohortId</code> 是<strong>必填</strong>——沒有它就代表「匯出全機構」，
+                    資料量與權限風險都太大。條件不足時直接轉回設定頁而不是回錯誤，
+                    因為使用者可能只是直接貼了網址。
+                </p>
+                <pre><code>[HttpGet]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; ExportXlsx([FromQuery] AdminExportQuery query)
+{
+    <span class="kw">if</span> (!ModelState.IsValid || !query.CohortId.HasValue)
+    {
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">var (leaves, absences, cohortName) = await LoadAllAsync(query);</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:68, 119–126</span>
+                </div>
+                <p class="desc">
+                    用 <strong>tuple 解構</strong>一次拿回三樣東西。
+                    <code>LoadAllAsync</code> 是這個 Controller 的私有方法，
+                    <code>ExportXlsx</code> 與兩個 CSV Action 共用它的一部分，避免重複查詢邏輯。
+                </p>
+                <pre><code><span class="kw">var</span> (leaves, absences, cohortName) = <span class="kw">await</span> LoadAllAsync(query);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">_leaveReport.GetLeaveDetailsForAdminAsync(query)</span>
+                    <span class="loc">Services/LeaveReportService.cs:246</span>
+                </div>
+                <p class="desc">
+                    回傳的是<strong>已經攤平的 <code>AdminLeaveDetailRow</code></strong>——
+                    班期名、學員名、假別名都已經 join 好變成字串欄位。
+                    匯出器拿到的是<strong>純資料列</strong>，不需要再懂 Entity 之間的關聯。
+                </p>
+                <pre><code><span class="kw">public async</span> Task&lt;IReadOnlyList&lt;AdminLeaveDetailRow&gt;&gt; GetLeaveDetailsForAdminAsync(AdminExportQuery query)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">_absence.GetForAdminAsync(…) · GetCohortNameAsync(cohortId)</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:119–130</span>
+                </div>
+                <p class="desc">
+                    請假與曠課是<strong>兩個完全獨立的 Service</strong>，在這裡才被組在一起。
+                    <code>cohortName</code> 只有一個用途：組出好認的檔名。
+                </p>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">BuildSummaryRows(leaves, absences)</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:155</span>
+                </div>
+                <p class="desc">
+                    第三個 sheet「彙總」<strong>不是再查一次資料庫</strong>，
+                    而是把前兩個 sheet 已經拿到的資料在記憶體裡合併統計。
+                    這保證三張 sheet 的數字<strong>一定對得起來</strong>——
+                    若各查各的，中間有人新增一筆就會兜不攏。
+                </p>
+                <pre><code><span class="kw">private static</span> List&lt;AdminExportSummaryRow&gt; BuildSummaryRows(
+    IReadOnlyList&lt;AdminLeaveDetailRow&gt; leaves,
+    IReadOnlyList&lt;AbsenceRecordListItem&gt; absences)</code></pre>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">ExportSheet.Create&lt;T&gt;(name, rows, columns)</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:70–75 · Services/Export/ExportColumn.cs</span>
+                </div>
+                <p class="desc">
+                    <strong>型別擦除的關鍵一步。</strong>三個 sheet 的來源型別都不一樣
+                    （<code>AdminLeaveDetailRow</code> / <code>AbsenceRecordListItem</code> / <code>AdminExportSummaryRow</code>），
+                    但 <code>ExportWorkbook</code> 只能收一種參數。
+                    <code>ExportSheet.Create&lt;T&gt;</code> 在建構時就把每一格的值<strong>算出來存成
+                    <code>(object? Value, ExportValueType Type)</code></strong>，
+                    泛型參數 <code>T</code> 就此消失，異質資料因此能放進同一個集合。
+                </p>
+                <pre><code><span class="kw">var</span> sheets = <span class="kw">new</span>[]
+{
+    ExportSheet.Create(<span class="str">"請假明細"</span>, leaves,   LeaveDetailColumns),
+    ExportSheet.Create(<span class="str">"曠課明細"</span>, absences, AbsenceDetailColumns),
+    ExportSheet.Create(<span class="str">"彙總"</span>,   BuildSummaryRows(leaves, absences), SummaryColumns),
+};
+
+<span class="cmt">// ExportColumn.cs：Create 內部把泛型攤平成 object?</span>
+<span class="kw">var</span> expanded = rows
+    .Select(r =&gt; (IReadOnlyList&lt;(<span class="kw">object</span>?, ExportValueType)&gt;)
+                 columns.Select(c =&gt; (c.Value(r), c.Type)).ToArray())
+    .ToArray();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">_excel.ExportWorkbook(sheets)</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:77 · Services/Export/ClosedXmlExcelExporter.cs</span>
+                </div>
+                <p class="desc">
+                    輸出器<strong>不認識任何 domain 型別</strong>，只看 <code>ExportValueType</code> 決定怎麼寫：
+                    <code>Date</code> / <code>DateTime</code> 寫成 Excel 原生日期（可排序、可篩選），
+                    <code>Hours</code> 寫成數字並套上 <code>#,##0.##</code> 格式。
+                    <strong>不是全部丟成字串</strong>——那樣使用者在 Excel 裡就沒辦法排序或做樞紐分析。
+                </p>
+                <pre><code><span class="kw">public interface</span> IExcelExporter
+{
+    <span class="kw">byte</span>[] Export&lt;T&gt;(IEnumerable&lt;T&gt; rows, IReadOnlyList&lt;ExportColumn&lt;T&gt;&gt; columns, <span class="kw">string</span>? sheetName = <span class="kw">null</span>);
+    <span class="kw">byte</span>[] ExportWorkbook(IEnumerable&lt;ExportSheet&gt; sheets);
+}</code></pre>
+                <div class="callout">
+                    <div class="t">欄寬的小插曲</div>
+                    ClosedXML 的 <code>AdjustToContents()</code> 對中文會估得偏窄。
+                    因此輸出器在自動調整後又補了 <code>+2</code> 的 padding，
+                    並限制下限 8、上限 60，避免出現「###」或超寬欄。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">→ byte[]</span>
+                    <span class="loc">Services/Export/ClosedXmlExcelExporter.cs</span>
+                </div>
+                <p class="desc">
+                    輸出器回傳的是<strong>記憶體中的位元組陣列</strong>，
+                    整個流程<strong>不落地成暫存檔</strong>——不用管清理，也不會有並行寫同一個檔名的問題。
+                </p>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">return File(bytes, mimeType, fileName);</span>
+                    <span class="loc">Controllers/Admin/ExportController.cs:78–80</span>
+                </div>
+                <p class="desc">
+                    <code>File()</code> 幫忙設好 <code>Content-Type</code> 與
+                    <code>Content-Disposition: attachment</code>，瀏覽器就會跳出下載。
+                    檔名用 <code>Slug(cohortName)</code>（<code>:143</code>）把班期名裡的空白與特殊字元清掉，
+                    避免在某些作業系統上變成無效檔名。
+                </p>
+                <pre><code><span class="kw">var</span> bytes = _excel.ExportWorkbook(sheets);
+<span class="kw">return</span> File(bytes,
+    <span class="str">"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"</span>,
+    $<span class="str">"admin-export-{Slug(cohortName)}-{DateTime.Today:yyyyMMdd}.xlsx"</span>);</code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>CSV 的兩個細節</h2>
+        <table class="doc">
+            <thead><tr><th style="width:200px;">細節</th><th>為什麼</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>UTF-8 含 BOM</strong></td>
+                    <td>Excel 開純 UTF-8（無 BOM）的 CSV 時，中文會變成亂碼——
+                        它會猜成系統的 ANSI 編碼。加上 BOM 這 3 個位元組，Excel 才認得出是 UTF-8。</td>
+                </tr>
+                <tr>
+                    <td><strong>RFC 4180 跳脫</strong></td>
+                    <td>欄位值裡有逗號、雙引號或換行時，整欄要用雙引號包起來，
+                        內部的雙引號要重複一次。請假原因是自由輸入的文字，
+                        使用者很容易打進逗號——沒處理就會整個欄位錯位。</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top:10px;">
+            這兩件事都在 <code>Services/Export/CsvExporter.cs</code> 裡，
+            並有對應的單元測試 <code>LeaveSystem.Tests/Services/CsvExporterTests.cs</code>。
+        </p>
+    </section>
+
+    <section class="block">
+        <h2>為什麼欄位定義要寫成 static readonly 陣列</h2>
+        <p>
+            <code>ExportController.cs:197 / :212 / :224</code> 定義了三組欄位：
+        </p>
+        <pre style="background:var(--code-bg); color:var(--code-text); border-radius:8px; padding:14px; overflow-x:auto; font-size:13px;"><code><span class="kw">private static readonly</span> IReadOnlyList&lt;ExportColumn&lt;AdminLeaveDetailRow&gt;&gt; LeaveDetailColumns = <span class="kw">new</span>[]
+{
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"班期"</span>,   r =&gt; r.CohortName),
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"起始"</span>,   r =&gt; r.StartAt,    ExportValueType.DateTime),
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"時數"</span>,   r =&gt; r.TotalHours, ExportValueType.Hours),
+    <span class="cmt">// …</span>
+};</code></pre>
+        <ul>
+            <li><strong>只建立一次</strong>：<code>static readonly</code> 不會每次請求都重新 new 一遍。</li>
+            <li><strong>CSV 與 Excel 共用</strong>：<code>ExportLeavesCsv</code>（<code>:85</code>）
+                與 <code>ExportXlsx</code>（<code>:61</code>）用的是<strong>同一個</strong>
+                <code>LeaveDetailColumns</code>，兩種格式的欄位順序與標題永遠一致。</li>
+            <li><strong>改欄位只改一處</strong>：要加一欄「駁回原因」，
+                在陣列裡加一行就好，兩種格式同時生效。</li>
+        </ul>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>直接開 <code>/Admin/Export/ExportXlsx</code>（不帶 <code>CohortId</code>），
+                看它把你導回設定頁。</li>
+            <li>在 <code>LeaveDetailColumns</code> 裡把「時數」那欄的
+                <code>ExportValueType.Hours</code> 改成 <code>Text</code>，重新匯出——
+                Excel 裡那一欄會變成靠左的文字、<strong>無法加總</strong>。<strong>看過就改回來。</strong></li>
+            <li>把某張假單的請假原因填成 <code>今天,明天"都"要請</code>，匯出 CSV 用記事本打開，
+                看 RFC 4180 的跳脫長什麼樣。</li>
+            <li>用記事本把匯出的 CSV 另存成「UTF-8（無 BOM）」再用 Excel 開，
+                親眼看中文變亂碼。</li>
+            <li>跑 <code>dotnet test --filter ExcelExporterTests</code>，
+                看測試是怎麼在<strong>不開 Excel</strong> 的情況下驗證產出的。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="07-absence.html">◀ 07 曠課紀錄 CRUD</a>
+        <span class="spacer"></span>
+        <a href="index.html">回目錄 ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>
