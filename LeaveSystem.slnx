@@ -3,4 +3,8 @@
   <Project Path="LeaveSystem.Tests/LeaveSystem.Tests.csproj">
     <Build Solution="Debug|*" Project="false" />
   </Project>
+  <!-- 離線工具：專題報告截圖擷取。不參與一般 Debug 建置，需要時單獨 dotnet run。 -->
+  <Project Path="tools/ScreenshotCapture/ScreenshotCapture.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
 </Solution>
