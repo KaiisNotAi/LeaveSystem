@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 8 章 關聯資料 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch08">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 3 · 資料庫</div>
+    <h1 class="chapter-title">第 8 章　關聯資料</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        建立<strong>使用者、角色、班期</strong>三張互相關聯的表，
+        看得懂一對多與多對多怎麼寫，知道 <code>Include</code> 在做什麼，
+        以及怎麼避免那個會讓網站變慢十倍的 <strong>N+1 問題</strong>。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>3 小時</b></span>
+        <span>📦 前置：<a href="ch07-first-crud.html">第 7 章</a>（假別 CRUD 完成）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#model">先想清楚：誰跟誰有關係</a></li>
+            <li><a href="#onetomany">一對多：班期與學員</a></li>
+            <li><a href="#manytomany">多對多：使用者與角色</a></li>
+            <li><a href="#tricky">難題：班期上的三個簽核人</a></li>
+            <li><a href="#migrate">產生 Migration</a></li>
+            <li><a href="#include">Include：載入關聯資料</a></li>
+            <li><a href="#nplus1">N+1 問題</a></li>
+            <li><a href="#projection">投影：只拿你要的欄位</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="model">1. 先想清楚：誰跟誰有關係</h2>
+
+    <p>在寫任何程式碼之前，先把關係用白話講一遍：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:250px;">關係</th><th style="width:120px;">類型</th><th>白話</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>班期 ↔ 學員</td>
+                <td>一對多</td>
+                <td>一個班期有很多學員；<strong>一個學員只屬於一個班期</strong></td>
+            </tr>
+            <tr>
+                <td>使用者 ↔ 角色</td>
+                <td>多對多</td>
+                <td>一個人可以同時是導師和行政；<strong>一個角色也有很多人</strong></td>
+            </tr>
+            <tr>
+                <td>班期 ↔ 導師 / 科長 / 分署長</td>
+                <td>特殊</td>
+                <td>一個班期<strong>各指定一位</strong>。這三個都指向使用者表</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">關係想錯，後面全部要重來</span>
+        資料模型是整個系統的地基。<strong>寫程式之前先在紙上畫一遍</strong>，
+        問自己「這邊可以有幾個？那邊可以有幾個？」。
+        完成品專案的完整關係圖在
+        <a href="../report/er-diagram.html">專題報告的 ER 圖</a>，可以先去看一眼。
+    </div>
+
+    <h2 class="sec" id="onetomany">2. 一對多：班期與學員</h2>
+
+    <p>一對多的寫法有固定套路：<strong>「多」的那邊放外鍵，兩邊各放一個導覽屬性。</strong></p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/Cohort.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">public class</span> Cohort
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required, MaxLength(50)]
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="kw">public</span> DateTime StartDate { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> DateTime EndDate   { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 總上課時數，例如 900</span>
+    <span class="kw">public int</span> TotalHours { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 請假上限百分比，預設 10%</span>
+    <span class="kw">public int</span> LeaveLimitPercent { <span class="kw">get</span>; <span class="kw">set</span>; } = 10;
+
+    <span class="cmt">// 計算屬性：不存資料庫（第 1 章講過的單一真相來源）</span>
+    <span class="kw">public int</span> LeaveLimitHours =&gt; (<span class="kw">int</span>)Math.Floor(TotalHours * LeaveLimitPercent / 100.0);
+
+    <span class="cmt">// 導覽屬性：這個班期底下的所有學員</span>
+    <span class="kw">public</span> ICollection&lt;UserAccount&gt; Students { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span> List&lt;UserAccount&gt;();
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/UserAccount.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">public class</span> UserAccount
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required, MaxLength(50)]
+    <span class="kw">public string</span> Username { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Required, MaxLength(100)]
+    <span class="kw">public string</span> DisplayName { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="cmt">// 第 10 章才會真的用到，先留欄位</span>
+    [Required, MaxLength(100)]
+    <span class="kw">public string</span> PasswordHash { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [MaxLength(100)]
+    <span class="kw">public string</span>? Email { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public bool</span> IsActive { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">true</span>;
+
+    <span class="cmt">// ── 一對多的「多」這一端 ──</span>
+    <span class="cmt">// 外鍵。int? 代表可以沒有班期（老師、行政人員就沒有）</span>
+    <span class="kw">public int</span>? CohortId { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 導覽屬性：指回那個班期</span>
+    <span class="kw">public</span> Cohort? Cohort { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">外鍵 CohortId 與導覽屬性 Cohort，為什麼兩個都要？</span>
+        <p>
+            <strong><code>CohortId</code>（int?）</strong>是資料庫實際存的東西，
+            也是你在表單下拉選單裡會用到的值。
+        </p>
+        <p>
+            <strong><code>Cohort</code>（物件）</strong>是給 C# 用的方便寫法，
+            讓你能寫 <code>student.Cohort.Name</code> 而不用自己再查一次。
+        </p>
+        <p>
+            <strong>重點：<code>Cohort</code> 這個屬性預設是 <code>null</code>，
+            除非你明確用 <code>Include</code> 把它載進來。</strong>
+            這是第 6 節的主題，也是新手最常撞的 <code>NullReferenceException</code> 來源。
+        </p>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">EF Core 怎麼知道它們是一對？</span>
+        靠命名慣例：屬性叫 <code>Cohort</code>（型別是 <code>Cohort</code>），
+        旁邊剛好有個 <code>CohortId</code>——<strong>「導覽屬性名 + Id」</strong>就是它的外鍵。
+        名字不照慣例的話要用 <code>[ForeignKey]</code> 屬性明講。
+    </div>
+
+    <h2 class="sec" id="manytomany">3. 多對多：使用者與角色</h2>
+
+    <p>
+        多對多沒辦法用兩張表表示（一個欄位存不下多個值），
+        必須加一張<strong>中間表</strong>把它拆成兩個一對多：
+    </p>
+
+    <div class="filetree">UserAccounts          UserRoles                 Roles
+┌──────────┐      ┌──────────────┐      ┌──────────┐
+│ Id       │◄─────│ UserId       │      │ Id       │
+│ Username │      │ RoleId       │─────►│ Name     │
+│ …        │      └──────────────┘      │ …        │
+└──────────┘       <span class="c">（中間表，複合主鍵）</span>    └──────────┘</div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/Role.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">public class</span> Role
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 程式判斷用的英文名："Admin"、"Tutor"、"Student"…</span>
+    [Required, MaxLength(30)]
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="cmt">// 畫面顯示用的中文名："系統管理員"、"導師"、"學員"…</span>
+    [Required, MaxLength(30)]
+    <span class="kw">public string</span> DisplayName { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="kw">public</span> ICollection&lt;UserRole&gt; UserRoles { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span> List&lt;UserRole&gt;();
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/UserRole.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="cmt">// 中間表。沒有自己的 Id，用 (UserId, RoleId) 當複合主鍵。</span>
+<span class="kw">public class</span> UserRole
+{
+    <span class="kw">public int</span> UserId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> UserAccount User { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">null</span>!;
+
+    <span class="kw">public int</span> RoleId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> Role Role { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">null</span>!;
+}</code></pre>
+    </div>
+
+    <p>再回頭給 <code>UserAccount</code> 補上對應的導覽屬性：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Models/Entities/UserAccount.cs</span></div>
+        <pre><code>    <span class="kw">public</span> Cohort? Cohort { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+<span class="add">    <span class="cmt">// ── 多對多：這個人有哪些角色 ──</span></span>
+<span class="add">    <span class="kw">public</span> ICollection&lt;UserRole&gt; UserRoles { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span> List&lt;UserRole&gt;();</span>
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t"><code>= null!;</code> 是什麼意思？</span>
+        那個驚嘆號是在跟編譯器說「我知道它現在是 null，但你別念我，執行時 EF Core 會填好」。
+        <strong>必填的導覽屬性用 <code>null!</code>，選填的用 <code>?</code></strong>——
+        對照一下 <code>UserRole.User</code>（必填，用 <code>null!</code>）
+        與 <code>UserAccount.Cohort</code>（選填，用 <code>?</code>）。
+    </div>
+
+    <h2 class="sec" id="tricky">4. 難題：班期上的三個簽核人</h2>
+
+    <p>
+        班期要指定導師、科長、分署長各一位，<strong>三個都指向 <code>UserAccount</code></strong>。
+        這裡有個坑：EF Core 會搞不清楚 <code>Cohort.Students</code> 跟這三個的關係。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Models/Entities/Cohort.cs</span></div>
+        <pre><code>    <span class="kw">public</span> ICollection&lt;UserAccount&gt; Students { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span> List&lt;UserAccount&gt;();
+
+<span class="add">    <span class="cmt">// ── 三位簽核人（都可以先不指派）──</span></span>
+<span class="add">    <span class="kw">public int</span>? TutorUserId          { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+<span class="add">    <span class="kw">public int</span>? SectionChiefUserId   { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+<span class="add">    <span class="kw">public int</span>? BranchDirectorUserId { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+<span class="add"></span>
+<span class="add">    <span class="kw">public</span> UserAccount? Tutor          { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+<span class="add">    <span class="kw">public</span> UserAccount? SectionChief   { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+<span class="add">    <span class="kw">public</span> UserAccount? BranchDirector { <span class="kw">get</span>; <span class="kw">set</span>; }</span>
+}</code></pre>
+    </div>
+
+    <p>
+        現在有四條路徑從 <code>Cohort</code> 通往 <code>UserAccount</code>，
+        EF Core 猜不出誰配誰。必須在 <code>AppDbContext</code> 裡明確講清楚：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/AppDbContext.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">namespace</span> MyLeaveSystem.Data;
+
+<span class="kw">public class</span> AppDbContext : DbContext
+{
+    <span class="kw">public</span> AppDbContext(DbContextOptions&lt;AppDbContext&gt; options) : <span class="kw">base</span>(options) { }
+
+    <span class="kw">public</span> DbSet&lt;LeaveType&gt;   LeaveTypes   =&gt; Set&lt;LeaveType&gt;();
+<span class="add">    <span class="kw">public</span> DbSet&lt;UserAccount&gt; UserAccounts =&gt; Set&lt;UserAccount&gt;();</span>
+<span class="add">    <span class="kw">public</span> DbSet&lt;Role&gt;        Roles        =&gt; Set&lt;Role&gt;();</span>
+<span class="add">    <span class="kw">public</span> DbSet&lt;UserRole&gt;    UserRoles    =&gt; Set&lt;UserRole&gt;();</span>
+<span class="add">    <span class="kw">public</span> DbSet&lt;Cohort&gt;      Cohorts      =&gt; Set&lt;Cohort&gt;();</span>
+
+<span class="add">    <span class="cmt">// 慣例猜不到的關係，在這裡明確設定</span></span>
+<span class="add">    <span class="kw">protected override void</span> OnModelCreating(ModelBuilder modelBuilder)</span>
+<span class="add">    {</span>
+<span class="add">        <span class="cmt">// ① 中間表用複合主鍵</span></span>
+<span class="add">        modelBuilder.Entity&lt;UserRole&gt;()</span>
+<span class="add">            .HasKey(ur =&gt; <span class="kw">new</span> { ur.UserId, ur.RoleId });</span>
+<span class="add"></span>
+<span class="add">        <span class="cmt">// ② 帳號不可重複</span></span>
+<span class="add">        modelBuilder.Entity&lt;UserAccount&gt;()</span>
+<span class="add">            .HasIndex(u =&gt; u.Username)</span>
+<span class="add">            .IsUnique();</span>
+<span class="add"></span>
+<span class="add">        <span class="cmt">// ③ 學員 ↔ 班期（一對多）</span></span>
+<span class="add">        modelBuilder.Entity&lt;UserAccount&gt;()</span>
+<span class="add">            .HasOne(u =&gt; u.Cohort)</span>
+<span class="add">            .WithMany(c =&gt; c.Students)</span>
+<span class="add">            .HasForeignKey(u =&gt; u.CohortId)</span>
+<span class="add">            .OnDelete(DeleteBehavior.Restrict);</span>
+<span class="add"></span>
+<span class="add">        <span class="cmt">// ④ 三位簽核人：WithMany() 空的＝對面不需要導覽屬性</span></span>
+<span class="add">        modelBuilder.Entity&lt;Cohort&gt;()</span>
+<span class="add">            .HasOne(c =&gt; c.Tutor).WithMany()</span>
+<span class="add">            .HasForeignKey(c =&gt; c.TutorUserId)</span>
+<span class="add">            .OnDelete(DeleteBehavior.Restrict);</span>
+<span class="add"></span>
+<span class="add">        modelBuilder.Entity&lt;Cohort&gt;()</span>
+<span class="add">            .HasOne(c =&gt; c.SectionChief).WithMany()</span>
+<span class="add">            .HasForeignKey(c =&gt; c.SectionChiefUserId)</span>
+<span class="add">            .OnDelete(DeleteBehavior.Restrict);</span>
+<span class="add"></span>
+<span class="add">        modelBuilder.Entity&lt;Cohort&gt;()</span>
+<span class="add">            .HasOne(c =&gt; c.BranchDirector).WithMany()</span>
+<span class="add">            .HasForeignKey(c =&gt; c.BranchDirectorUserId)</span>
+<span class="add">            .OnDelete(DeleteBehavior.Restrict);</span>
+<span class="add">    }</span>
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">OnDelete(DeleteBehavior.Restrict) 是什麼？</span>
+        <p>
+            預設行為是<strong>連鎖刪除</strong>：刪掉一個班期，底下所有學員跟著被刪。
+            這在請假系統是災難。
+        </p>
+        <p>
+            <code>Restrict</code> 的意思是「<strong>底下還有東西就不准刪</strong>」，
+            資料庫會直接拒絕。這樣你就不會不小心因為刪一個班期，
+            連帶弄丟一整批學員與他們的請假紀錄。
+        </p>
+        <p>
+            另外，多條路徑指向同一張表時，SQL Server 也會拒絕多重連鎖刪除路徑
+            （報錯 <code>may cause cycles or multiple cascade paths</code>）——
+            所以這裡不設 <code>Restrict</code> 的話，Migration 根本跑不起來。
+        </p>
+    </div>
+
+    <h2 class="sec" id="migrate">5. 產生 Migration</h2>
+
+    <p>先補上種子資料（六個角色，之後第 10 章要用）：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/SeedData.cs</span></div>
+        <pre><code><span class="kw">public static void</span> Initialize(AppDbContext db)
+{
+<span class="add">    SeedRoles(db);</span>
+    SeedLeaveTypes(db);
+}
+
+<span class="add"><span class="kw">private static void</span> SeedRoles(AppDbContext db)</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">if</span> (db.Roles.Any()) <span class="kw">return</span>;</span>
+<span class="add"></span>
+<span class="add">    db.Roles.AddRange(</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"Admin"</span>,          DisplayName = <span class="str">"系統管理員"</span> },</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"Staff"</span>,          DisplayName = <span class="str">"行政人員"</span> },</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"Tutor"</span>,          DisplayName = <span class="str">"導師"</span> },</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"SectionChief"</span>,   DisplayName = <span class="str">"科長"</span> },</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"BranchDirector"</span>, DisplayName = <span class="str">"分署長"</span> },</span>
+<span class="add">        <span class="kw">new</span> Role { Name = <span class="str">"Student"</span>,        DisplayName = <span class="str">"學員"</span> });</span>
+<span class="add"></span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add">}</span></code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">套用結構變更</span></div>
+        <pre><code>dotnet ef migrations add AddUsersRolesAndCohorts
+dotnet ef database update</code></pre>
+    </div>
+
+    <p>到 SSMS 看：多了 <code>UserAccounts</code>、<code>Roles</code>、<code>UserRoles</code>、<code>Cohorts</code> 四張表，
+       而且 <code>UserAccounts</code> 有一個指向 <code>Cohorts</code> 的外鍵。</p>
+
+    <div class="callout oops">
+        <span class="t">Migration 失敗：introducing FOREIGN KEY constraint … may cause cycles</span>
+        就是上面說的多重連鎖刪除路徑。回去確認三個簽核人關係都加了
+        <code>.OnDelete(DeleteBehavior.Restrict)</code>，
+        然後 <code>dotnet ef migrations remove</code> 重新產生。
+    </div>
+
+    <h2 class="sec" id="include">6. Include：載入關聯資料</h2>
+
+    <p>這是本章最重要的一節。先撞牆：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">這段會爆炸</span></div>
+        <pre><code><span class="kw">var</span> users = <span class="kw">await</span> _db.UserAccounts.ToListAsync();
+
+<span class="kw">foreach</span> (<span class="kw">var</span> u <span class="kw">in</span> users)
+{
+    <span class="cmt">// 💥 NullReferenceException：u.Cohort 是 null</span>
+    Console.WriteLine($<span class="str">"{u.DisplayName} 屬於 {u.Cohort.Name}"</span>);
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼是 null？資料庫裡明明有 CohortId</span>
+        <p>
+            因為 EF Core <strong>不會自動去載入關聯物件</strong>。
+            <code>u.CohortId</code> 有值（那是同一張表的欄位），
+            但 <code>u.Cohort</code> 是另一張表的資料，<strong>你沒開口要，它就不撈</strong>。
+        </p>
+        <p>
+            這是刻意的設計：如果每次查使用者都自動把班期、角色、請假單全部撈出來，
+            一個簡單查詢會變成災難。
+        </p>
+    </div>
+
+    <p>正確做法是明確要求：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Include 的三種用法</span></div>
+        <pre><code><span class="cmt">// ① 載入一層</span>
+<span class="kw">var</span> users = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.Cohort)
+    .ToListAsync();
+
+<span class="cmt">// ② 載入多層：先 Include 再 ThenInclude</span>
+<span class="cmt">//    使用者 → 他的 UserRoles → 每個 UserRole 的 Role</span>
+<span class="kw">var</span> withRoles = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.UserRoles)
+        .ThenInclude(ur =&gt; ur.Role)
+    .ToListAsync();
+
+<span class="cmt">// ③ 同時載入好幾條分支：Include 好幾次</span>
+<span class="kw">var</span> full = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.Cohort)
+    .Include(u =&gt; u.UserRoles).ThenInclude(ur =&gt; ur.Role)
+    .ToListAsync();</code></pre>
+    </div>
+
+    <h3 class="sub">6.1 動手：使用者清單</h3>
+
+    <p>先做一個唯讀的使用者清單，把 Include 用起來。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/UsersController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public class</span> UsersController : Controller
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+    <span class="kw">public</span> UsersController(AppDbContext db) =&gt; _db = db;
+
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+    {
+        <span class="kw">var</span> users = <span class="kw">await</span> _db.UserAccounts
+            .AsNoTracking()
+            .Include(u =&gt; u.Cohort)                              <span class="cmt">// 班期</span>
+            .Include(u =&gt; u.UserRoles).ThenInclude(ur =&gt; ur.Role) <span class="cmt">// 角色</span>
+            .OrderBy(u =&gt; u.Username)
+            .ToListAsync();
+
+        <span class="kw">return</span> View(users);
+    }
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/Users/Index.cshtml</span></div>
+        <pre><code>@model List&lt;UserAccount&gt;
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"使用者管理"</span>;
+}
+
+&lt;h1&gt;使用者管理&lt;/h1&gt;
+
+&lt;table class="table table-striped align-middle"&gt;
+    &lt;thead&gt;
+        &lt;tr&gt;&lt;th&gt;帳號&lt;/th&gt;&lt;th&gt;姓名&lt;/th&gt;&lt;th&gt;角色&lt;/th&gt;&lt;th&gt;所屬班期&lt;/th&gt;&lt;th&gt;狀態&lt;/th&gt;&lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+        @<span class="kw">foreach</span> (<span class="kw">var</span> u <span class="kw">in</span> Model)
+        {
+            &lt;tr&gt;
+                &lt;td&gt;&lt;code&gt;@u.Username&lt;/code&gt;&lt;/td&gt;
+                &lt;td&gt;@u.DisplayName&lt;/td&gt;
+                &lt;td&gt;
+                    @<span class="kw">foreach</span> (<span class="kw">var</span> ur <span class="kw">in</span> u.UserRoles)
+                    {
+                        &lt;span class="badge bg-secondary"&gt;@ur.Role.DisplayName&lt;/span&gt;
+                    }
+                &lt;/td&gt;
+                @* ?. 很重要：沒有班期的人 Cohort 是 null *@
+                &lt;td&gt;@(u.Cohort?.Name ?? <span class="str">"—"</span>)&lt;/td&gt;
+                &lt;td&gt;@(u.IsActive ? <span class="str">"啟用"</span> : <span class="str">"停用"</span>)&lt;/td&gt;
+            &lt;/tr&gt;
+        }
+    &lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+    </div>
+
+    <p>再補幾筆測試資料到種子裡，這樣畫面才看得到東西：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/SeedData.cs</span></div>
+        <pre><code><span class="kw">public static void</span> Initialize(AppDbContext db)
+{
+    SeedRoles(db);
+    SeedLeaveTypes(db);
+<span class="add">    SeedDemoUsers(db);</span>
+}
+
+<span class="add"><span class="kw">private static void</span> SeedDemoUsers(AppDbContext db)</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">if</span> (db.UserAccounts.Any()) <span class="kw">return</span>;</span>
+<span class="add"></span>
+<span class="add">    <span class="kw">var</span> cohort = <span class="kw">new</span> Cohort</span>
+<span class="add">    {</span>
+<span class="add">        Name = <span class="str">"115-1 班"</span>,</span>
+<span class="add">        StartDate = <span class="kw">new</span> DateTime(2026, 7, 1),</span>
+<span class="add">        EndDate   = <span class="kw">new</span> DateTime(2027, 1, 1),</span>
+<span class="add">        TotalHours = 900,          <span class="cmt">// 上限 = 900 × 10% = 90 小時</span></span>
+<span class="add">        LeaveLimitPercent = 10</span>
+<span class="add">    };</span>
+<span class="add">    db.Cohorts.Add(cohort);</span>
+<span class="add">    db.SaveChanges();              <span class="cmt">// 先存，才拿得到 cohort.Id</span></span>
+<span class="add"></span>
+<span class="add">    <span class="kw">var</span> tutor   = <span class="kw">new</span> UserAccount { Username = <span class="str">"tutor01"</span>, DisplayName = <span class="str">"方怡君"</span>, PasswordHash = <span class="str">"(尚未設定)"</span> };</span>
+<span class="add">    <span class="kw">var</span> student = <span class="kw">new</span> UserAccount { Username = <span class="str">"stu001"</span>,  DisplayName = <span class="str">"王小明"</span>, PasswordHash = <span class="str">"(尚未設定)"</span>, CohortId = cohort.Id };</span>
+<span class="add">    db.UserAccounts.AddRange(tutor, student);</span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add"></span>
+<span class="add">    <span class="cmt">// 指派角色</span></span>
+<span class="add">    <span class="kw">var</span> tutorRole   = db.Roles.First(r =&gt; r.Name == <span class="str">"Tutor"</span>);</span>
+<span class="add">    <span class="kw">var</span> studentRole = db.Roles.First(r =&gt; r.Name == <span class="str">"Student"</span>);</span>
+<span class="add">    db.UserRoles.AddRange(</span>
+<span class="add">        <span class="kw">new</span> UserRole { UserId = tutor.Id,   RoleId = tutorRole.Id },</span>
+<span class="add">        <span class="kw">new</span> UserRole { UserId = student.Id, RoleId = studentRole.Id });</span>
+<span class="add"></span>
+<span class="add">    <span class="cmt">// 指派這個班期的導師</span></span>
+<span class="add">    cohort.TutorUserId = tutor.Id;</span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add">}</span></code></pre>
+    </div>
+
+    <p>
+        刪掉資料庫重新啟動，開 <code>/Users</code>——
+        應該看到兩位使用者，各自帶著角色徽章，學員有班期、導師顯示「—」。
+    </p>
+
+    <div class="callout oops">
+        <span class="t">試著把 Include 拿掉</span>
+        把 <code>.Include(u =&gt; u.UserRoles).ThenInclude(…)</code> 註解掉再跑一次，
+        角色欄位會變成<strong>空白</strong>（不是報錯，因為 <code>UserRoles</code> 初始化成空清單了）。
+        這種「不會爆但資料默默不見」的情況更難察覺——
+        <strong>看到畫面上該有東西卻是空的，先檢查 Include。</strong>
+    </div>
+
+    <h2 class="sec" id="nplus1">7. N+1 問題</h2>
+
+    <p>
+        這是所有 ORM 最經典的效能陷阱。假設你在迴圈裡查資料：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">❌ 錯誤示範</span></div>
+        <pre><code><span class="kw">var</span> users = <span class="kw">await</span> _db.UserAccounts.ToListAsync();          <span class="cmt">// 1 次查詢</span>
+
+<span class="kw">foreach</span> (<span class="kw">var</span> u <span class="kw">in</span> users)
+{
+    <span class="cmt">// 每一圈都查一次資料庫！100 個使用者 = 100 次查詢</span>
+    <span class="kw">var</span> cohort = <span class="kw">await</span> _db.Cohorts.FirstOrDefaultAsync(c =&gt; c.Id == u.CohortId);
+    Console.WriteLine($<span class="str">"{u.DisplayName} — {cohort?.Name}"</span>);
+}</code></pre>
+    </div>
+
+    <p>
+        總共 <strong>1 + N</strong> 次查詢，所以叫 N+1。
+        測試時只有 3 筆資料，你完全感覺不到；上線之後有 500 個使用者，這一頁就要跑五百多次往返。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">✅ 正確做法</span></div>
+        <pre><code><span class="cmt">// 用 Include：EF Core 會用 JOIN 一次撈完</span>
+<span class="kw">var</span> users = <span class="kw">await</span> _db.UserAccounts
+    .Include(u =&gt; u.Cohort)
+    .ToListAsync();
+
+<span class="kw">foreach</span> (<span class="kw">var</span> u <span class="kw">in</span> users)
+{
+    Console.WriteLine($<span class="str">"{u.DisplayName} — {u.Cohort?.Name}"</span>);   <span class="cmt">// 不會再查資料庫</span>
+}</code></pre>
+    </div>
+
+    <h3 class="sub">7.1 Include 沒辦法解決的時候：批次查詢</h3>
+
+    <p>
+        有時候你要的東西不是導覽屬性，而是一個<strong>統計值</strong>。
+        例如待簽核清單每一列都要顯示「這位學員已請幾小時」：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">改寫自完成品：Services/ApprovalService.cs:283-290</span></div>
+        <pre><code><span class="cmt">// ❌ N+1：迴圈裡逐一 SumAsync</span>
+<span class="kw">foreach</span> (<span class="kw">var</span> item <span class="kw">in</span> pendingList)
+{
+    item.UsedHours = <span class="kw">await</span> _db.LeaveRequests
+        .Where(r =&gt; r.StudentId == item.StudentId &amp;&amp; r.Status == Approved)
+        .SumAsync(r =&gt; r.TotalHours);
+}
+
+<span class="cmt">// ✅ 一次撈完再查字典</span>
+<span class="kw">var</span> studentIds = pendingList.Select(x =&gt; x.StudentId).Distinct().ToList();
+
+<span class="kw">var</span> usedByStudent = <span class="kw">await</span> _db.LeaveRequests
+    .Where(r =&gt; studentIds.Contains(r.StudentId) &amp;&amp; r.Status == Approved)
+    .GroupBy(r =&gt; r.StudentId)
+    .Select(g =&gt; <span class="kw">new</span> { StudentId = g.Key, Sum = g.Sum(r =&gt; r.TotalHours) })
+    .ToDictionaryAsync(x =&gt; x.StudentId, x =&gt; x.Sum);
+
+<span class="kw">foreach</span> (<span class="kw">var</span> item <span class="kw">in</span> pendingList)
+{
+    item.UsedHours = usedByStudent.TryGetValue(item.StudentId, <span class="kw">out var</span> s) ? s : 0m;
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">怎麼發現自己寫出 N+1</span>
+        <p>
+            <strong>打開 SQL 記錄</strong>（<a href="ch06-efcore.html#sql">第 6 章第 9 節</a>），
+            開一次頁面，數終端機印出幾句 <code>SELECT</code>。
+        </p>
+        <p>
+            一個清單頁應該只有<strong>個位數</strong>的查詢。
+            如果你看到幾十句長得幾乎一樣的 SELECT，就是 N+1。
+        </p>
+    </div>
+
+    <h2 class="sec" id="projection">8. 投影：只拿你要的欄位</h2>
+
+    <p>
+        <code>Include</code> 會把整個關聯物件的<strong>所有欄位</strong>撈回來。
+        如果你只需要一個名字，可以用 <code>Select</code> 只挑要的：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">投影查詢</span></div>
+        <pre><code><span class="kw">var</span> rows = <span class="kw">await</span> _db.UserAccounts
+    .AsNoTracking()
+    .Select(u =&gt; <span class="kw">new</span>
+    {
+        u.Username,
+        u.DisplayName,
+        CohortName = u.Cohort!.Name      <span class="cmt">// EF Core 會自動 JOIN</span>
+    })
+    .ToListAsync();</code></pre>
+    </div>
+
+    <p>產生的 SQL 只會 <code>SELECT</code> 那三個欄位，而不是兩張表的全部欄位。</p>
+
+    <div class="callout why">
+        <span class="t">什麼時候用 Include、什麼時候用 Select</span>
+        <p>
+            <strong>Include</strong>：你需要完整的物件（例如要拿去修改，或是後面邏輯會用到很多欄位）。
+        </p>
+        <p>
+            <strong>Select 投影</strong>：純顯示用的清單、報表。資料量大時差別很明顯。
+        </p>
+        <p>
+            完成品專案兩種都有用：<code>ApprovalService.LoadStepForActionAsync</code> 用
+            <code>Include</code>（要拿去改），
+            <code>AbsenceRecordService.CheckStudentAsync</code> 用
+            <code>.Select(u =&gt; new { u.CohortId })</code>（只要一個欄位）。
+        </p>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 8 章檢查點</div>
+        <div class="hint">全部做到再進第 9 章。</div>
+        <ul>
+            <li><span>SSMS 裡看得到 <code>UserAccounts</code>、<code>Roles</code>、<code>UserRoles</code>、<code>Cohorts</code> 四張新表與外鍵。</span></li>
+            <li><span><code>/Users</code> 顯示使用者清單，含角色徽章與班期名稱（沒班期的顯示「—」）。</span></li>
+            <li><span>我把 <code>Include</code> 拿掉試過一次，親眼看到關聯資料變空白 / 拋 <code>NullReferenceException</code>。</span></li>
+            <li><span>我能說出 N+1 問題是什麼，以及怎麼從 SQL 記錄裡看出來。</span></li>
+            <li><span>我知道 <code>OnDelete(DeleteBehavior.Restrict)</code> 為什麼是必要的。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品的 <code>Models/Entities/</code> 有 11 個 Entity，
+            關係比你剛做的多，但<strong>套路完全一樣</strong>。
+            完整的 ER 圖在 <a href="../report/er-diagram.html">專題報告的實體關聯圖</a>，
+            現在去看應該能讀懂大部分。
+        </p>
+        <p>
+            關於 <code>Include</code> 與 N+1 的實戰，可以看
+            <a href="../tutorial/04-approval.html">循序圖教學站 · 04 簽核引擎</a>
+            最後一節「待辦清單是怎麼算出來的」——它示範了本章第 7.1 節那個批次查詢技巧。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch07-first-crud.html"><span class="lbl">上一章</span>◀ 第 7 章 第一個完整 CRUD</a>
+        <span class="spacer"></span>
+        <a href="ch09-services-di-tests.html"><span class="lbl">下一章</span>第 9 章 服務層、DI 與測試 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 1 章 C# 夠用就好 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch01">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 1 · 準備與基礎</div>
+    <h1 class="chapter-title">第 1 章　C# 夠用就好</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        看得懂本書後面所有程式碼的<strong>語法</strong>。這一章不教「C# 全部」，
+        只教蓋這個系統會用到的那些——每一個語法點，我都會直接拿完成品專案裡的真實程式碼當例子。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2～3 小時</b></span>
+        <span>📦 前置：<a href="ch00-before-you-start.html">第 0 章</a>（.NET SDK 已裝好）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#play">先弄一個能亂試的地方</a></li>
+            <li><a href="#var">變數與型別</a></li>
+            <li><a href="#null">null：C# 最重要的一件事</a></li>
+            <li><a href="#class">class 與屬性</a></li>
+            <li><a href="#enum">enum：一組固定的選項</a></li>
+            <li><a href="#collection">集合與 LINQ</a></li>
+            <li><a href="#interface">介面：為什麼要多此一舉</a></li>
+            <li><a href="#async">async / await</a></li>
+            <li><a href="#misc">其他你會一直看到的寫法</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="play">1. 先弄一個能亂試的地方</h2>
+
+    <p>讀語法最快的方式是邊讀邊跑。開一個終端機，建一個丟完就刪的小專案：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">找個空資料夾執行</span></div>
+        <pre><code>dotnet new console -o CsPlayground
+cd CsPlayground
+dotnet run</code></pre>
+    </div>
+
+    <p>
+        它會印出 <code>Hello, World!</code>。之後你把本章的範例貼進 <code>Program.cs</code>，
+        存檔後再 <code>dotnet run</code> 一次就看得到結果。
+    </p>
+
+    <div class="callout tip">
+        <span class="t">印東西出來看</span>
+        <code>Console.WriteLine(x);</code> 是你這一章最好的朋友。
+        看不懂某個值是什麼，就印出來。
+    </div>
+
+    <h2 class="sec" id="var">2. 變數與型別</h2>
+
+    <p>C# 是<strong>強型別</strong>語言：每個變數都有固定的型別，宣告之後不能改放別種東西。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">基本型別</span></div>
+        <pre><code><span class="kw">int</span>      hours    = 8;                 <span class="cmt">// 整數</span>
+<span class="kw">decimal</span>  total    = 4.5m;              <span class="cmt">// 精確小數（注意結尾的 m）</span>
+<span class="kw">string</span>   name     = <span class="str">"王小明"</span>;          <span class="cmt">// 文字</span>
+<span class="kw">bool</span>     isActive = <span class="kw">true</span>;              <span class="cmt">// 真 / 假</span>
+DateTime startAt  = <span class="kw">new</span> DateTime(2026, 9, 15, 8, 0, 0);   <span class="cmt">// 日期時間</span>
+
+<span class="cmt">// var = 「型別你自己看右邊推」，右邊是什麼型別，左邊就是什麼型別</span>
+<span class="kw">var</span> hours2 = 8;          <span class="cmt">// 這就是 int，不是「動態型別」</span>
+<span class="kw">var</span> name2  = <span class="str">"王小明"</span>;   <span class="cmt">// 這就是 string</span></code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼時數要用 decimal 不用 double？</span>
+        <p>
+            <code>double</code> 是「浮點數」，用二進位近似小數，
+            <code>0.1 + 0.2</code> 會得到 <code>0.30000000000000004</code>。
+            拿來算錢或算時數，累加久了就會對不起來。
+        </p>
+        <p>
+            <code>decimal</code> 用十進位存，<strong>不會有這種誤差</strong>，代價是慢一點、佔記憶體多一點。
+            涉及金額、時數這類「數字必須精確」的場合一律用 <code>decimal</code>。
+            完成品專案裡 <code>LeaveRequest.TotalHours</code>、<code>AbsenceRecord.Hours</code>
+            都是 <code>decimal</code>，就是這個原因。
+        </p>
+    </div>
+
+    <h2 class="sec" id="null">3. null：C# 最重要的一件事</h2>
+
+    <p>
+        <code>null</code> 代表「這裡沒有東西」。它是所有新手 bug 的最大來源，
+        所以現代 C# 專案都會打開一個叫做 <strong>可為 Null 參考型別</strong> 的檢查。
+        你在 <code>.csproj</code> 裡看到的這一行就是它：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">XML</span><span class="path">任何一個現代 .NET 專案的 .csproj</span></div>
+        <pre><code>&lt;Nullable&gt;enable&lt;/Nullable&gt;</code></pre>
+    </div>
+
+    <p>打開之後，型別後面加不加問號的意思完全不同：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">有沒有問號差很多</span></div>
+        <pre><code><span class="kw">string</span>  name  = <span class="str">"王小明"</span>;   <span class="cmt">// 保證不會是 null，可以直接用</span>
+<span class="kw">string</span>? email = <span class="kw">null</span>;      <span class="cmt">// 可能是 null，用之前要檢查</span>
+
+<span class="cmt">// 編譯器會對這行發出警告：email 可能是 null</span>
+Console.WriteLine(email.Length);
+
+<span class="cmt">// 正確做法一：先檢查</span>
+<span class="kw">if</span> (email <span class="kw">is not null</span>)
+{
+    Console.WriteLine(email.Length);
+}
+
+<span class="cmt">// 正確做法二：?. 「如果是 null 就整串當 null，不要爆炸」</span>
+Console.WriteLine(email?.Length);       <span class="cmt">// email 是 null → 印出空白，不會出錯</span>
+
+<span class="cmt">// 正確做法三：?? 「如果左邊是 null，就用右邊這個預設值」</span>
+<span class="kw">string</span> shown = email ?? <span class="str">"（未填）"</span>;</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">你一定會遇到：NullReferenceException</span>
+        <p>
+            執行時跳出 <code>System.NullReferenceException: Object reference not set to an instance of an object.</code>
+            就是「你對一個 null 呼叫了東西」。
+        </p>
+        <p>
+            訊息裡會告訴你是哪一行。到那一行去看：<strong>那一行有幾個 <code>.</code>，就有幾個嫌疑犯</strong>。
+            例如 <code>request.Student.Cohort.Name</code> 這行爆掉，
+            可能是 <code>Student</code> 是 null，也可能是 <code>Cohort</code> 是 null。
+            這在第 8 章講到「關聯資料忘記 Include」時會非常常見。
+        </p>
+    </div>
+
+    <h2 class="sec" id="class">4. class 與屬性</h2>
+
+    <p>
+        <code>class</code> 是「一種東西的設計圖」。
+        以下是完成品專案裡真正的 <code>LeaveType</code>（假別）類別，去掉註解後的樣子：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Models/Entities/LeaveType.cs</span></div>
+        <pre><code><span class="kw">public class</span> LeaveType
+{
+    <span class="kw">public int</span>     Id          { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public string</span>  Name        { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+    <span class="kw">public string</span>  Code        { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+    <span class="kw">public bool</span>    IsActive    { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">true</span>;
+    <span class="kw">public int</span>     SortOrder   { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <p>逐項拆解：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:180px;">寫法</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>public</code></td><td>外面的程式碼可以存取。相對的 <code>private</code> 只有這個 class 內部能用。</td></tr>
+            <tr><td><code>{ get; set; }</code></td><td>這叫<strong>屬性</strong>。可以讀（get）也可以寫（set）。
+                你可以先粗略理解成「一個欄位」。</td></tr>
+            <tr><td><code>= string.Empty;</code></td><td>預設值。沒寫的話 <code>string</code> 預設是 <code>null</code>，
+                打開 Nullable 檢查後編譯器會念你，所以給個空字串。</td></tr>
+            <tr><td><code>string?</code></td><td>這個欄位<strong>允許</strong>是 null（描述可以不填）。</td></tr>
+        </tbody>
+    </table>
+
+    <p>用它建立一個實體：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">物件初始化語法</span></div>
+        <pre><code><span class="kw">var</span> sick = <span class="kw">new</span> LeaveType
+{
+    Name = <span class="str">"病假"</span>,
+    Code = <span class="str">"SICK"</span>,
+    SortOrder = 1,
+    Description = <span class="str">"因病無法到課"</span>
+};
+
+Console.WriteLine(sick.Name);        <span class="cmt">// 病假</span>
+Console.WriteLine(sick.IsActive);    <span class="cmt">// True（用了預設值）</span></code></pre>
+    </div>
+
+    <h3 class="sub">4.1 計算屬性：只有 get 沒有 set</h3>
+
+    <p>有些值不需要存起來，用算的就好。完成品專案的 <code>Cohort</code>（班期）就有一個：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Models/Entities/Cohort.cs</span></div>
+        <pre><code><span class="kw">public int</span> TotalHours        { <span class="kw">get</span>; <span class="kw">set</span>; }   <span class="cmt">// 總上課時數，例如 900</span>
+<span class="kw">public int</span> LeaveLimitPercent { <span class="kw">get</span>; <span class="kw">set</span>; } = 10;  <span class="cmt">// 上限百分比</span>
+
+<span class="cmt">// 請假上限 = 總時數 × 百分比，無條件捨去。這個值不存資料庫，每次用到才算。</span>
+<span class="kw">public int</span> LeaveLimitHours =&gt; (<span class="kw">int</span>)Math.Floor(TotalHours * LeaveLimitPercent / 100.0);</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼上限要用算的，不存一個欄位？</span>
+        因為<strong>存起來就會有兩份真相</strong>。如果行政把 <code>TotalHours</code> 從 900 改成 800，
+        卻忘了同步更新那個上限欄位，系統就會拿舊的上限去擋人。
+        用算的則永遠一致。這叫「單一真相來源」。
+    </div>
+
+    <h2 class="sec" id="enum">5. enum：一組固定的選項</h2>
+
+    <p>
+        當某個欄位只可能是幾個固定值之一時（例如請假單的狀態），用 <code>enum</code> 比用字串安全：
+        打錯字編譯就會失敗，而不是等到執行時才發現。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Models/Enums/LeaveStatus.cs</span></div>
+        <pre><code><span class="kw">public enum</span> LeaveStatus
+{
+    Draft     = 0,   <span class="cmt">// 草稿</span>
+    Pending   = 1,   <span class="cmt">// 簽核中</span>
+    Approved  = 2,   <span class="cmt">// 已核准</span>
+    Rejected  = 3,   <span class="cmt">// 已駁回</span>
+    Cancelled = 4    <span class="cmt">// 已取消</span>
+}
+
+<span class="cmt">// 用起來</span>
+<span class="kw">var</span> status = LeaveStatus.Pending;
+<span class="kw">if</span> (status == LeaveStatus.Approved) { <span class="cmt">/* … */</span> }</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">數字要自己指定</span>
+        不寫 <code>= 0, = 1</code> 的話 C# 會自動從 0 編號。
+        但這些數字會<strong>直接存進資料庫</strong>，所以一定要明確寫出來——
+        將來有人在中間插一個新狀態，順序一亂，資料庫裡的舊資料就全部變成別的意思了。
+    </div>
+
+    <h2 class="sec" id="collection">6. 集合與 LINQ</h2>
+
+    <p><code>List&lt;T&gt;</code> 是「一串同型別的東西」。<code>&lt;T&gt;</code> 裡填元素的型別。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">List 基本操作</span></div>
+        <pre><code><span class="kw">var</span> types = <span class="kw">new</span> List&lt;LeaveType&gt;
+{
+    <span class="kw">new</span> LeaveType { Name = <span class="str">"病假"</span>, Code = <span class="str">"SICK"</span>,        SortOrder = 1 },
+    <span class="kw">new</span> LeaveType { Name = <span class="str">"事假"</span>, Code = <span class="str">"PERSONAL"</span>,    SortOrder = 2, IsActive = <span class="kw">false</span> },
+    <span class="kw">new</span> LeaveType { Name = <span class="str">"公假"</span>, Code = <span class="str">"OFFICIAL"</span>,    SortOrder = 4 }
+};
+
+Console.WriteLine(types.Count);     <span class="cmt">// 3</span>
+Console.WriteLine(types[0].Name);   <span class="cmt">// 病假（從 0 開始數）</span>
+
+<span class="kw">foreach</span> (<span class="kw">var</span> t <span class="kw">in</span> types)
+{
+    Console.WriteLine(t.Name);
+}</code></pre>
+    </div>
+
+    <h3 class="sub">6.1 LINQ：對集合下查詢</h3>
+
+    <p>
+        LINQ 讓你用<strong>接近描述目的</strong>的方式操作集合，而不是自己寫迴圈。
+        這幾個是本書會一直用到的：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">六個一定要會的 LINQ 方法</span></div>
+        <pre><code><span class="cmt">// Where：篩選出符合條件的</span>
+<span class="kw">var</span> active = types.Where(t =&gt; t.IsActive).ToList();
+
+<span class="cmt">// OrderBy：排序（OrderByDescending 是反過來）</span>
+<span class="kw">var</span> sorted = types.OrderBy(t =&gt; t.SortOrder).ToList();
+
+<span class="cmt">// Select：把每個元素轉成別的東西</span>
+<span class="kw">var</span> names = types.Select(t =&gt; t.Name).ToList();     <span class="cmt">// List&lt;string&gt;</span>
+
+<span class="cmt">// FirstOrDefault：找第一個符合的，找不到回 null（First 找不到會丟例外）</span>
+<span class="kw">var</span> sick = types.FirstOrDefault(t =&gt; t.Code == <span class="str">"SICK"</span>);
+
+<span class="cmt">// Any：有沒有任何一個符合？回 true / false</span>
+<span class="kw">bool</span> hasInactive = types.Any(t =&gt; !t.IsActive);      <span class="cmt">// true</span>
+
+<span class="cmt">// Sum：加總</span>
+<span class="kw">int</span> orderTotal = types.Sum(t =&gt; t.SortOrder);        <span class="cmt">// 1 + 2 + 4 = 7</span></code></pre>
+    </div>
+
+    <h3 class="sub">6.2 <code>t =&gt; t.IsActive</code> 這是什麼？</h3>
+
+    <p>
+        這叫 <strong>Lambda 運算式</strong>，是「一個沒有名字的小函式」。
+        <code>=&gt;</code> 唸作「goes to」，左邊是參數，右邊是回傳的東西。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Lambda 的三種等價寫法</span></div>
+        <pre><code><span class="cmt">// 這三行意思完全一樣：「給我一個 t，我回傳 t.IsActive」</span>
+t =&gt; t.IsActive
+(LeaveType t) =&gt; t.IsActive
+<span class="kw">delegate</span> (LeaveType t) { <span class="kw">return</span> t.IsActive; }
+
+<span class="cmt">// 所以 Where(t =&gt; t.IsActive) 讀作：</span>
+<span class="cmt">// 「篩出那些『把它叫做 t 時，t.IsActive 為 true』的元素」</span>
+
+<span class="cmt">// 參數名字隨你取，這樣寫完全一樣：</span>
+types.Where(x =&gt; x.IsActive)
+types.Where(假別 =&gt; 假別.IsActive)</code></pre>
+    </div>
+
+    <h3 class="sub">6.3 GroupBy：分組統計</h3>
+
+    <p>這個稍微難一點，但報表章節（第 12 章）會用到，先看過有印象就好：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">改寫自完成品：Services/LeaveReportService.cs</span></div>
+        <pre><code><span class="cmt">// 把一堆請假單，依「假別」分組，算出每種假別請了幾小時、幾張單</span>
+<span class="kw">var</span> summary = approved
+    .GroupBy(r =&gt; r.LeaveTypeName)              <span class="cmt">// 依假別名稱分組</span>
+    .Select(g =&gt; <span class="kw">new</span>
+    {
+        LeaveTypeName = g.Key,                  <span class="cmt">// g.Key 就是分組的依據（假別名稱）</span>
+        TotalHours    = g.Sum(r =&gt; r.Hours),    <span class="cmt">// g 是這一組裡的所有元素</span>
+        Count         = g.Count()
+    })
+    .ToList();
+
+<span class="cmt">// 結果類似：</span>
+<span class="cmt">//   病假  8.00 小時  1 張</span>
+<span class="cmt">//   事假 16.00 小時  1 張</span></code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">為什麼幾乎每次結尾都有 .ToList()？</span>
+        LINQ 是<strong>延遲執行</strong>的：<code>Where(...)</code> 本身不會馬上算，
+        它只是記下「等一下要這樣篩」。<code>.ToList()</code> 才真的跑一遍並產出結果。
+        這在第 6 章講 EF Core 時很關鍵——<strong>沒 <code>ToList()</code> 之前，查詢還沒送到資料庫</strong>。
+    </div>
+
+    <h2 class="sec" id="interface">7. 介面：為什麼要多此一舉</h2>
+
+    <p>
+        <code>interface</code> 是一份「<strong>約定</strong>」：規定「誰想當這種東西，就必須提供這些方法」，
+        但完全不管方法內容怎麼寫。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/ILeaveCalculator.cs（介面）</span></div>
+        <pre><code><span class="kw">public interface</span> ILeaveCalculator
+{
+    <span class="cmt">// 只有簽章，沒有內容，也沒有 public（介面成員本來就是公開的）</span>
+    <span class="kw">bool</span> TryCalculate(DateTime startAt, DateTime endAt,
+                      <span class="kw">out decimal</span> totalHours, <span class="kw">out string</span>? errorMessage);
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/LeaveCalculator.cs（實作）</span></div>
+        <pre><code><span class="cmt">// 「: ILeaveCalculator」＝ 我遵守這份約定</span>
+<span class="kw">public class</span> LeaveCalculator : ILeaveCalculator
+{
+    <span class="kw">public bool</span> TryCalculate(DateTime startAt, DateTime endAt,
+                            <span class="kw">out decimal</span> totalHours, <span class="kw">out string</span>? errorMessage)
+    {
+        <span class="cmt">// …真正的計算邏輯在這裡…</span>
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">明明只有一個實作，為什麼要多寫一個介面？</span>
+        <p>兩個理由，都很實際：</p>
+        <p>
+            <strong>① 測試。</strong>第 9 章你會寫測試。假設要測「請假單送出流程」，
+            但它會發 Email。測試時你不想真的寄信，就換一個「假的 Email 寄送器」塞進去。
+            因為程式只認介面 <code>IEmailSender</code>，換實作不用改任何一行 Controller。
+        </p>
+        <p>
+            <strong>② 分工。</strong>介面先訂好，寫 Controller 的人和寫 Service 的人可以同時開工，
+            不用等對方寫完。
+        </p>
+        <p>
+            習慣上介面名稱前面加 <code>I</code>（Interface）。你在完成品專案看到的
+            <code>IAuthService</code>、<code>IApprovalService</code>、<code>ILeaveReportService</code> 都是介面。
+        </p>
+    </div>
+
+    <h3 class="sub">7.1 <code>out</code> 參數</h3>
+
+    <p>
+        <code>TryCalculate</code> 用到了 <code>out</code>。它的意思是「這個參數是我<strong>回傳</strong>給你的，不是你給我的」。
+        一個方法只能 <code>return</code> 一個值，<code>out</code> 讓你多帶幾個出來：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">out 的用法</span></div>
+        <pre><code><span class="kw">var</span> calculator = <span class="kw">new</span> LeaveCalculator();
+
+<span class="cmt">// out var 就地宣告變數接住回傳值</span>
+<span class="kw">if</span> (calculator.TryCalculate(startAt, endAt, <span class="kw">out var</span> hours, <span class="kw">out var</span> error))
+{
+    Console.WriteLine($<span class="str">"共 {hours} 小時"</span>);     <span class="cmt">// 成功：hours 有值</span>
+}
+<span class="kw">else</span>
+{
+    Console.WriteLine(error);                <span class="cmt">// 失敗：error 說明為什麼</span>
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼不直接丟例外就好？</span>
+        「使用者填錯時段」是<strong>預期內</strong>會發生的事，不是程式出錯。
+        例外（Exception）應該留給真正意外的狀況。
+        <code>TryXxx</code> 這種「回傳 bool + out 錯誤訊息」的寫法，
+        讓呼叫端可以直接把訊息顯示給使用者，不用寫 <code>try/catch</code>。
+        C# 內建的 <code>int.TryParse</code> 也是同一個模式。
+    </div>
+
+    <h2 class="sec" id="async">8. async / await</h2>
+
+    <p>
+        本書幾乎每一個跟資料庫有關的方法都長這樣：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">async 方法的標準長相</span></div>
+        <pre><code><span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+{
+    <span class="kw">var</span> items = <span class="kw">await</span> _db.LeaveTypes.ToListAsync();
+    <span class="kw">return</span> View(items);
+}</code></pre>
+    </div>
+
+    <table class="doc">
+        <thead><tr><th style="width:180px;">元素</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>async</code></td><td>宣告「這個方法裡面會有 <code>await</code>」。</td></tr>
+            <tr><td><code>Task&lt;T&gt;</code></td><td>回傳型別要包一層。
+                「一個<strong>將來</strong>會給你 T 的承諾」。沒有回傳值的話就寫 <code>Task</code>。</td></tr>
+            <tr><td><code>await</code></td><td>「等這件事做完，再繼續往下」。
+                寫了 <code>await</code> 之後，<code>Task&lt;T&gt;</code> 就變回你要的 <code>T</code>。</td></tr>
+            <tr><td>方法名尾巴 <code>Async</code></td><td>純粹是慣例，提醒呼叫的人要 <code>await</code>。</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">為什麼要這麼麻煩？直接等不行嗎？</span>
+        <p>
+            查資料庫要花時間（可能幾十毫秒）。這段時間如果整條執行緒<strong>傻等</strong>，
+            那條執行緒就不能服務別的使用者。
+        </p>
+        <p>
+            <code>await</code> 的意思是：「我要等資料庫，這段期間<strong>把執行緒還回去</strong>服務別人，
+            資料回來了再叫我繼續。」同樣的伺服器，能同時服務的人多很多。
+        </p>
+        <p>
+            <strong>新手記住規則就好：看到方法名結尾是 <code>Async</code>，前面就要加 <code>await</code>；
+            用了 <code>await</code>，方法自己就要標 <code>async</code> 並把回傳型別包成 <code>Task&lt;…&gt;</code>。</strong>
+        </p>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">常見錯誤：忘記 await</span>
+        <p>
+            寫 <code>var items = _db.LeaveTypes.ToListAsync();</code>（漏了 <code>await</code>），
+            <code>items</code> 的型別會是 <code>Task&lt;List&lt;LeaveType&gt;&gt;</code> 而不是 <code>List&lt;LeaveType&gt;</code>，
+            接著你想 <code>items.Count</code> 就會編譯失敗，訊息類似：
+        </p>
+        <p><code>'Task&lt;List&lt;LeaveType&gt;&gt;' 未包含 'Count' 的定義</code></p>
+        <p>看到訊息裡出現 <code>Task&lt;</code>，第一個念頭就是「我是不是漏了 await」。</p>
+    </div>
+
+    <h2 class="sec" id="misc">9. 其他你會一直看到的寫法</h2>
+
+    <h3 class="sub">9.1 字串插值 <code>$"…"</code></h3>
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">把變數塞進字串</span></div>
+        <pre><code><span class="kw">var</span> name = <span class="str">"王小明"</span>;
+<span class="kw">var</span> hours = 4.5m;
+
+<span class="cmt">// 前面加 $，就可以在字串裡用 { } 放變數</span>
+Console.WriteLine($<span class="str">"學員 {name} 請了 {hours} 小時"</span>);
+<span class="cmt">// → 學員 王小明 請了 4.5 小時</span>
+
+<span class="cmt">// 冒號後面是格式：0.## 代表最多兩位小數、尾巴的 0 不顯示</span>
+Console.WriteLine($<span class="str">"共 {hours:0.##} 小時"</span>);        <span class="cmt">// 共 4.5 小時</span>
+Console.WriteLine($<span class="str">"{DateTime.Today:yyyy-MM-dd}"</span>);  <span class="cmt">// 2026-08-19</span></code></pre>
+    </div>
+
+    <h3 class="sub">9.2 switch 運算式</h3>
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/ApprovalService.cs</span></div>
+        <pre><code><span class="cmt">// 依角色字串，決定要看班期上的哪一個欄位</span>
+<span class="kw">return</span> step.ApproverRole <span class="kw">switch</span>
+{
+    <span class="str">"Tutor"</span>          =&gt; cohort.TutorUserId,
+    <span class="str">"SectionChief"</span>   =&gt; cohort.SectionChiefUserId,
+    <span class="str">"BranchDirector"</span> =&gt; cohort.BranchDirectorUserId,
+    _                =&gt; <span class="kw">null</span>      <span class="cmt">// _ 是「其他情況」</span>
+};</code></pre>
+    </div>
+
+    <h3 class="sub">9.3 record：專門用來裝資料的輕量 class</h3>
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/IApprovalService.cs</span></div>
+        <pre><code><span class="cmt">// 一行就定義好一個「有三個唯讀屬性」的型別</span>
+<span class="kw">public record</span> ApprovalActionResult(<span class="kw">bool</span> Success, <span class="kw">string</span>? ErrorMessage, ApprovalOutcome Outcome);
+
+<span class="cmt">// 用起來</span>
+<span class="kw">var</span> result = <span class="kw">new</span> ApprovalActionResult(<span class="kw">false</span>, <span class="str">"你不是這一關的簽核人"</span>, ApprovalOutcome.None);
+<span class="kw">if</span> (!result.Success) Console.WriteLine(result.ErrorMessage);</code></pre>
+    </div>
+
+    <h3 class="sub">9.4 靜態成員 static</h3>
+    <p>
+        <code>static</code> 表示「這個東西屬於類別本身，不屬於任何一個實體」。
+        不用 <code>new</code> 就能直接用：
+    </p>
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">static 的例子</span></div>
+        <pre><code>Math.Floor(8.7)          <span class="cmt">// 不用 new Math()</span>
+DateTime.UtcNow          <span class="cmt">// 不用 new DateTime()</span>
+<span class="kw">string</span>.IsNullOrWhiteSpace(x)
+
+<span class="cmt">// 自己寫的話：純計算、不依賴任何實體狀態的方法，就適合 static</span>
+<span class="kw">private static bool</span> IsOnTheHour(DateTime dt)
+{
+    <span class="kw">return</span> dt.Minute == 0 &amp;&amp; dt.Second == 0;
+}</code></pre>
+    </div>
+
+    <h2 class="sec" id="wrap">10. 這一章的重點回顧</h2>
+
+    <table class="doc">
+        <thead><tr><th style="width:190px;">語法</th><th>什麼時候會再看到</th></tr></thead>
+        <tbody>
+            <tr><td><code>class</code> + 屬性</td><td>第 6 章開始，每個資料表對應一個 class</td></tr>
+            <tr><td><code>enum</code></td><td>第 11 章的請假單狀態機</td></tr>
+            <tr><td>LINQ（Where / Select / …）</td><td>第 6 章之後每一次查資料庫</td></tr>
+            <tr><td><code>interface</code></td><td>第 9 章把業務規則搬出 Controller 時</td></tr>
+            <tr><td><code>async</code> / <code>await</code></td><td>第 6 章開始，每個碰資料庫的方法</td></tr>
+            <tr><td><code>out</code> 參數</td><td>第 11 章的時數計算 <code>TryCalculate</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">現在不用全部記住</span>
+        這一章的定位是<strong>參考手冊</strong>，不是要你背起來。
+        後面章節遇到看不懂的語法，回來這裡查對應的小節就好。
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 1 章檢查點</div>
+        <div class="hint">建議在 CsPlayground 裡實際打過再勾。</div>
+        <ul>
+            <li><span>我能說出 <code>string</code> 與 <code>string?</code> 的差別，以及 <code>?.</code> 和 <code>??</code> 各在做什麼。</span></li>
+            <li><span>我能自己寫一個有三個屬性的 <code>class</code>，並用物件初始化語法建立實體。</span></li>
+            <li><span>我能用 <code>Where</code> + <code>OrderBy</code> + <code>Select</code> 對一個 <code>List</code> 做查詢並印出結果。</span></li>
+            <li><span>我看得懂 <code>t =&gt; t.IsActive</code> 這個 Lambda 在說什麼。</span></li>
+            <li><span>我能解釋為什麼要有 <code>interface</code>，即使目前只有一個實作。</span></li>
+            <li><span>我知道看到 <code>Task&lt;…&gt;</code> 出現在錯誤訊息裡，通常代表我漏了 <code>await</code>。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        本章所有範例都是從真實檔案取出來的：
+        <code>Models/Entities/LeaveType.cs</code>、<code>Models/Entities/Cohort.cs</code>、
+        <code>Models/Enums/LeaveStatus.cs</code>、<code>Services/ILeaveCalculator.cs</code>、
+        <code>Services/IApprovalService.cs</code>。
+        現在打開它們，你應該能<strong>認得出每一行的語法</strong>（即使還不知道它們為什麼在那裡）。
+    </div>
+
+    <div class="pager">
+        <a href="ch00-before-you-start.html"><span class="lbl">上一章</span>◀ 第 0 章 開始之前</a>
+        <span class="spacer"></span>
+        <a href="ch02-first-site.html"><span class="lbl">下一章</span>第 2 章 第一個網站 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

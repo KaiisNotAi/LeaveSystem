@@ -1,0 +1,455 @@
+/* ===================================================================
+   學生請假系統 — 從零開始學 ASP.NET Core MVC
+   跟 docs/tutorial 同一套配色，但版面是「書」而不是「圖」：
+   長文閱讀、程式碼區塊、檢查點、章節導覽。
+   完全不依賴外部資源，直接以 file:// 開啟也能正常運作。
+   =================================================================== */
+
+:root {
+    --primary: #1e3a8a;
+    --primary-light: #3b5bdb;
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --code-bg: #0f172a;
+    --code-text: #e2e8f0;
+    --success: #10b981;
+    --danger: #ef4444;
+    --radius: 12px;
+    --shadow: 0 10px 30px rgba(30, 58, 138, 0.10);
+    --measure: 76ch;      /* 長文的舒適行寬 */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Microsoft JhengHei", "Noto Sans TC", "PingFang TC", "Segoe UI", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.85;
+    scroll-behavior: smooth;
+}
+
+code, kbd, pre, .mono { font-family: "Cascadia Code", "Consolas", "Menlo", monospace; }
+
+/* ===== 頂部：品牌 + 進度 + 章節切換 ===== */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+}
+.site-header .bar {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 9px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.site-header .brand { font-weight: 700; font-size: 16px; white-space: nowrap; }
+.site-header .brand a { color: #fff; text-decoration: none; }
+.site-header .spacer { flex: 1; }
+.site-header .chapter-jump {
+    background: rgba(255,255,255,.14);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.3);
+    border-radius: 7px;
+    padding: 5px 10px;
+    font-family: inherit;
+    font-size: 13.5px;
+    max-width: 320px;
+}
+.site-header .chapter-jump option { color: #1f2937; }
+.site-header .hdr-link {
+    color: rgba(255,255,255,.9);
+    text-decoration: none;
+    font-size: 13.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.site-header .hdr-link:hover { background: rgba(255,255,255,.16); color: #fff; }
+
+/* 進度條 */
+.progress-rail { height: 4px; background: rgba(255,255,255,.18); }
+.progress-rail > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+
+/* ===== 版面 ===== */
+main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 26px 20px 90px;
+}
+/* 內文限制行寬比較好讀；但程式碼、表格、卡片這類元素放寬才不浪費版面 */
+main > * { max-width: var(--measure); }
+main > .wide,
+main > .toc-box,
+main > .pager,
+main > .track,
+main > .overall,
+main > .checkpoint,
+main > .code,
+main > .filetree,
+main > table.doc { max-width: none; }
+
+.chapter-kicker {
+    font-size: 13px;
+    letter-spacing: .18em;
+    color: var(--accent-dark);
+    font-weight: 700;
+}
+h1.chapter-title {
+    font-size: 33px;
+    line-height: 1.35;
+    color: var(--primary);
+    margin: 6px 0 10px;
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 12px;
+}
+.chapter-goal {
+    background: #fffbeb;
+    border-left: 5px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 18px 0 8px;
+    font-size: 17px;
+}
+.chapter-goal .t { font-weight: 700; color: var(--accent-dark); display: block; margin-bottom: 2px; }
+
+.meta-row {
+    display: flex;
+    gap: 8px 18px;
+    flex-wrap: wrap;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin: 10px 0 26px;
+}
+.meta-row b { color: var(--text); font-weight: 600; }
+
+/* 本章目錄 */
+.toc-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    margin: 0 0 34px;
+    box-shadow: var(--shadow);
+}
+.toc-box .t { font-weight: 700; color: var(--primary); margin-bottom: 6px; font-size: 15px; }
+.toc-box ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 34px; }
+.toc-box li { margin: 3px 0; font-size: 14.5px; break-inside: avoid; }
+.toc-box a { color: var(--text); text-decoration: none; }
+.toc-box a:hover { color: var(--primary-light); text-decoration: underline; }
+
+h2.sec {
+    font-size: 25px;
+    color: var(--primary);
+    margin: 48px 0 14px;
+    padding-top: 8px;
+    scroll-margin-top: 80px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+h2.sec::before {
+    content: "";
+    width: 6px; height: 24px;
+    background: var(--accent);
+    border-radius: 3px;
+    flex: none;
+}
+h3.sub {
+    font-size: 19px;
+    color: var(--primary-light);
+    margin: 30px 0 8px;
+    scroll-margin-top: 80px;
+}
+
+p { margin: 14px 0; font-size: 16.5px; }
+main ul, main ol { font-size: 16.5px; }
+main li { margin: 7px 0; }
+
+p code, li code, td code, .callout code {
+    background: #eef2ff;
+    color: var(--primary);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 14.5px;
+    word-break: break-word;
+}
+
+/* ===== 程式碼區塊 ===== */
+.code {
+    margin: 18px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .18);
+}
+.code > .code-head {
+    background: #1e293b;
+    color: #cbd5e1;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.code > .code-head .path {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    color: #e2e8f0;
+}
+.code > .code-head .tag {
+    font-size: 11px;
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    flex: none;
+}
+.code > .code-head .tag.new { background: #065f46; color: #d1fae5; }
+.code > .code-head .tag.edit { background: #78350f; color: #fef3c7; }
+.code > .code-head .tag.cmd { background: #1e3a8a; color: #dbeafe; }
+.code > .code-head .copy {
+    margin-left: auto;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.2);
+    color: #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    padding: 2px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    flex: none;
+}
+.code > .code-head .copy:hover { background: rgba(255,255,255,.2); }
+.code pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.7;
+}
+.code pre .cmt { color: #7f9cc0; }
+.code pre .kw  { color: #93c5fd; }
+.code pre .str { color: #fca5a5; }
+.code pre .add { background: rgba(16, 185, 129, .16); display: inline-block; width: 100%; }
+
+/* ===== 各種提示框 ===== */
+.callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--primary-light);
+    border-radius: 0 10px 10px 0;
+    padding: 13px 18px;
+    margin: 18px 0;
+    font-size: 16px;
+}
+.callout .t { font-weight: 700; color: var(--primary); display: block; margin-bottom: 2px; }
+.callout p:first-of-type { margin-top: 4px; }
+.callout p:last-child { margin-bottom: 0; }
+
+.callout.why   { border-left-color: var(--primary-light); background: #eff6ff; }
+.callout.why .t::before { content: "🤔 "; }
+.callout.oops  { border-left-color: var(--danger); background: #fef2f2; }
+.callout.oops .t { color: #b91c1c; }
+.callout.oops .t::before { content: "⚠️ "; }
+.callout.tip   { border-left-color: var(--accent-dark); background: #fffbeb; }
+.callout.tip .t { color: var(--accent-dark); }
+.callout.tip .t::before { content: "💡 "; }
+.callout.link  { border-left-color: var(--success); background: #ecfdf5; }
+.callout.link .t { color: #047857; }
+.callout.link .t::before { content: "🔗 "; }
+
+/* ===== 檢查點 ===== */
+.checkpoint {
+    background: var(--panel);
+    border: 2px solid var(--success);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 34px 0;
+    box-shadow: var(--shadow);
+}
+.checkpoint > .t {
+    font-weight: 700;
+    color: #047857;
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+.checkpoint > .hint { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; }
+.checkpoint ul { list-style: none; padding: 0; margin: 0; }
+.checkpoint li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px dashed var(--border);
+    font-size: 16px;
+}
+.checkpoint li:first-child { border-top: 0; }
+.checkpoint input[type="checkbox"] {
+    width: 19px; height: 19px;
+    margin-top: 4px;
+    flex: none;
+    accent-color: var(--success);
+    cursor: pointer;
+}
+.checkpoint li.done > span { color: var(--text-muted); text-decoration: line-through; }
+
+/* ===== 表格 ===== */
+table.doc {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    font-size: 15.5px;
+    margin: 18px 0;
+}
+table.doc th {
+    background: var(--primary);
+    color: #fff;
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+}
+table.doc td { padding: 10px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+table.doc tbody tr:nth-child(even) { background: #f9fafb; }
+
+/* ===== 首頁課程地圖 ===== */
+.track {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 22px;
+    margin: 18px 0;
+}
+.track > h3 {
+    margin: 0 0 4px;
+    color: var(--primary);
+    font-size: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+.track > h3 .part { font-size: 12.5px; color: var(--accent-dark); letter-spacing: .12em; font-weight: 700; }
+.track > p { margin: 2px 0 12px; color: var(--text-muted); font-size: 15px; }
+
+.ch-list { display: grid; gap: 8px; }
+.ch-item {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s, transform .15s;
+}
+.ch-item:hover { border-color: var(--primary-light); transform: translateX(3px); }
+.ch-item .no {
+    font-family: "Cascadia Code", monospace;
+    font-weight: 700;
+    color: #fff;
+    background: var(--primary-light);
+    border-radius: 6px;
+    padding: 1px 8px;
+    font-size: 13px;
+    flex: none;
+}
+.ch-item.done .no { background: var(--success); }
+.ch-item .name { font-weight: 600; font-size: 16.5px; }
+.ch-item .desc { color: var(--text-muted); font-size: 14.5px; flex: 1; }
+.ch-item .tick { color: var(--success); font-weight: 700; flex: none; }
+
+.overall {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 22px 0;
+}
+.overall .big { font-size: 30px; font-weight: 700; }
+.overall .rail { height: 10px; background: rgba(255,255,255,.25); border-radius: 999px; margin-top: 10px; overflow: hidden; }
+.overall .rail > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .35s; }
+.overall button {
+    margin-top: 12px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.35);
+    color: #fff;
+    border-radius: 7px;
+    padding: 5px 14px;
+    font-family: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+.overall button:hover { background: rgba(255,255,255,.28); }
+
+/* ===== 頁尾導覽 ===== */
+.pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+.pager a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel);
+    max-width: 46%;
+}
+.pager a:hover { border-color: var(--primary-light); background: #eef2ff; }
+.pager a .lbl { display: block; font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.pager .spacer { flex: 1; }
+
+kbd {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 13px;
+}
+
+.filetree {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 13.5px;
+    line-height: 1.75;
+    /* 樹狀圖靠空白對齊，一定要保留原始換行與空格 */
+    white-space: pre;
+    overflow-x: auto;
+    margin: 18px 0;
+}
+.filetree .c { color: #7f9cc0; }
+.filetree .hi { color: #fbbf24; font-weight: 700; }
+
+@media (max-width: 820px) {
+    h1.chapter-title { font-size: 25px; }
+    h2.sec { font-size: 21px; }
+    .toc-box ol { columns: 1; }
+    .pager a { max-width: none; }
+}

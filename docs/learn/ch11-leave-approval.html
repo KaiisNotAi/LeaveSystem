@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 11 章 請假與簽核 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch11">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 4 · 蓋出真正的系統</div>
+    <h1 class="chapter-title">第 11 章　請假與簽核</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        完成這個系統的<strong>核心功能</strong>：學員送單、依時數自動展開 N 關簽核、
+        簽核人核准或駁回、五道防線擋住越權。
+        前面十章學的東西，這一章全部會用上。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>4 小時</b>（本書最長的一章）</span>
+        <span>📦 前置：<a href="ch10-auth.html">第 10 章</a>（登入與角色可用）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#state">先想清楚狀態機</a></li>
+            <li><a href="#entities">三張新表</a></li>
+            <li><a href="#rules">簽核規則存在資料表裡</a></li>
+            <li><a href="#submit">送單：五道規則串起來</a></li>
+            <li><a href="#inbox">待簽核清單</a></li>
+            <li><a href="#approve">簽核引擎與五道防線</a></li>
+            <li><a href="#test">用測試守住規則</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="state">1. 先想清楚狀態機</h2>
+
+    <p>一張請假單會經過哪些狀態、由什麼事件推動？<strong>先畫出來再寫程式。</strong></p>
+
+    <div class="filetree">                    ┌──────────────────────────────► <span class="hi">Cancelled</span>（學員自行取消）
+                    │                                （只有還沒人簽核時可以）
+  學員送出          │
+     │              │
+     ▼              │
+  <span class="hi">Pending</span> ──────────┘
+  CurrentLevel=1
+     │
+     ├── 簽核人核准，<span class="c">而且還有下一關</span> ──► <span class="hi">Pending</span>（CurrentLevel + 1）──┐
+     │                                                                    │
+     │◄───────────────────────────────────────────────────────────────────┘
+     │
+     ├── 簽核人核准，<span class="c">而且已經是最後一關</span> ──► <span class="hi">Approved</span>  <span class="c">（終點）</span>
+     │
+     └── 任何一關駁回 ─────────────────────────► <span class="hi">Rejected</span>  <span class="c">（終點）</span></div>
+
+    <p>三個關鍵設計：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:230px;">設計</th><th>為什麼</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>單子有 <code>Status</code>，<br>每一關另外有 <code>Decision</code></td>
+                <td>整張單的狀態 vs 每一關的結果，是<strong>兩件事</strong>。
+                    第 1 關核准了，整張單還是 <code>Pending</code>。</td>
+            </tr>
+            <tr>
+                <td>用 <code>CurrentLevel</code> 記「現在停在第幾關」</td>
+                <td>這樣「待辦清單」只要找
+                    <code>Level == CurrentLevel</code> 的關卡就好，不用回推。</td>
+            </tr>
+            <tr>
+                <td>任一關駁回就直接結束</td>
+                <td>不做「退回上一關」。學員修正後<strong>重送一張新單</strong>，
+                    歷史紀錄比較乾淨。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="entities">2. 三張新表</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Enums/LeaveStatus.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Models.Enums;
+
+<span class="kw">public enum</span> LeaveStatus
+{
+    Draft     = 0,
+    Pending   = 1,   <span class="cmt">// 簽核中</span>
+    Approved  = 2,
+    Rejected  = 3,
+    Cancelled = 4
+}
+
+<span class="kw">public enum</span> ApprovalDecision
+{
+    Pending  = 0,    <span class="cmt">// 這一關還沒簽</span>
+    Approved = 1,
+    Rejected = 2
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/LeaveRequest.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+<span class="kw">using</span> MyLeaveSystem.Models.Enums;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">public class</span> LeaveRequest
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public int</span> StudentId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> UserAccount Student { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">null</span>!;
+
+    <span class="kw">public int</span> LeaveTypeId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> LeaveType LeaveType { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">null</span>!;
+
+    <span class="kw">public</span> DateTime StartAt { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> DateTime EndAt   { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 用 decimal 不用 double（第 1 章第 2 節）</span>
+    <span class="kw">public decimal</span> TotalHours { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required, MaxLength(200)]
+    <span class="kw">public string</span> Reason { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="kw">public</span> LeaveStatus Status { <span class="kw">get</span>; <span class="kw">set</span>; } = LeaveStatus.Pending;
+
+    <span class="cmt">// 現在停在第幾關</span>
+    <span class="kw">public int</span> CurrentLevel { <span class="kw">get</span>; <span class="kw">set</span>; } = 1;
+
+    <span class="kw">public</span> DateTime CreatedAt { <span class="kw">get</span>; <span class="kw">set</span>; } = DateTime.UtcNow;
+    <span class="kw">public</span> DateTime UpdatedAt { <span class="kw">get</span>; <span class="kw">set</span>; } = DateTime.UtcNow;
+
+    <span class="kw">public</span> ICollection&lt;LeaveRequestStep&gt; Steps { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span> List&lt;LeaveRequestStep&gt;();
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/LeaveRequestStep.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+<span class="kw">using</span> MyLeaveSystem.Models.Enums;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="cmt">/// 一關簽核。一張單有 1~3 個。</span>
+<span class="kw">public class</span> LeaveRequestStep
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public int</span> LeaveRequestId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> LeaveRequest LeaveRequest { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">null</span>!;
+
+    <span class="cmt">// 第幾關：1、2、3</span>
+    <span class="kw">public int</span> Level { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="cmt">// 這一關該由哪個「角色」簽。存字串是為了跟 ApprovalRule 的 JSON 一致。</span>
+    [Required, MaxLength(30)]
+    <span class="kw">public string</span> ApproverRole { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="cmt">// ⚠ 送單時是 null！簽核當下才填入「實際是誰簽的」。原因見第 6 節。</span>
+    <span class="kw">public int</span>? ApproverUserId { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> UserAccount? Approver { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public</span> ApprovalDecision Decision { <span class="kw">get</span>; <span class="kw">set</span>; } = ApprovalDecision.Pending;
+
+    [MaxLength(200)]
+    <span class="kw">public string</span>? Comment { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public</span> DateTime? DecidedAt { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/ApprovalRule.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="cmt">/// 「幾小時要送到哪幾關」的設定。存在資料表裡，行政可以自己改。</span>
+<span class="kw">public class</span> ApprovalRule
+{
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public decimal</span>  MinHours { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public decimal</span>? MaxHours { <span class="kw">get</span>; <span class="kw">set</span>; }   <span class="cmt">// null = 無上限</span>
+
+    <span class="cmt">// JSON 陣列，例如 ["Tutor","SectionChief"]。順序 = 關卡順序。</span>
+    [Required, MaxLength(200)]
+    <span class="kw">public string</span> RequiredRoles { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="str">"[]"</span>;
+
+    [MaxLength(100)]
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <p>加進 <code>AppDbContext</code>，並產生 Migration：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/AppDbContext.cs</span></div>
+        <pre><code><span class="add"><span class="kw">public</span> DbSet&lt;LeaveRequest&gt;     LeaveRequests     =&gt; Set&lt;LeaveRequest&gt;();</span>
+<span class="add"><span class="kw">public</span> DbSet&lt;LeaveRequestStep&gt; LeaveRequestSteps =&gt; Set&lt;LeaveRequestStep&gt;();</span>
+<span class="add"><span class="kw">public</span> DbSet&lt;ApprovalRule&gt;     ApprovalRules     =&gt; Set&lt;ApprovalRule&gt;();</span></code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path"></span></div>
+        <pre><code>dotnet ef migrations add AddLeaveRequestsAndApproval
+dotnet ef database update</code></pre>
+    </div>
+
+    <h2 class="sec" id="rules">3. 簽核規則存在資料表裡</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/SeedData.cs</span></div>
+        <pre><code><span class="add"><span class="kw">private static void</span> SeedApprovalRules(AppDbContext db)</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">if</span> (db.ApprovalRules.Any()) <span class="kw">return</span>;</span>
+<span class="add"></span>
+<span class="add">    db.ApprovalRules.AddRange(</span>
+<span class="add">        <span class="kw">new</span> ApprovalRule { MinHours = 0m,     MaxHours = 8m,</span>
+<span class="add">            RequiredRoles = <span class="str">"[\"Tutor\"]"</span>,</span>
+<span class="add">            Description = <span class="str">"8 小時內由導師決行"</span> },</span>
+<span class="add">        <span class="kw">new</span> ApprovalRule { MinHours = 8.01m,  MaxHours = 24m,</span>
+<span class="add">            RequiredRoles = <span class="str">"[\"Tutor\",\"SectionChief\"]"</span>,</span>
+<span class="add">            Description = <span class="str">"8 小時以上至 24 小時，導師→科長"</span> },</span>
+<span class="add">        <span class="kw">new</span> ApprovalRule { MinHours = 24.01m, MaxHours = <span class="kw">null</span>,</span>
+<span class="add">            RequiredRoles = <span class="str">"[\"Tutor\",\"SectionChief\",\"BranchDirector\"]"</span>,</span>
+<span class="add">            Description = <span class="str">"24 小時以上，導師→科長→分署長"</span> });</span>
+<span class="add"></span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add">}</span></code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼不寫成 if (hours &lt;= 8) …</span>
+        <p>
+            因為門檻<strong>會改</strong>。今天是 8 小時，明年可能改成 4 小時，
+            或者多加一級「超過 40 小時要送到局裡」。
+        </p>
+        <p>
+            寫死在程式裡的話，每次改都要<strong>改程式、重新編譯、重新部署</strong>。
+            做成資料表之後，行政人員自己在管理頁面改一改就生效了。
+        </p>
+        <p>
+            <strong>判斷原則：這件事會不會因為政策變動而改？會的話就做成設定。</strong>
+        </p>
+    </div>
+
+    <p>需要一個小工具把 JSON 字串解析成角色清單：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/ApprovalRoleJson.cs</span></div>
+        <pre><code><span class="kw">using</span> System.Text.Json;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models;
+
+<span class="kw">public static class</span> ApprovalRoleJson
+{
+    <span class="kw">public static</span> IReadOnlyList&lt;<span class="kw">string</span>&gt; Deserialize(<span class="kw">string</span>? json)
+    {
+        <span class="kw">if</span> (<span class="kw">string</span>.IsNullOrWhiteSpace(json)) <span class="kw">return</span> Array.Empty&lt;<span class="kw">string</span>&gt;();
+
+        <span class="kw">try</span>
+        {
+            <span class="kw">return</span> JsonSerializer.Deserialize&lt;List&lt;<span class="kw">string</span>&gt;&gt;(json) ?? <span class="kw">new</span> List&lt;<span class="kw">string</span>&gt;();
+        }
+        <span class="kw">catch</span> (JsonException)
+        {
+            <span class="cmt">// 設定壞掉時回空清單，讓呼叫端顯示友善訊息而不是 500</span>
+            <span class="kw">return</span> Array.Empty&lt;<span class="kw">string</span>&gt;();
+        }
+    }
+}</code></pre>
+    </div>
+
+    <h2 class="sec" id="submit">4. 送單：五道規則串起來</h2>
+
+    <p>這是全書最長的一個 Action。它依序做五件事，<strong>任何一件不過就退回表單</strong>。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/ViewModels/LeaveRequestCreateViewModel.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">public class</span> LeaveRequestCreateViewModel
+{
+    [Required(ErrorMessage = <span class="str">"請選擇假別"</span>)]
+    [Display(Name = <span class="str">"假別"</span>)]
+    <span class="kw">public int</span> LeaveTypeId { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required][Display(Name = <span class="str">"開始日期"</span>)][DataType(DataType.Date)]
+    <span class="kw">public</span> DateTime StartDate { <span class="kw">get</span>; <span class="kw">set</span>; } = DateTime.Today;
+
+    [Required(ErrorMessage = <span class="str">"請選擇開始時間"</span>)][Display(Name = <span class="str">"開始時間"</span>)]
+    <span class="kw">public int</span>? StartHour { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required][Display(Name = <span class="str">"結束日期"</span>)][DataType(DataType.Date)]
+    <span class="kw">public</span> DateTime EndDate { <span class="kw">get</span>; <span class="kw">set</span>; } = DateTime.Today;
+
+    [Required(ErrorMessage = <span class="str">"請選擇結束時間"</span>)][Display(Name = <span class="str">"結束時間"</span>)]
+    <span class="kw">public int</span>? EndHour { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required(ErrorMessage = <span class="str">"請填寫請假原因"</span>)]
+    [StringLength(200)][Display(Name = <span class="str">"請假原因"</span>)]
+    <span class="kw">public string</span> Reason { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="cmt">// 下拉選項（不是使用者填的，是我們填給 View 用的）</span>
+    <span class="kw">public</span> List&lt;LeaveTypeOption&gt; LeaveTypeOptions { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">new</span>();
+}
+
+<span class="kw">public record</span> LeaveTypeOption(<span class="kw">int</span> Id, <span class="kw">string</span> Name);</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/LeaveRequestsController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Authorization;
+<span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+<span class="kw">using</span> MyLeaveSystem.Models;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+<span class="kw">using</span> MyLeaveSystem.Models.Enums;
+<span class="kw">using</span> MyLeaveSystem.Models.ViewModels;
+<span class="kw">using</span> MyLeaveSystem.Services;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+[Authorize(Roles = <span class="str">"Student"</span>)]      <span class="cmt">// 整個 Controller 只有學員能進</span>
+<span class="kw">public class</span> LeaveRequestsController : AppControllerBase
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+    <span class="kw">private readonly</span> ILeaveCalculator _calculator;
+
+    <span class="kw">public</span> LeaveRequestsController(AppDbContext db, ILeaveCalculator calculator)
+    {
+        _db = db;
+        _calculator = calculator;
+    }
+
+    <span class="cmt">// ── 我的請假單 ──</span>
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+    {
+        <span class="kw">var</span> studentId = GetCurrentUserId();
+        <span class="kw">if</span> (studentId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+        <span class="kw">var</span> list = <span class="kw">await</span> _db.LeaveRequests
+            .AsNoTracking()
+            .Include(r =&gt; r.LeaveType)
+            .Where(r =&gt; r.StudentId == studentId.Value)     <span class="cmt">// ← 只看自己的</span>
+            .OrderByDescending(r =&gt; r.CreatedAt)
+            .ToListAsync();
+
+        <span class="kw">return</span> View(list);
+    }
+
+    [HttpGet]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Create()
+    {
+        <span class="kw">var</span> vm = <span class="kw">new</span> LeaveRequestCreateViewModel();
+        <span class="kw">await</span> PopulateLeaveTypesAsync(vm);
+        <span class="kw">return</span> View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveRequestCreateViewModel input)
+    {
+        <span class="cmt">// ══ 規則 0：欄位驗證 ══</span>
+        <span class="kw">if</span> (!ModelState.IsValid)
+        {
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="kw">var</span> studentId = GetCurrentUserId();
+        <span class="kw">if</span> (studentId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+        <span class="cmt">// 連班期一起載入 —— 規則 2 要用它的上限</span>
+        <span class="kw">var</span> student = <span class="kw">await</span> _db.UserAccounts
+            .Include(u =&gt; u.Cohort)
+            .FirstOrDefaultAsync(u =&gt; u.Id == studentId.Value &amp;&amp; u.IsActive);
+
+        <span class="kw">if</span> (student <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+        <span class="cmt">// ══ 規則 1：必須有班期 ══</span>
+        <span class="kw">if</span> (student.Cohort <span class="kw">is null</span>)
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty,
+                <span class="str">"你的帳號尚未指派班期，暫時無法送出請假申請。請聯絡行政人員。"</span>);
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// ══ 規則 2：時數計算（第 9 章寫的 Service）══</span>
+        <span class="kw">var</span> startAt = input.StartDate.Date.AddHours(input.StartHour!.Value);
+        <span class="kw">var</span> endAt   = input.EndDate.Date.AddHours(input.EndHour!.Value);
+
+        <span class="kw">if</span> (!_calculator.TryCalculate(startAt, endAt, <span class="kw">out var</span> totalHours, <span class="kw">out var</span> calcError))
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty, calcError!);
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// ══ 規則 3：班期請假上限 ══</span>
+        <span class="cmt">//    口徑：只累計已核准的。Pending 不佔額度。</span>
+        <span class="kw">var</span> approvedHours = <span class="kw">await</span> _db.LeaveRequests
+            .Where(r =&gt; r.StudentId == student.Id &amp;&amp; r.Status == LeaveStatus.Approved)
+            .SumAsync(r =&gt; (<span class="kw">decimal</span>?)r.TotalHours) ?? 0m;
+
+        <span class="kw">if</span> (approvedHours + totalHours &gt; student.Cohort.LeaveLimitHours)
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty,
+                $<span class="str">"送出後將超過班期請假上限 {student.Cohort.LeaveLimitHours} 小時"</span> +
+                $<span class="str">"（目前已核准 {approvedHours:0.##} 小時，本次 {totalHours:0.##} 小時）。"</span>);
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// ══ 規則 4：依時數找出對應的簽核規則 ══</span>
+        <span class="kw">var</span> matchedRule = <span class="kw">await</span> _db.ApprovalRules
+            .OrderBy(r =&gt; r.MinHours)
+            .FirstOrDefaultAsync(r =&gt;
+                r.MinHours &lt;= totalHours &amp;&amp;
+                (!r.MaxHours.HasValue || totalHours &lt;= r.MaxHours.Value));
+
+        <span class="kw">if</span> (matchedRule <span class="kw">is null</span>)
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"找不到符合此請假時數的簽核規則，請聯絡行政人員。"</span>);
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// ══ 規則 5：依規則展開 N 關簽核步驟 ══</span>
+        <span class="kw">var</span> requiredRoles = ApprovalRoleJson.Deserialize(matchedRule.RequiredRoles);
+        <span class="kw">if</span> (requiredRoles.Count == 0)
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"簽核規則未設定有效角色，請聯絡行政人員。"</span>);
+            <span class="kw">await</span> PopulateLeaveTypesAsync(input);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="kw">var</span> steps = requiredRoles
+            .Select((role, index) =&gt; <span class="kw">new</span> LeaveRequestStep
+            {
+                Level        = index + 1,      <span class="cmt">// 陣列順序 = 關卡順序</span>
+                ApproverRole = role,
+                Decision     = ApprovalDecision.Pending
+                <span class="cmt">// ApproverUserId 故意留 null —— 見第 6 節</span>
+            })
+            .ToList();
+
+        <span class="cmt">// ══ 全部通過，建立單子 ══</span>
+        <span class="kw">var</span> now = DateTime.UtcNow;
+        _db.LeaveRequests.Add(<span class="kw">new</span> LeaveRequest
+        {
+            StudentId    = student.Id,
+            LeaveTypeId  = input.LeaveTypeId,
+            StartAt      = startAt,
+            EndAt        = endAt,
+            TotalHours   = totalHours,
+            Reason       = input.Reason.Trim(),
+            Status       = LeaveStatus.Pending,
+            CurrentLevel = 1,
+            CreatedAt    = now,
+            UpdatedAt    = now,
+            Steps        = steps          <span class="cmt">// 父子一起 Add，EF Core 會處理外鍵</span>
+        });
+
+        <span class="kw">await</span> _db.SaveChangesAsync();
+
+        TempData[<span class="str">"Success"</span>] = $<span class="str">"請假申請已送出（共 {totalHours:0.##} 小時，{steps.Count} 關簽核）。"</span>;
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+
+    <span class="cmt">// 每次退回表單都要重新填下拉選項，不然回去是空的</span>
+    <span class="kw">private async</span> Task PopulateLeaveTypesAsync(LeaveRequestCreateViewModel vm)
+    {
+        vm.LeaveTypeOptions = <span class="kw">await</span> _db.LeaveTypes
+            .AsNoTracking()
+            .Where(t =&gt; t.IsActive)          <span class="cmt">// 停用的假別不出現在新單裡</span>
+            .OrderBy(t =&gt; t.SortOrder)
+            .Select(t =&gt; <span class="kw">new</span> LeaveTypeOption(t.Id, t.Name))
+            .ToListAsync();
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼是「先全部檢查完，才建立物件」</span>
+        <p>
+            注意所有驗證都在 <code>_db.LeaveRequests.Add(...)</code> <strong>之前</strong>。
+            任何一關不過就直接 <code>return View(input)</code>，
+            <strong>連碰都沒碰到資料庫</strong>。
+        </p>
+        <p>
+            這樣就不可能出現「單子建了一半、步驟沒建成功」的殘缺資料。
+        </p>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">每次退回都要記得重填下拉選項</span>
+        <p>
+            <code>PopulateLeaveTypesAsync</code> 在這個 Action 裡出現了<strong>六次</strong>。
+            漏掉任何一次，使用者填錯退回表單時，假別下拉就會變成空的——
+            他連改都改不了。
+        </p>
+        <p>這是 MVC 表單最容易漏的一步，而且不會有任何錯誤訊息。</p>
+    </div>
+
+    <p>對應的 View（重點在時段下拉）：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/LeaveRequests/Create.cshtml（節錄）</span></div>
+        <pre><code>@model LeaveRequestCreateViewModel
+
+&lt;div class="alert alert-info"&gt;
+    上課時段為 &lt;strong&gt;08:00~12:00、13:00~17:00&lt;/strong&gt;，午休 12:00~13:00 不計入請假時數。
+&lt;/div&gt;
+
+&lt;form method="post" asp-action="Create"&gt;
+    &lt;div asp-validation-summary="ModelOnly" class="alert alert-danger"&gt;&lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="LeaveTypeId" class="form-label"&gt;&lt;/label&gt;
+        &lt;select asp-for="LeaveTypeId" class="form-select"&gt;
+            &lt;option value=""&gt;— 請選擇假別 —&lt;/option&gt;
+            @<span class="kw">foreach</span> (<span class="kw">var</span> t <span class="kw">in</span> Model.LeaveTypeOptions)
+            {
+                &lt;option value="@t.Id"&gt;@t.Name&lt;/option&gt;
+            }
+        &lt;/select&gt;
+        &lt;span asp-validation-for="LeaveTypeId" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="row"&gt;
+        &lt;div class="col-md-6 mb-3"&gt;
+            &lt;label asp-for="StartDate" class="form-label"&gt;&lt;/label&gt;
+            &lt;input asp-for="StartDate" class="form-control" type="date" /&gt;
+        &lt;/div&gt;
+        &lt;div class="col-md-6 mb-3"&gt;
+            &lt;label asp-for="StartHour" class="form-label"&gt;&lt;/label&gt;
+            &lt;select asp-for="StartHour" class="form-select"&gt;
+                &lt;option value=""&gt;— 請選擇開始時間 —&lt;/option&gt;
+                @* 只提供 08~17 的整點，跟 LeaveCalculator 的規則一致 *@
+                @<span class="kw">for</span> (<span class="kw">var</span> h = 8; h &lt;= 17; h++)
+                {
+                    &lt;option value="@h"&gt;@h.ToString("00"):00&lt;/option&gt;
+                }
+            &lt;/select&gt;
+            &lt;span asp-validation-for="StartHour" class="text-danger small"&gt;&lt;/span&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+
+    @* 結束日期 / 結束時間同理 *@
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Reason" class="form-label"&gt;&lt;/label&gt;
+        &lt;textarea asp-for="Reason" class="form-control" rows="3"&gt;&lt;/textarea&gt;
+        &lt;span asp-validation-for="Reason" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;button type="submit" class="btn btn-primary"&gt;送出申請&lt;/button&gt;
+    &lt;a asp-action="Index" class="btn btn-secondary"&gt;返回列表&lt;/a&gt;
+&lt;/form&gt;
+
+@section Scripts { &lt;partial name="_ValidationScriptsPartial" /&gt; }</code></pre>
+    </div>
+
+    <h2 class="sec" id="inbox">5. 待簽核清單</h2>
+
+    <p>
+        簽核人要看到「輪到我簽的單」。這個查詢比想像中麻煩，
+        因為 <code>ApproverUserId</code> 在還沒簽之前是 <code>null</code>——
+        <strong>不能用 <code>WHERE ApproverUserId = 我</code></strong>。
+    </p>
+
+    <p>正確的判斷條件有四個，缺一不可：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:60px;">#</th><th style="width:280px;">條件</th><th>為什麼</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td><code>step.Decision == Pending</code></td><td>這一關還沒簽過</td></tr>
+            <tr><td>2</td><td><code>request.Status == Pending</code></td><td>整張單還在跑（不是已駁回/取消）</td></tr>
+            <tr><td>3</td><td><code>step.Level == request.CurrentLevel</code></td>
+                <td><strong>只有「當前這一關」算待辦。</strong>第 3 關的人不該提前看到</td></tr>
+            <tr><td>4</td><td>我是<strong>這個班期</strong>該角色的簽核人</td>
+                <td>光是「我是導師」不夠，還要是「這位學員班期的導師」</td></tr>
+        </tbody>
+    </table>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/ApprovalService.cs（待辦清單部分）</span></div>
+        <pre><code><span class="kw">public async</span> Task&lt;IReadOnlyList&lt;LeaveRequestStep&gt;&gt; GetPendingForUserAsync(<span class="kw">int</span> currentUserId)
+{
+    <span class="cmt">// 這個人有哪些角色（重新查資料庫，不信 Cookie —— 原因見第 6 節）</span>
+    <span class="kw">var</span> roleNames = <span class="kw">await</span> _db.UserRoles
+        .Include(ur =&gt; ur.Role)
+        .Where(ur =&gt; ur.UserId == currentUserId)
+        .Select(ur =&gt; ur.Role.Name)
+        .ToListAsync();
+
+    <span class="kw">if</span> (roleNames.Count == 0) <span class="kw">return</span> Array.Empty&lt;LeaveRequestStep&gt;();
+
+    <span class="cmt">// ① 在資料庫端能篩的先篩掉（條件 1~3）</span>
+    <span class="kw">var</span> candidates = <span class="kw">await</span> _db.LeaveRequestSteps
+        .Include(s =&gt; s.LeaveRequest).ThenInclude(r =&gt; r.Student).ThenInclude(u =&gt; u.Cohort)
+        .Include(s =&gt; s.LeaveRequest).ThenInclude(r =&gt; r.LeaveType)
+        .Where(s =&gt;
+            s.Decision == ApprovalDecision.Pending &amp;&amp;
+            s.LeaveRequest.Status == LeaveStatus.Pending &amp;&amp;
+            s.Level == s.LeaveRequest.CurrentLevel &amp;&amp;
+            roleNames.Contains(s.ApproverRole))
+        .AsNoTracking()
+        .ToListAsync();
+
+    <span class="cmt">// ② 條件 4 在記憶體端做（switch 運算式翻不成 SQL）</span>
+    <span class="kw">return</span> candidates
+        .Where(s =&gt; GetAssignedApproverId(s) == currentUserId)
+        .OrderByDescending(s =&gt; s.LeaveRequest.CreatedAt)
+        .ToList();
+}
+
+<span class="cmt">/// 依關卡角色，查出這個班期指定的簽核人是誰。</span>
+<span class="kw">private static int</span>? GetAssignedApproverId(LeaveRequestStep step)
+{
+    <span class="kw">var</span> cohort = step.LeaveRequest.Student.Cohort;
+    <span class="kw">if</span> (cohort <span class="kw">is null</span>) <span class="kw">return null</span>;
+
+    <span class="kw">return</span> step.ApproverRole <span class="kw">switch</span>
+    {
+        <span class="str">"Tutor"</span>          =&gt; cohort.TutorUserId,
+        <span class="str">"SectionChief"</span>   =&gt; cohort.SectionChiefUserId,
+        <span class="str">"BranchDirector"</span> =&gt; cohort.BranchDirectorUserId,
+        _ =&gt; <span class="kw">null</span>
+    };
+}</code></pre>
+    </div>
+
+    <h2 class="sec" id="approve">6. 簽核引擎與五道防線</h2>
+
+    <p>
+        核准這個動作，<strong>驗證的程式碼比實際做事的程式碼還多</strong>。這是對的。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Services/ApprovalService.cs（核准部分）</span></div>
+        <pre><code><span class="kw">public record</span> ApprovalActionResult(<span class="kw">bool</span> Success, <span class="kw">string</span>? ErrorMessage, <span class="kw">bool</span> FullyApproved);
+
+<span class="kw">public async</span> Task&lt;ApprovalActionResult&gt; ApproveAsync(<span class="kw">int</span> stepId, <span class="kw">int</span> currentUserId, <span class="kw">string</span>? comment)
+{
+    <span class="cmt">// 一次把三層關聯載齊（Step → Request → Student → Cohort）</span>
+    <span class="kw">var</span> step = <span class="kw">await</span> _db.LeaveRequestSteps
+        .Include(s =&gt; s.LeaveRequest).ThenInclude(r =&gt; r.Student).ThenInclude(u =&gt; u.Cohort)
+        .FirstOrDefaultAsync(s =&gt; s.Id == stepId);
+
+    <span class="kw">if</span> (step <span class="kw">is null</span>)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"找不到指定的簽核關卡。"</span>, <span class="kw">false</span>);
+
+    <span class="kw">var</span> check = <span class="kw">await</span> EnsureCanActAsync(step, currentUserId);
+    <span class="kw">if</span> (!check.Success) <span class="kw">return</span> check;
+
+    <span class="kw">var</span> now = DateTime.UtcNow;
+    <span class="kw">var</span> request = step.LeaveRequest;
+
+    <span class="cmt">// 寫下這一關的結果（是「寫上去」不是「改掉」，歷史要留著）</span>
+    step.Decision       = ApprovalDecision.Approved;
+    step.ApproverUserId = currentUserId;       <span class="cmt">// ← 這時候才知道實際是誰簽的</span>
+    step.Comment        = <span class="kw">string</span>.IsNullOrWhiteSpace(comment) ? <span class="kw">null</span> : comment.Trim();
+    step.DecidedAt      = now;
+
+    <span class="cmt">// 還有沒有下一關？</span>
+    <span class="kw">var</span> nextStep = <span class="kw">await</span> _db.LeaveRequestSteps
+        .Where(s =&gt; s.LeaveRequestId == request.Id &amp;&amp; s.Level &gt; request.CurrentLevel)
+        .OrderBy(s =&gt; s.Level)
+        .FirstOrDefaultAsync();
+
+    <span class="kw">bool</span> fullyApproved;
+    <span class="kw">if</span> (nextStep <span class="kw">is not null</span>)
+    {
+        request.CurrentLevel = nextStep.Level;      <span class="cmt">// 轉下一關，Status 仍是 Pending</span>
+        fullyApproved = <span class="kw">false</span>;
+    }
+    <span class="kw">else</span>
+    {
+        request.Status = LeaveStatus.Approved;      <span class="cmt">// 最後一關 → 整張核准</span>
+        fullyApproved = <span class="kw">true</span>;
+    }
+
+    request.UpdatedAt = now;
+    <span class="kw">await</span> _db.SaveChangesAsync();
+
+    <span class="kw">return new</span>(<span class="kw">true</span>, <span class="kw">null</span>, fullyApproved);
+}</code></pre>
+    </div>
+
+    <h3 class="sub">6.1 五道防線</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Services/ApprovalService.cs（權限檢查）</span></div>
+        <pre><code><span class="kw">private async</span> Task&lt;ApprovalActionResult&gt; EnsureCanActAsync(LeaveRequestStep step, <span class="kw">int</span> currentUserId)
+{
+    <span class="kw">var</span> request = step.LeaveRequest;
+
+    <span class="cmt">// ① 整張單必須還在跑</span>
+    <span class="kw">if</span> (request.Status != LeaveStatus.Pending)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"這張請假單已結案，無法再簽核。"</span>, <span class="kw">false</span>);
+
+    <span class="cmt">// ② 必須正好是當前這一關（擋插隊）</span>
+    <span class="kw">if</span> (step.Level != request.CurrentLevel)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"這一關尚未輪到，或已經過關。"</span>, <span class="kw">false</span>);
+
+    <span class="cmt">// ③ 這一關還沒被簽過（擋連點兩下、擋重送）</span>
+    <span class="kw">if</span> (step.Decision != ApprovalDecision.Pending)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"本關已簽核。"</span>, <span class="kw">false</span>);
+
+    <span class="cmt">// ④ 這個人確實有該角色 —— 重新查資料庫，不信 Cookie</span>
+    <span class="kw">var</span> hasRole = <span class="kw">await</span> _db.UserRoles
+        .Include(ur =&gt; ur.Role)
+        .AnyAsync(ur =&gt; ur.UserId == currentUserId &amp;&amp; ur.Role.Name == step.ApproverRole);
+
+    <span class="kw">if</span> (!hasRole)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"您的角色無法簽核這一關。"</span>, <span class="kw">false</span>);
+
+    <span class="cmt">// ⑤ 而且是「這個班期」指定的那一位（擋 A 班導師簽 B 班的單）</span>
+    <span class="kw">var</span> assigned = GetAssignedApproverId(step);
+    <span class="kw">if</span> (assigned <span class="kw">is null</span> || assigned.Value != currentUserId)
+        <span class="kw">return new</span>(<span class="kw">false</span>, <span class="str">"您不是這個班期指定的簽核人。"</span>, <span class="kw">false</span>);
+
+    <span class="kw">return new</span>(<span class="kw">true</span>, <span class="kw">null</span>, <span class="kw">false</span>);
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">第 ④ 道為什麼要重新查資料庫？Cookie 裡不是有角色了嗎？</span>
+        <p>
+            因為 Cookie 裡的角色是<strong>登入當下的快照</strong>，有效期 8 小時。
+        </p>
+        <p>
+            假設某位導師被停權或改成一般職員，他<strong>手上那個還沒過期的 Cookie
+            仍然帶著「Tutor」這個角色</strong>。如果只信 Cookie，他還能繼續簽 8 小時。
+        </p>
+        <p>
+            <strong>原則：顯示用的可以信 Cookie（快），
+            真正動資料的關鍵操作要重新查（準）。</strong>
+        </p>
+    </div>
+
+    <div class="callout why">
+        <span class="t">第 ⑤ 道：這就是送單時故意不寫死簽核人的收成</span>
+        <p>
+            <a href="#submit">第 4 節</a>建立 Step 時，<code>ApproverUserId</code> 留 <code>null</code>，
+            只記角色字串。「<strong>誰</strong>」是簽核當下才從班期查出來的。
+        </p>
+        <p>
+            好處：班期換導師時，<strong>所有在途的單立刻轉給新導師</strong>，
+            不用去改任何一筆歷史資料。如果送單時就寫死，那些單會永遠卡在離職的人身上。
+        </p>
+    </div>
+
+    <h3 class="sub">6.2 Controller 只負責翻譯</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/ApprovalsController.cs（節錄）</span></div>
+        <pre><code>[Authorize(Roles = <span class="str">"Tutor,SectionChief,BranchDirector"</span>)]
+<span class="kw">public class</span> ApprovalsController : AppControllerBase
+{
+    <span class="kw">private readonly</span> IApprovalService _approvalService;
+    <span class="kw">public</span> ApprovalsController(IApprovalService s) =&gt; _approvalService = s;
+
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+    {
+        <span class="kw">var</span> userId = GetCurrentUserId();
+        <span class="kw">if</span> (userId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+        <span class="kw">return</span> View(<span class="kw">await</span> _approvalService.GetPendingForUserAsync(userId.Value));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Approve(<span class="kw">int</span> stepId, <span class="kw">string</span>? comment)
+    {
+        <span class="kw">var</span> userId = GetCurrentUserId();
+        <span class="kw">if</span> (userId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+        <span class="kw">var</span> result = <span class="kw">await</span> _approvalService.ApproveAsync(stepId, userId.Value, comment);
+
+        <span class="kw">if</span> (!result.Success)
+            TempData[<span class="str">"Error"</span>] = result.ErrorMessage;
+        <span class="kw">else</span>
+            TempData[<span class="str">"Success"</span>] = result.FullyApproved
+                ? <span class="str">"簽核成功，整張請假單已核准。"</span>
+                : <span class="str">"簽核成功，已推進到下一關。"</span>;
+
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+}</code></pre>
+    </div>
+
+    <p>
+        注意 Controller <strong>一個業務判斷都沒有</strong>——
+        它只是把結果翻譯成畫面訊息。這就是<a href="ch09-services-di-tests.html#layers">第 9 章</a>講的分層。
+    </p>
+
+    <h2 class="sec" id="test">7. 用測試守住規則</h2>
+
+    <p>
+        簽核權限是這個系統<strong>最不能出錯</strong>的地方。用測試把五道防線鎖住：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">測試專案需要記憶體資料庫</span></div>
+        <pre><code>cd MyLeaveSystem.Tests
+dotnet add package Microsoft.EntityFrameworkCore.InMemory</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">MyLeaveSystem.Tests/ApprovalServiceTests.cs（節錄）</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+<span class="kw">using</span> Xunit;
+
+<span class="kw">namespace</span> MyLeaveSystem.Tests;
+
+<span class="kw">public class</span> ApprovalServiceTests
+{
+    <span class="cmt">// 每個測試一個全新的記憶體資料庫，彼此不干擾</span>
+    <span class="kw">private static</span> AppDbContext NewDb()
+    {
+        <span class="kw">var</span> options = <span class="kw">new</span> DbContextOptionsBuilder&lt;AppDbContext&gt;()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        <span class="kw">return new</span> AppDbContext(options);
+    }
+
+    [Fact]
+    <span class="kw">public async</span> Task 非本班期導師_不能簽核()
+    {
+        <span class="kw">using var</span> db = NewDb();
+        <span class="cmt">// …建立：A 班（導師 = 1 號）、學員、一張待簽單…</span>
+
+        <span class="kw">var</span> sut = <span class="kw">new</span> ApprovalService(db);
+
+        <span class="cmt">// 2 號老師（是導師，但不是這個班期的）來簽</span>
+        <span class="kw">var</span> result = <span class="kw">await</span> sut.ApproveAsync(stepId: 1, currentUserId: 2, comment: <span class="kw">null</span>);
+
+        Assert.False(result.Success);
+        Assert.Contains(<span class="str">"班期指定的簽核人"</span>, result.ErrorMessage);
+    }
+
+    [Fact]
+    <span class="kw">public async</span> Task 核准最後一關_整張單變成Approved()
+    {
+        <span class="kw">using var</span> db = NewDb();
+        <span class="cmt">// …建立：只有一關的單…</span>
+
+        <span class="kw">var</span> result = <span class="kw">await new</span> ApprovalService(db).ApproveAsync(1, tutorId, <span class="str">"准假"</span>);
+
+        Assert.True(result.Success);
+        Assert.True(result.FullyApproved);
+
+        <span class="kw">var</span> request = <span class="kw">await</span> db.LeaveRequests.FirstAsync();
+        Assert.Equal(LeaveStatus.Approved, request.Status);
+    }
+
+    [Fact]
+    <span class="kw">public async</span> Task 核准第一關_轉到第二關且仍是Pending()
+    {
+        <span class="cmt">// …建立：兩關的單…</span>
+        <span class="kw">var</span> result = <span class="kw">await new</span> ApprovalService(db).ApproveAsync(step1Id, tutorId, <span class="kw">null</span>);
+
+        Assert.True(result.Success);
+        Assert.False(result.FullyApproved);          <span class="cmt">// 還沒結案</span>
+
+        <span class="kw">var</span> request = <span class="kw">await</span> db.LeaveRequests.FirstAsync();
+        Assert.Equal(LeaveStatus.Pending, request.Status);
+        Assert.Equal(2, request.CurrentLevel);       <span class="cmt">// 推進到第 2 關</span>
+    }
+
+    [Fact]
+    <span class="kw">public async</span> Task 同一關重複簽核_第二次會被擋()
+    {
+        <span class="cmt">// …建立、簽一次…</span>
+        <span class="kw">var</span> second = <span class="kw">await</span> sut.ApproveAsync(stepId, tutorId, <span class="kw">null</span>);
+
+        Assert.False(second.Success);
+        Assert.Contains(<span class="str">"已簽核"</span>, second.ErrorMessage);
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">InMemory 資料庫的限制</span>
+        <p>
+            它<strong>不是真的 SQL Server</strong>，不會檢查外鍵、不支援原生 SQL。
+            所以它適合測<strong>業務邏輯</strong>（誰能簽、狀態怎麼變），
+            不適合測「這個查詢翻譯成的 SQL 對不對」。
+        </p>
+        <p>
+            完成品專案的 106 個測試就是這樣分的：邏輯用 InMemory，
+            SQL 相關的細節靠手動驗收。
+        </p>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 11 章檢查點</div>
+        <div class="hint">這是全書最難的一章。全部做到就差不多了。</div>
+        <ul>
+            <li><span>學員能送出請假單，清單頁看得到它，狀態是「簽核中」。</span></li>
+            <li><span>我送了一張 4 小時的單（1 關）與一張 3 天的單（3 關），在資料庫裡確認 <code>LeaveRequestSteps</code> 的筆數不同。</span></li>
+            <li><span>導師登入後在待簽核清單看得到單，能核准，狀態正確變化。</span></li>
+            <li><span>我用<strong>別班</strong>的導師帳號試著簽，被第 ⑤ 道防線擋下來。</span></li>
+            <li><span>我把單子送到超過班期上限，被規則 3 擋下來。</span></li>
+            <li><span><code>dotnet test</code> 全綠。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            這一章對應完成品的
+            <code>Controllers/LeaveRequestsController.cs</code>（430 行）與
+            <code>Services/ApprovalService.cs</code>（409 行）——
+            全專案最長的兩個檔案。
+        </p>
+        <p>
+            <strong>現在去看這兩張圖，你應該能完全讀懂：</strong><br>
+            <a href="../tutorial/03-leave-submit.html">循序圖教學站 · 03 學員送出請假單</a>（11 步）<br>
+            <a href="../tutorial/04-approval.html">循序圖教學站 · 04 簽核引擎</a>（12 步，含五道防線的表格）
+        </p>
+        <p>
+            業務規則的完整定義在
+            <a href="../04-請假與簽核流程.md"><code>docs/04-請假與簽核流程.md</code></a>。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch10-auth.html"><span class="lbl">上一章</span>◀ 第 10 章 登入與權限</a>
+        <span class="spacer"></span>
+        <a href="ch12-finish.html"><span class="lbl">下一章</span>第 12 章 收尾與接下來 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 10 章 登入與權限 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch10">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 4 · 蓋出真正的系統</div>
+    <h1 class="chapter-title">第 10 章　登入與權限</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        有一個能登入的系統：密碼安全雜湊、Cookie 記住身分、
+        <code>[Authorize]</code> 依角色擋人，而且知道<strong>「只能看自己的資料」</strong>要怎麼做。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>3 小時</b></span>
+        <span>📦 前置：<a href="ch09-services-di-tests.html">第 9 章</a>（Service 與 DI 觀念）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#password">密碼絕對不能存明碼</a></li>
+            <li><a href="#authservice">AuthService</a></li>
+            <li><a href="#cookie">設定 Cookie 認證</a></li>
+            <li><a href="#login">動手：登入頁</a></li>
+            <li><a href="#authorize">[Authorize]：擋人</a></li>
+            <li><a href="#mine">最重要的一課：只能看自己的資料</a></li>
+            <li><a href="#layout">依角色顯示不同選單</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="password">1. 密碼絕對不能存明碼</h2>
+
+    <p>
+        資料庫總有一天會外洩（被駭、備份檔放錯地方、離職員工帶走）。
+        如果裡面是明碼密碼，<strong>災難不只在你的網站</strong>——
+        很多人到處用同一組密碼。
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:200px;">做法</th><th>安全嗎</th></tr></thead>
+        <tbody>
+            <tr><td>直接存密碼</td><td>❌ 外洩＝全滅</td></tr>
+            <tr><td>MD5 / SHA1 / SHA256</td>
+                <td>❌ <strong>太快了</strong>。現代顯示卡一秒可以試幾十億組，常見密碼幾秒就破</td></tr>
+            <tr><td><strong>BCrypt</strong>（本書用）</td>
+                <td>✅ <strong>刻意設計成很慢</strong>，而且每次加不同的隨機鹽</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">「慢」為什麼是優點？</span>
+        <p>
+            使用者登入一次，慢 0.2 秒完全無感。
+            但攻擊者要暴力破解，就從「一秒試十億組」變成「一秒試五組」——
+            <strong>差距是幾億倍。</strong>
+        </p>
+        <p>
+            另外 BCrypt 會自動加一段隨機的「鹽」，所以<strong>同樣的密碼每次算出來的雜湊都不一樣</strong>。
+            攻擊者沒辦法用預先算好的對照表（彩虹表）一次破解一堆帳號。
+        </p>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">安裝 BCrypt</span></div>
+        <pre><code>dotnet add package BCrypt.Net-Next</code></pre>
+    </div>
+
+    <p>照第 9 章的習慣，包成介面：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/IPasswordHasher.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="kw">public interface</span> IPasswordHasher
+{
+    <span class="kw">string</span> Hash(<span class="kw">string</span> password);
+    <span class="kw">bool</span> Verify(<span class="kw">string</span> password, <span class="kw">string</span> hash);
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/BcryptPasswordHasher.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="kw">public class</span> BcryptPasswordHasher : IPasswordHasher
+{
+    <span class="kw">public string</span> Hash(<span class="kw">string</span> password)
+        =&gt; BCrypt.Net.BCrypt.HashPassword(password);
+
+    <span class="kw">public bool</span> Verify(<span class="kw">string</span> password, <span class="kw">string</span> hash)
+    {
+        <span class="kw">try</span>
+        {
+            <span class="kw">return</span> BCrypt.Net.BCrypt.Verify(password, hash);
+        }
+        <span class="kw">catch</span>
+        {
+            <span class="cmt">// 資料庫裡的雜湊格式壞掉時不要整個爆掉，當成驗證失敗</span>
+            <span class="kw">return false</span>;
+        }
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">包成介面的另一個好處</span>
+        BCrypt 每次驗證要花約 0.2 秒。第 9 章那種<strong>測試</strong>如果要跑幾百次，
+        就會慢到不能忍。包成介面之後，測試可以塞一個「直接比對字串」的假實作。
+    </div>
+
+    <h2 class="sec" id="authservice">2. AuthService</h2>
+
+    <p>
+        登入其實是<strong>兩件獨立的事</strong>：
+        <strong>驗證</strong>（你是不是你）與<strong>簽入</strong>（把身分寫成 Cookie）。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/IAuthService.cs</span></div>
+        <pre><code><span class="kw">using</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="kw">public interface</span> IAuthService
+{
+    <span class="cmt">/// 驗證帳密。成功回使用者（含角色），失敗回 null。</span>
+    Task&lt;UserAccount?&gt; ValidateAsync(<span class="kw">string</span> username, <span class="kw">string</span> password);
+
+    <span class="cmt">/// 寫入 Cookie 完成登入。</span>
+    Task SignInAsync(HttpContext context, UserAccount user, <span class="kw">bool</span> isPersistent = <span class="kw">false</span>);
+
+    <span class="cmt">/// 清除 Cookie 完成登出。</span>
+    Task SignOutAsync(HttpContext context);
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/AuthService.cs</span></div>
+        <pre><code><span class="kw">using</span> System.Security.Claims;
+<span class="kw">using</span> Microsoft.AspNetCore.Authentication;
+<span class="kw">using</span> Microsoft.AspNetCore.Authentication.Cookies;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="kw">public class</span> AuthService : IAuthService
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+    <span class="kw">private readonly</span> IPasswordHasher _passwordHasher;
+
+    <span class="kw">public</span> AuthService(AppDbContext db, IPasswordHasher passwordHasher)
+    {
+        _db = db;
+        _passwordHasher = passwordHasher;
+    }
+
+    <span class="kw">public async</span> Task&lt;UserAccount?&gt; ValidateAsync(<span class="kw">string</span> username, <span class="kw">string</span> password)
+    {
+        <span class="cmt">// 連角色一起載入 —— 下一步 SignInAsync 馬上要用（避免查兩次）</span>
+        <span class="kw">var</span> user = <span class="kw">await</span> _db.UserAccounts
+            .Include(u =&gt; u.UserRoles)
+                .ThenInclude(ur =&gt; ur.Role)
+            .FirstOrDefaultAsync(u =&gt; u.Username == username);
+
+        <span class="kw">if</span> (user <span class="kw">is null</span>) <span class="kw">return null</span>;                                    <span class="cmt">// 查無帳號</span>
+        <span class="kw">if</span> (!user.IsActive) <span class="kw">return null</span>;                                  <span class="cmt">// 已停用</span>
+        <span class="kw">if</span> (!_passwordHasher.Verify(password, user.PasswordHash)) <span class="kw">return null</span>;  <span class="cmt">// 密碼錯</span>
+
+        <span class="kw">return</span> user;
+    }
+
+    <span class="kw">public async</span> Task SignInAsync(HttpContext context, UserAccount user, <span class="kw">bool</span> isPersistent = <span class="kw">false</span>)
+    {
+        <span class="cmt">// 一筆 Claim = 一個「身分屬性」</span>
+        <span class="kw">var</span> claims = <span class="kw">new</span> List&lt;Claim&gt;
+        {
+            <span class="kw">new</span>(ClaimTypes.NameIdentifier, user.Id.ToString()),   <span class="cmt">// ← 第 6 節會一直用到</span>
+            <span class="kw">new</span>(ClaimTypes.Name, user.DisplayName),
+            <span class="kw">new</span>(<span class="str">"Username"</span>, user.Username)
+        };
+
+        <span class="cmt">// 每個角色加一筆。[Authorize(Roles="Admin")] 比對的就是這些。</span>
+        <span class="kw">foreach</span> (<span class="kw">var</span> ur <span class="kw">in</span> user.UserRoles)
+        {
+            <span class="kw">if</span> (ur.Role <span class="kw">is not null</span>)
+                claims.Add(<span class="kw">new</span> Claim(ClaimTypes.Role, ur.Role.Name));
+        }
+
+        <span class="kw">var</span> identity  = <span class="kw">new</span> ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        <span class="kw">var</span> principal = <span class="kw">new</span> ClaimsPrincipal(identity);
+
+        <span class="kw">var</span> properties = <span class="kw">new</span> AuthenticationProperties
+        {
+            IsPersistent = isPersistent,                      <span class="cmt">// 勾「記住我」才持久化</span>
+            ExpiresUtc   = DateTimeOffset.UtcNow.AddHours(8)
+        };
+
+        <span class="cmt">// 這一行才真的寫出 Set-Cookie</span>
+        <span class="kw">await</span> context.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme, principal, properties);
+    }
+
+    <span class="kw">public</span> Task SignOutAsync(HttpContext context)
+        =&gt; context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼三種失敗都回同一個 null？</span>
+        <p>
+            如果分別回「查無此帳號」與「密碼錯誤」，攻擊者就能<strong>用它來列舉出哪些帳號存在</strong>，
+            再集中火力猜那些帳號的密碼。
+        </p>
+        <p>
+            所以畫面上一律顯示「帳號或密碼錯誤，或帳號已停用」——
+            使用者稍微不方便，但安全性差很多。
+        </p>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">Claim 是什麼</span>
+        <p>
+            就是一組「鍵 = 值」的身分描述。
+            <code>NameIdentifier = "5"</code>、<code>Role = "Tutor"</code>、<code>Role = "Staff"</code>。
+        </p>
+        <p>
+            它們會被<strong>加密簽章後放進 Cookie</strong>。
+            使用者可以看到那串亂碼，但<strong>改不動</strong>——
+            改了簽章就對不上，伺服器會當成未登入。
+        </p>
+    </div>
+
+    <h2 class="sec" id="cookie">3. 設定 Cookie 認證</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs</span></div>
+        <pre><code><span class="add"><span class="kw">using</span> Microsoft.AspNetCore.Authentication.Cookies;</span>
+
+builder.Services.AddScoped&lt;ILeaveCalculator, LeaveCalculator&gt;();
+<span class="add">builder.Services.AddScoped&lt;IPasswordHasher, BcryptPasswordHasher&gt;();</span>
+<span class="add">builder.Services.AddScoped&lt;IAuthService, AuthService&gt;();</span>
+
+<span class="add">builder.Services</span>
+<span class="add">    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)</span>
+<span class="add">    .AddCookie(options =&gt;</span>
+<span class="add">    {</span>
+<span class="add">        options.LoginPath        = <span class="str">"/Account/Login"</span>;         <span class="cmt">// 未登入 → 轉這裡</span></span>
+<span class="add">        options.AccessDeniedPath = <span class="str">"/Account/AccessDenied"</span>;  <span class="cmt">// 角色不足 → 轉這裡</span></span>
+<span class="add">        options.ExpireTimeSpan   = TimeSpan.FromHours(8);</span>
+<span class="add">        options.SlidingExpiration = <span class="kw">true</span>;                    <span class="cmt">// 使用中會自動延長</span></span>
+<span class="add">        options.Cookie.Name      = <span class="str">"MyLeaveSystem.Auth"</span>;</span>
+<span class="add">        options.Cookie.HttpOnly  = <span class="kw">true</span>;                     <span class="cmt">// JS 讀不到，降低 XSS 風險</span></span>
+<span class="add">    });</span></code></pre>
+    </div>
+
+    <p><strong>然後是本章最容易寫錯的一行</strong>——在管線裡加入 <code>UseAuthentication()</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs（Build 之後的下半段）</span></div>
+        <pre><code>app.UseRouting();
+
+<span class="add">app.UseAuthentication();   <span class="cmt">// ← 一定要在 UseAuthorization 之前！</span></span>
+app.UseAuthorization();</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">順序寫反不會有編譯錯誤</span>
+        <p>
+            <code>UseAuthentication</code> 負責<strong>「你是誰」</strong>（解開 Cookie 還原身分），
+            <code>UseAuthorization</code> 負責<strong>「你能不能」</strong>。
+            先算出你是誰，才判斷得了你能不能。
+        </p>
+        <p>
+            順序反了的話，授權階段拿到的 <code>User</code> 永遠是匿名的，
+            <strong>所有掛 <code>[Authorize]</code> 的頁面都會變成永遠拒絕</strong>，
+            而且程式跑得起來、完全不報錯。
+        </p>
+        <p>
+            <strong>這是 ASP.NET Core 新手第一名的坑。</strong>
+            回頭看<a href="ch02-first-site.html#pipeline">第 2 章第 5 節</a>，
+            管線順序的重要性就是在講這件事。
+        </p>
+    </div>
+
+    <h2 class="sec" id="login">4. 動手：登入頁</h2>
+
+    <h3 class="sub">4.1 給預設管理員一個真的密碼</h3>
+
+    <p>第 8 章的種子資料把 <code>PasswordHash</code> 填成假字串，現在補上：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Data/SeedData.cs</span></div>
+        <pre><code><span class="add"><span class="kw">public const string</span> DefaultAdminUsername = <span class="str">"Admin"</span>;</span>
+<span class="add"><span class="kw">public const string</span> DefaultAdminPassword = <span class="str">"Admin@123"</span>;</span>
+
+<span class="add"><span class="kw">private static void</span> SeedAdminUser(AppDbContext db)</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">if</span> (db.UserAccounts.Any(u =&gt; u.Username == DefaultAdminUsername)) <span class="kw">return</span>;</span>
+<span class="add"></span>
+<span class="add">    <span class="kw">var</span> admin = <span class="kw">new</span> UserAccount</span>
+<span class="add">    {</span>
+<span class="add">        Username     = DefaultAdminUsername,</span>
+<span class="add">        DisplayName  = <span class="str">"系統管理員"</span>,</span>
+<span class="add">        <span class="cmt">// 種子資料裡直接呼叫 BCrypt（這裡沒有 DI 可用）</span></span>
+<span class="add">        PasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultAdminPassword),</span>
+<span class="add">        IsActive     = <span class="kw">true</span></span>
+<span class="add">    };</span>
+<span class="add">    db.UserAccounts.Add(admin);</span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add"></span>
+<span class="add">    <span class="kw">var</span> adminRole = db.Roles.First(r =&gt; r.Name == <span class="str">"Admin"</span>);</span>
+<span class="add">    db.UserRoles.Add(<span class="kw">new</span> UserRole { UserId = admin.Id, RoleId = adminRole.Id });</span>
+<span class="add">    db.SaveChanges();</span>
+<span class="add">}</span></code></pre>
+    </div>
+
+    <p>
+        記得在 <code>Initialize</code> 裡呼叫它（放在 <code>SeedRoles</code> 之後），
+        並把第 8 章那兩位示範使用者的 <code>PasswordHash</code> 也改成
+        <code>BCrypt.Net.BCrypt.HashPassword("Demo@123")</code>。
+        然後刪掉資料庫重新啟動。
+    </p>
+
+    <h3 class="sub">4.2 ViewModel 與 Controller</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/ViewModels/LoginViewModel.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">public class</span> LoginViewModel
+{
+    [Required(ErrorMessage = <span class="str">"請輸入帳號"</span>)]
+    [Display(Name = <span class="str">"帳號"</span>)]
+    <span class="kw">public string</span> Username { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Required(ErrorMessage = <span class="str">"請輸入密碼"</span>)]
+    [DataType(DataType.Password)]      <span class="cmt">// 讓 input 變成 type="password"</span>
+    [Display(Name = <span class="str">"密碼"</span>)]
+    <span class="kw">public string</span> Password { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Display(Name = <span class="str">"記住我"</span>)]
+    <span class="kw">public bool</span> RememberMe { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    <span class="kw">public string</span>? ReturnUrl { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/AccountController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Authorization;
+<span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> MyLeaveSystem.Models.ViewModels;
+<span class="kw">using</span> MyLeaveSystem.Services;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="cmt">// 整個 Controller 開放未登入存取（不然沒人進得來登入頁）</span>
+[AllowAnonymous]
+<span class="kw">public class</span> AccountController : Controller
+{
+    <span class="kw">private readonly</span> IAuthService _authService;
+    <span class="kw">public</span> AccountController(IAuthService authService) =&gt; _authService = authService;
+
+    [HttpGet]
+    <span class="kw">public</span> IActionResult Login(<span class="kw">string</span>? returnUrl = <span class="kw">null</span>)
+        =&gt; View(<span class="kw">new</span> LoginViewModel { ReturnUrl = returnUrl });
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Login(LoginViewModel input)
+    {
+        <span class="cmt">// ① 欄位有沒有填</span>
+        <span class="kw">if</span> (!ModelState.IsValid) <span class="kw">return</span> View(input);
+
+        <span class="cmt">// ② 帳密對不對</span>
+        <span class="kw">var</span> user = <span class="kw">await</span> _authService.ValidateAsync(input.Username, input.Password);
+        <span class="kw">if</span> (user <span class="kw">is null</span>)
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"帳號或密碼錯誤，或帳號已停用"</span>);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// ③ 寫 Cookie</span>
+        <span class="kw">await</span> _authService.SignInAsync(HttpContext, user, input.RememberMe);
+
+        <span class="cmt">// ④ 導回原本想去的頁面</span>
+        <span class="kw">if</span> (!<span class="kw">string</span>.IsNullOrEmpty(input.ReturnUrl) &amp;&amp; Url.IsLocalUrl(input.ReturnUrl))
+            <span class="kw">return</span> Redirect(input.ReturnUrl);
+
+        <span class="kw">return</span> RedirectToAction(<span class="str">"Index"</span>, <span class="str">"Home"</span>);
+    }
+
+    <span class="cmt">// 登出用 POST，不用 GET</span>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Logout()
+    {
+        <span class="kw">await</span> _authService.SignOutAsync(HttpContext);
+        <span class="kw">return</span> RedirectToAction(<span class="str">"Index"</span>, <span class="str">"Home"</span>);
+    }
+
+    [HttpGet]
+    <span class="kw">public</span> IActionResult AccessDenied() =&gt; View();
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">Url.IsLocalUrl 這個檢查不能省：Open Redirect</span>
+        <p>
+            沒有它的話，攻擊者可以散布這種連結：<br>
+            <code>https://你的網站/Account/Login?returnUrl=https://假冒的登入頁</code>
+        </p>
+        <p>
+            使用者<strong>看到的是你的網域、登入也是真的成功</strong>，
+            但登入後被送到攻擊者的網站，那裡再假裝「登入逾時請重新登入」騙一次密碼。
+            <code>IsLocalUrl</code> 確保只能轉到自己站內。
+        </p>
+    </div>
+
+    <div class="callout why">
+        <span class="t">登出為什麼一定要 POST</span>
+        如果做成 GET，攻擊者只要在論壇貼一張
+        <code>&lt;img src="https://你的網站/Account/Logout"&gt;</code>，
+        所有看到那則貼文的人都會被登出。雖然只是騷擾，但完全沒必要留這個洞。
+    </div>
+
+    <h3 class="sub">4.3 登入頁</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/Account/Login.cshtml</span></div>
+        <pre><code>@model LoginViewModel
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"登入"</span>;
+}
+
+&lt;div class="row justify-content-center mt-4"&gt;
+  &lt;div class="col-md-5"&gt;
+    &lt;div class="card shadow-sm"&gt;
+      &lt;div class="card-body"&gt;
+        &lt;h3 class="card-title text-center mb-4"&gt;登入&lt;/h3&gt;
+
+        &lt;form method="post" asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl"&gt;
+          &lt;div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"&gt;&lt;/div&gt;
+
+          &lt;div class="mb-3"&gt;
+            &lt;label asp-for="Username" class="form-label"&gt;&lt;/label&gt;
+            &lt;input asp-for="Username" class="form-control" autocomplete="username" autofocus /&gt;
+            &lt;span asp-validation-for="Username" class="text-danger small"&gt;&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class="mb-3"&gt;
+            &lt;label asp-for="Password" class="form-label"&gt;&lt;/label&gt;
+            &lt;input asp-for="Password" class="form-control" autocomplete="current-password" /&gt;
+            &lt;span asp-validation-for="Password" class="text-danger small"&gt;&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class="form-check mb-3"&gt;
+            &lt;input asp-for="RememberMe" class="form-check-input" /&gt;
+            &lt;label asp-for="RememberMe" class="form-check-label"&gt;&lt;/label&gt;
+          &lt;/div&gt;
+
+          &lt;div class="d-grid"&gt;
+            &lt;button type="submit" class="btn btn-primary"&gt;登入&lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/form&gt;
+
+        &lt;hr class="my-4" /&gt;
+        &lt;div class="alert alert-info small mb-0"&gt;
+          &lt;strong&gt;首次登入提示：&lt;/strong&gt;&lt;br /&gt;
+          預設帳號：&lt;code&gt;Admin&lt;/code&gt;&lt;br /&gt;
+          @* 注意這裡的 @@：Razor 裡要輸出 @ 符號要打兩次 *@
+          預設密碼：&lt;code&gt;Admin@@123&lt;/code&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+@section Scripts {
+    &lt;partial name="_ValidationScriptsPartial" /&gt;
+}</code></pre>
+    </div>
+
+    <p>再建一個簡單的 <code>Views/Account/AccessDenied.cshtml</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/Account/AccessDenied.cshtml</span></div>
+        <pre><code>@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"沒有權限"</span>;
+}
+
+&lt;div class="text-center mt-5"&gt;
+    &lt;h1&gt;🚫 沒有權限&lt;/h1&gt;
+    &lt;p class="text-muted"&gt;您目前的角色無法存取這個頁面。&lt;/p&gt;
+    &lt;a asp-controller="Home" asp-action="Index" class="btn btn-primary"&gt;回首頁&lt;/a&gt;
+&lt;/div&gt;</code></pre>
+    </div>
+
+    <p>現在跑起來，開 <code>/Account/Login</code>，用 <code>Admin / Admin@123</code> 登入。</p>
+
+    <h2 class="sec" id="authorize">5. [Authorize]：擋人</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">三種用法</span></div>
+        <pre><code><span class="cmt">// ① 只要登入就好</span>
+[Authorize]
+<span class="kw">public class</span> ReportsController : Controller
+
+<span class="cmt">// ② 必須是特定角色（逗號分隔＝其中之一即可）</span>
+[Authorize(Roles = <span class="str">"Admin,Staff"</span>)]
+<span class="kw">public class</span> UsersController : Controller
+
+<span class="cmt">// ③ 掛在單一 Action 上，可以蓋過類別層級的設定</span>
+[Authorize(Roles = <span class="str">"Student"</span>)]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Summary()</code></pre>
+    </div>
+
+    <p>把它套用到現有的 Controller：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs 與 UsersController.cs</span></div>
+        <pre><code><span class="add">[Authorize(Roles = <span class="str">"Admin"</span>)]</span>
+<span class="kw">public class</span> LeaveTypesController : Controller</code></pre>
+    </div>
+
+    <p>
+        現在登出後開 <code>/LeaveTypes</code>，會被導到登入頁；
+        用非 Admin 帳號登入再開，會被導到 <code>/Account/AccessDenied</code>。
+    </p>
+
+    <h3 class="sub">5.1 讓首頁也需要登入</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/HomeController.cs</span></div>
+        <pre><code><span class="kw">public class</span> HomeController : Controller
+{
+<span class="add">    [Authorize]      <span class="cmt">// 未登入進站會被導到登入頁</span></span>
+    <span class="kw">public</span> IActionResult Index() =&gt; View();
+
+<span class="add">    [AllowAnonymous] <span class="cmt">// 隱私權聲明開放大家看</span></span>
+    <span class="kw">public</span> IActionResult Privacy() =&gt; View();
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">[AllowAnonymous] 永遠贏</span>
+        它會蓋過任何層級的 <code>[Authorize]</code>。
+        所以 <code>AccountController</code> 掛了 <code>[AllowAnonymous]</code>——
+        登入頁本身當然不能要求登入才進得去。
+    </div>
+
+    <h2 class="sec" id="mine">6. 最重要的一課：只能看自己的資料</h2>
+
+    <p>
+        <code>[Authorize(Roles = "Student")]</code> 只擋掉「不是學員的人」。
+        <strong>它擋不住「學員 A 去看學員 B 的資料」。</strong>
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">❌ 有嚴重漏洞的寫法</span></div>
+        <pre><code>[Authorize(Roles = <span class="str">"Student"</span>)]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; MyRequests(<span class="kw">int</span> studentId)
+{
+    <span class="cmt">// 💥 studentId 是網址上帶來的，任何學員都能改成別人的 Id</span>
+    <span class="kw">var</span> list = <span class="kw">await</span> _db.LeaveRequests
+        .Where(r =&gt; r.StudentId == studentId)
+        .ToListAsync();
+
+    <span class="kw">return</span> View(list);
+}</code></pre>
+    </div>
+
+    <p>
+        <code>/LeaveRequests/MyRequests?studentId=7</code> —— 改個數字就看到別人的請假紀錄了。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">✅ 正確做法：身分只從 Cookie 取</span></div>
+        <pre><code>[Authorize(Roles = <span class="str">"Student"</span>)]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; MyRequests()      <span class="cmt">// ← 沒有參數</span>
+{
+    <span class="kw">var</span> studentId = GetCurrentUserId();
+    <span class="kw">if</span> (studentId <span class="kw">is null</span>) <span class="kw">return</span> Forbid();
+
+    <span class="kw">var</span> list = <span class="kw">await</span> _db.LeaveRequests
+        .Where(r =&gt; r.StudentId == studentId.Value)
+        .ToListAsync();
+
+    <span class="kw">return</span> View(list);
+}</code></pre>
+    </div>
+
+    <p>把取得目前使用者 Id 的方法寫成共用的基底類別：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/AppControllerBase.cs</span></div>
+        <pre><code><span class="kw">using</span> System.Security.Claims;
+<span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public abstract class</span> AppControllerBase : Controller
+{
+    <span class="cmt">/// 從 Cookie 的 Claim 取得目前登入者的 Id。</span>
+    <span class="cmt">/// 這個值使用者「改不動」，因為 Cookie 有簽章。</span>
+    <span class="kw">protected int</span>? GetCurrentUserId()
+    {
+        <span class="kw">var</span> raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        <span class="kw">return int</span>.TryParse(raw, <span class="kw">out var</span> id) ? id : <span class="kw">null</span>;
+    }
+}</code></pre>
+    </div>
+
+    <p>之後你的 Controller 就繼承它：<code>public class ReportsController : AppControllerBase</code>。</p>
+
+    <div class="callout oops">
+        <span class="t">記住這條規則，它會救你很多次</span>
+        <p>
+            <strong>「我是誰」永遠從 Cookie 取，絕對不要從網址、表單或任何使用者可以改的地方取。</strong>
+        </p>
+        <p>
+            這類漏洞有個名字叫 <strong>IDOR</strong>（不安全的直接物件參考），
+            是實務上最常見的資安問題之一——
+            因為它<strong>功能完全正常</strong>，測試也測不出來，只有攻擊者會發現。
+        </p>
+        <p>
+            涉及「別人的資料」的每一個 Action，都要問自己：
+            <strong>這個 id 是誰給的？我有沒有確認這個人有權限碰它？</strong>
+        </p>
+    </div>
+
+    <h2 class="sec" id="layout">7. 依角色顯示不同選單</h2>
+
+    <p>在 View 裡可以直接判斷角色：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/Shared/_Layout.cshtml（導覽列區塊）</span></div>
+        <pre><code>&lt;ul class="navbar-nav flex-grow-1"&gt;
+
+    @<span class="kw">if</span> (User.IsInRole(<span class="str">"Admin"</span>) || User.IsInRole(<span class="str">"Staff"</span>))
+    {
+        &lt;li class="nav-item"&gt;
+            &lt;a class="nav-link text-dark" asp-controller="LeaveTypes" asp-action="Index"&gt;假別管理&lt;/a&gt;
+        &lt;/li&gt;
+        &lt;li class="nav-item"&gt;
+            &lt;a class="nav-link text-dark" asp-controller="Users" asp-action="Index"&gt;使用者管理&lt;/a&gt;
+        &lt;/li&gt;
+    }
+
+    @<span class="kw">if</span> (User.IsInRole(<span class="str">"Student"</span>))
+    {
+        &lt;li class="nav-item"&gt;
+            &lt;a class="nav-link text-dark" asp-controller="LeaveRequests" asp-action="Index"&gt;我的請假申請&lt;/a&gt;
+        &lt;/li&gt;
+    }
+&lt;/ul&gt;
+
+@<span class="kw">if</span> (User.Identity?.IsAuthenticated == <span class="kw">true</span>)
+{
+    &lt;span class="navbar-text me-2"&gt;您好，@User.Identity.Name&lt;/span&gt;
+    &lt;form method="post" asp-controller="Account" asp-action="Logout" class="d-inline"&gt;
+        &lt;button type="submit" class="btn btn-link nav-link"&gt;登出&lt;/button&gt;
+    &lt;/form&gt;
+}
+<span class="kw">else</span>
+{
+    &lt;a class="nav-link text-dark" asp-controller="Account" asp-action="Login"&gt;登入&lt;/a&gt;
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">藏起來 ≠ 擋住</span>
+        <p>
+            把選單藏起來只是<strong>介面上的體貼</strong>。
+            使用者還是可以自己在網址列打 <code>/Users</code>。
+        </p>
+        <p>
+            <strong>真正的防線永遠是 Controller 上的 <code>[Authorize]</code>。</strong>
+            View 的 <code>@if</code> 只是不要讓使用者看到自己按了會被拒絕的按鈕。
+            <strong>兩個都要做</strong>，但只有一個是安全機制。
+        </p>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">改了角色要重新登入才生效</span>
+        因為角色是<strong>登入當下</strong>寫進 Cookie 的快照。
+        在 <code>/Users</code> 把某人改成 Admin，他要登出再登入才會拿到新角色。
+        這是「用 Cookie 存角色」換來效能的代價（每個請求不用再查一次資料庫）。
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 10 章檢查點</div>
+        <div class="hint">全部做到再進第 11 章。</div>
+        <ul>
+            <li><span>我能用 <code>Admin / Admin@123</code> 登入，導覽列顯示我的名字與登出按鈕。</span></li>
+            <li><span>未登入開 <code>/LeaveTypes</code> 會被導到登入頁；登入後能正常使用。</span></li>
+            <li><span>用非 Admin 帳號開 <code>/LeaveTypes</code> 會被導到 <code>/Account/AccessDenied</code>。</span></li>
+            <li><span>我在 SSMS 看過 <code>PasswordHash</code> 欄位，確認它是 <code>$2a$…</code> 開頭的雜湊而非明碼。</span></li>
+            <li><span>我把 <code>UseAuthentication()</code> 移到 <code>UseAuthorization()</code> 後面試過一次，重現了「登入後仍被踢回登入頁」，然後改回來。</span></li>
+            <li><span>我能解釋為什麼「我是誰」一定要從 Cookie 取，不能從網址參數取。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            你剛寫的 <code>AuthService</code> 跟完成品的
+            <code>Services/AuthService.cs</code>（93 行）幾乎一模一樣。
+            登入頁對照 <code>Views/Account/Login.cshtml</code>。
+        </p>
+        <p>
+            整條登入流程的互動循序圖：
+            <a href="../tutorial/02-auth.html">循序圖教學站 · 02 登入認證與 Cookie</a>。
+            <strong>它的 12 個步驟你現在應該每一步都認得。</strong>
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch09-services-di-tests.html"><span class="lbl">上一章</span>◀ 第 9 章 服務層、DI 與測試</a>
+        <span class="spacer"></span>
+        <a href="ch11-leave-approval.html"><span class="lbl">下一章</span>第 11 章 請假與簽核 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

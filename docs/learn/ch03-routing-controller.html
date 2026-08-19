@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 3 章 路由與 Controller — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch03">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 2 · MVC 三個字母</div>
+    <h1 class="chapter-title">第 3 章　路由與 Controller</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        知道「在網址列打一串字」是怎麼變成「呼叫某個 C# 方法」的，
+        並且能自己新增 Controller 與 Action、處理網址參數、回傳不同種類的結果。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2 小時</b></span>
+        <span>📦 前置：<a href="ch02-first-site.html">第 2 章</a>（專案能跑起來）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#pattern">預設路由樣板</a></li>
+            <li><a href="#first">動手：第一個自己的 Controller</a></li>
+            <li><a href="#param">網址參數怎麼傳進來</a></li>
+            <li><a href="#result">IActionResult：可以回傳什麼</a></li>
+            <li><a href="#attr">屬性路由：不想照樣板走的時候</a></li>
+            <li><a href="#convention">MVC 的三個「約定」</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="pattern">1. 預設路由樣板</h2>
+
+    <p>回到 <code>Program.cs</code>，看這一段：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Program.cs</span></div>
+        <pre><code>app.MapControllerRoute(
+    name: <span class="str">"default"</span>,
+    pattern: <span class="str">"{controller=Home}/{action=Index}/{id?}"</span>);</code></pre>
+    </div>
+
+    <p>
+        那串 <code>pattern</code> 是<strong>網址的填空題</strong>。
+        大括號是要填的空格，斜線是分隔。逐段翻譯：
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:190px;">片段</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>{controller=Home}</code></td>
+                <td>第一段是 Controller 名稱；<strong>沒填就當作 <code>Home</code></strong></td></tr>
+            <tr><td><code>{action=Index}</code></td>
+                <td>第二段是 Action（方法）名稱；沒填就當作 <code>Index</code></td></tr>
+            <tr><td><code>{id?}</code></td>
+                <td>第三段叫 <code>id</code>，<strong>問號代表可有可無</strong></td></tr>
+        </tbody>
+    </table>
+
+    <p>所以：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:270px;">網址</th><th>會呼叫哪個方法</th></tr></thead>
+        <tbody>
+            <tr><td><code>/</code></td><td><code>HomeController.Index()</code>（兩個都用預設值）</td></tr>
+            <tr><td><code>/Home</code></td><td><code>HomeController.Index()</code></td></tr>
+            <tr><td><code>/Home/Privacy</code></td><td><code>HomeController.Privacy()</code></td></tr>
+            <tr><td><code>/LeaveTypes/Edit/5</code></td><td><code>LeaveTypesController.Edit(5)</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">「Controller」四個字去哪了？</span>
+        <p>
+            網址寫 <code>/Home</code>，類別卻叫 <code>HomeController</code>——
+            框架會<strong>自動把 <code>Controller</code> 這個字尾去掉</strong>再比對。
+        </p>
+        <p>
+            這是 MVC 的第一個「<strong>約定優於設定</strong>」：
+            只要你照著命名慣例走，就完全不用寫設定檔告訴框架誰對應誰。
+            代價是你必須知道這些慣例——本章第 6 節會整理。
+        </p>
+    </div>
+
+    <h2 class="sec" id="first">2. 動手：第一個自己的 Controller</h2>
+
+    <p>
+        我們來做「假別清單」的雛形。假別（病假、事假…）是這個系統最單純的資料，
+        第 7 章會把它做成完整的 CRUD，現在先用寫死的資料把路由跑通。
+    </p>
+
+    <p>在 <code>Controllers</code> 資料夾新增 <code>LeaveTypesController.cs</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="cmt">// 1. 類別名稱一定要用 Controller 結尾</span>
+<span class="cmt">// 2. 一定要繼承 Controller（那個冒號的意思）</span>
+<span class="kw">public class</span> LeaveTypesController : Controller
+{
+    <span class="cmt">// GET /LeaveTypes  或  /LeaveTypes/Index</span>
+    <span class="kw">public</span> IActionResult Index()
+    {
+        <span class="kw">return</span> Content(<span class="str">"這裡以後要顯示假別清單"</span>);
+    }
+}</code></pre>
+    </div>
+
+    <p>
+        存檔、重新啟動（<kbd>Ctrl</kbd>+<kbd>C</kbd> 然後 <code>dotnet run</code>，
+        或直接用 <code>dotnet watch run</code>），開 <code>/LeaveTypes</code>。
+        應該會看到那行純文字。
+    </p>
+
+    <div class="callout oops">
+        <span class="t">出現 404 找不到頁面？</span>
+        <p>依序檢查這四件事，九成是其中之一：</p>
+        <ol>
+            <li>類別名稱是不是 <code>LeaveTypesController</code>（<strong>Controller 結尾</strong>，大小寫也要對）</li>
+            <li>有沒有 <code>: Controller</code></li>
+            <li>方法是不是 <code>public</code>（<code>private</code> 的方法路由找不到）</li>
+            <li><strong>C# 改了要重新編譯</strong>——只存檔重新整理是不夠的</li>
+        </ol>
+    </div>
+
+    <h3 class="sub">2.1 加第二個 Action</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">public class</span> LeaveTypesController : Controller
+{
+    <span class="kw">public</span> IActionResult Index()
+    {
+        <span class="kw">return</span> Content(<span class="str">"這裡以後要顯示假別清單"</span>);
+    }
+
+<span class="add">    <span class="cmt">// GET /LeaveTypes/About</span></span>
+<span class="add">    <span class="kw">public</span> IActionResult About()</span>
+<span class="add">    {</span>
+<span class="add">        <span class="kw">return</span> Content(<span class="str">"假別用來分類請假原因：病假、事假、喪假、公假。"</span>);</span>
+<span class="add">    }</span>
+}</code></pre>
+    </div>
+
+    <p>開 <code>/LeaveTypes/About</code>。<strong>你不需要做任何註冊</strong>——加一個 public 方法，路由就自己認得了。</p>
+
+    <h2 class="sec" id="param">3. 網址參數怎麼傳進來</h2>
+
+    <p>樣板最後那個 <code>{id?}</code> 現在派上用場。加一個 <code>Details</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="cmt">// GET /LeaveTypes/Details/3</span>
+<span class="kw">public</span> IActionResult Details(<span class="kw">int</span> id)
+{
+    <span class="kw">return</span> Content($<span class="str">"你要看第 {id} 號假別"</span>);
+}</code></pre>
+    </div>
+
+    <p>
+        開 <code>/LeaveTypes/Details/3</code>，會看到「你要看第 3 號假別」。
+    </p>
+
+    <div class="callout why">
+        <span class="t">框架怎麼知道要把 3 塞進 id？</span>
+        <p>
+            因為<strong>參數名稱 <code>id</code> 跟路由樣板裡的 <code>{id?}</code> 同名</strong>。
+            這叫「模型繫結（Model Binding）」，第 5 章會完整講。
+        </p>
+        <p>
+            如果你把參數改名成 <code>typeId</code>，路由就對不上了，
+            <code>typeId</code> 會拿到 <code>0</code>（int 的預設值）。試試看，親眼看到比較有印象。
+        </p>
+    </div>
+
+    <h3 class="sub">3.1 查詢字串參數</h3>
+
+    <p>網址問號後面的東西，也會自動對應到同名參數：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="cmt">// GET /LeaveTypes/Search?keyword=病&amp;onlyActive=true</span>
+<span class="kw">public</span> IActionResult Search(<span class="kw">string</span>? keyword, <span class="kw">bool</span> onlyActive)
+{
+    <span class="kw">return</span> Content($<span class="str">"關鍵字={keyword}，只看啟用={onlyActive}"</span>);
+}</code></pre>
+    </div>
+
+    <p>
+        開 <code>/LeaveTypes/Search?keyword=病&amp;onlyActive=true</code>。
+        不帶參數直接開 <code>/LeaveTypes/Search</code> 也可以——
+        <code>keyword</code> 會是 <code>null</code>，<code>onlyActive</code> 會是 <code>false</code>。
+    </p>
+
+    <div class="callout oops">
+        <span class="t">危險：不要相信網址上的任何東西</span>
+        <p>
+            使用者可以<strong>手動把網址改成任何值</strong>。
+            <code>/LeaveTypes/Details/999999</code>、<code>/Approvals/Details/{別人的單號}</code>——
+            全都能打得出來。
+        </p>
+        <p>
+            所以每一個吃 id 的 Action 都要問自己：<strong>「這個人有資格看這筆資料嗎？」</strong>
+            第 10 章與第 11 章會反覆處理這件事。這是新手最容易漏掉、也最嚴重的安全問題。
+        </p>
+    </div>
+
+    <h2 class="sec" id="result">4. IActionResult：可以回傳什麼</h2>
+
+    <p>
+        到目前為止我們都回傳 <code>Content(...)</code>，那只是純文字。
+        <code>IActionResult</code> 是「一個 HTTP 回應」的抽象，實際可以是很多種東西：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">常見的回傳方式</span></div>
+        <pre><code><span class="kw">return</span> View();                          <span class="cmt">// 找對應的 .cshtml 畫面 → 第 4 章</span>
+<span class="kw">return</span> View(model);                     <span class="cmt">// 同上，並把資料帶過去</span>
+
+<span class="kw">return</span> Content(<span class="str">"純文字"</span>);               <span class="cmt">// 直接回一串字</span>
+<span class="kw">return</span> Json(<span class="kw">new</span> { ok = <span class="kw">true</span> });          <span class="cmt">// 回 JSON（給前端 JS 用）</span>
+
+<span class="kw">return</span> RedirectToAction(<span class="str">"Index"</span>);       <span class="cmt">// 叫瀏覽器轉去別的 Action</span>
+<span class="kw">return</span> Redirect(<span class="str">"/LeaveTypes"</span>);         <span class="cmt">// 轉去某個網址</span>
+
+<span class="kw">return</span> NotFound();                      <span class="cmt">// 404</span>
+<span class="kw">return</span> Forbid();                        <span class="cmt">// 403，已登入但沒權限</span>
+<span class="kw">return</span> Challenge();                     <span class="cmt">// 導去登入頁</span>
+
+<span class="kw">return</span> File(bytes, <span class="str">"text/csv"</span>, <span class="str">"a.csv"</span>); <span class="cmt">// 下載檔案 → 第 12 章</span></code></pre>
+    </div>
+
+    <h3 class="sub">4.1 動手：查不到就回 404</h3>
+
+    <p>把 <code>Details</code> 改成比較像真的：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">public</span> IActionResult Details(<span class="kw">int</span> id)
+{
+    <span class="cmt">// 暫時用寫死的資料，第 6 章會換成真的資料庫</span>
+    <span class="kw">var</span> names = <span class="kw">new</span> Dictionary&lt;<span class="kw">int</span>, <span class="kw">string</span>&gt;
+    {
+        [1] = <span class="str">"病假"</span>, [2] = <span class="str">"事假"</span>, [3] = <span class="str">"喪假"</span>, [4] = <span class="str">"公假"</span>
+    };
+
+    <span class="kw">if</span> (!names.ContainsKey(id))
+    {
+        <span class="kw">return</span> NotFound();      <span class="cmt">// 回 404</span>
+    }
+
+    <span class="kw">return</span> Content($<span class="str">"第 {id} 號假別是「{names[id]}」"</span>);
+}</code></pre>
+    </div>
+
+    <p>
+        試 <code>/LeaveTypes/Details/2</code>（正常）與 <code>/LeaveTypes/Details/99</code>（404）。
+    </p>
+
+    <div class="callout why">
+        <span class="t">為什麼回傳型別要寫 IActionResult，不寫 ContentResult？</span>
+        因為同一個方法在不同情況下要回<strong>不同種類</strong>的結果——
+        正常時回內容、找不到時回 404。<code>IActionResult</code> 是它們共同的介面
+        （還記得<a href="ch01-csharp-basics.html#interface">第 1 章第 7 節</a>嗎），
+        所以兩種都能用同一個 <code>return</code> 回出去。
+    </div>
+
+    <h2 class="sec" id="attr">5. 屬性路由：不想照樣板走的時候</h2>
+
+    <p>
+        預設樣板夠用九成場合。但有時你想要一個不照規則的網址，
+        這時可以直接在方法上標<strong>屬性（Attribute）</strong>：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">屬性路由的例子</span></div>
+        <pre><code><span class="cmt">// 這個 Action 的網址變成 /leave-types/all，而不是 /LeaveTypes/AllTypes</span>
+[Route(<span class="str">"leave-types/all"</span>)]
+<span class="kw">public</span> IActionResult AllTypes()
+{
+    <span class="kw">return</span> Content(<span class="str">"全部假別"</span>);
+}</code></pre>
+    </div>
+
+    <p>
+        也可以掛在整個類別上。完成品專案就用了這招——因為它有<strong>兩個同名的
+        <code>AbsenceRecordsController</code></strong>（一個給學員、一個給行政），
+        必須用路由把它們分開：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Controllers/Admin/AbsenceRecordsController.cs:20</span></div>
+        <pre><code>[Route(<span class="str">"Admin/AbsenceRecords/{action=Index}/{id?}"</span>)]
+[Authorize(Roles = <span class="str">"Admin,Staff"</span>)]
+<span class="kw">public class</span> AbsenceRecordsController : Controller</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">屬性是什麼？</span>
+        方括號裡那些 <code>[Route(...)]</code>、<code>[Authorize(...)]</code>、<code>[HttpPost]</code>
+        叫做「屬性」，是<strong>貼在程式碼上的標籤</strong>。
+        它們不會執行任何邏輯，只是讓框架讀到之後改變行為。
+        你在本書後面會看到很多種。
+    </div>
+
+    <h2 class="sec" id="convention">6. MVC 的三個「約定」</h2>
+
+    <p>本章出現的所有「魔法」，其實都是這三條約定。把它們記起來，之後就不會覺得莫名其妙：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:60px;">#</th><th style="width:220px;">約定</th><th>例子</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Controller 類別名稱要以 <strong><code>Controller</code></strong> 結尾，
+                    比對網址時會去掉這個字尾</td>
+                <td><code>LeaveTypesController</code> → 網址 <code>/LeaveTypes</code></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td><code>public</code> 方法自動成為 Action，方法名就是網址第二段</td>
+                <td><code>public IActionResult About()</code> → <code>/LeaveTypes/About</code></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td><code>return View()</code> 會去找
+                    <strong><code>Views/{Controller 名}/{Action 名}.cshtml</code></strong></td>
+                <td><code>LeaveTypesController.Index()</code> →
+                    <code>Views/LeaveTypes/Index.cshtml</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>第 3 條你還沒用到——那是下一章的主題。</p>
+
+    <div class="callout oops">
+        <span class="t">約定的代價</span>
+        <p>
+            約定讓你少寫很多設定，但也代表<strong>改個檔名就可能悄悄壞掉</strong>，
+            而且編譯器不會警告你。
+        </p>
+        <p>
+            例如把 <code>Views/LeaveTypes/</code> 資料夾改名成 <code>Views/LeaveType/</code>（少個 s），
+            編譯完全正常，但一開頁面就會跳
+            <code>InvalidOperationException: The view 'Index' was not found.</code>
+            ——訊息裡會列出它找過哪些路徑，仔細讀那個清單就知道哪裡不對。
+        </p>
+    </div>
+
+    <h2 class="sec" id="thin">7. 一個現在就要養成的習慣：Controller 要「薄」</h2>
+
+    <p>
+        你剛才在 <code>Details</code> 裡塞了一個 <code>Dictionary</code>。現在無所謂，
+        但請記住這個原則：
+    </p>
+
+    <div class="callout why">
+        <span class="t">Controller 只做三件事</span>
+        <p><strong>① 收</strong>——接住請求參數。<br>
+           <strong>② 轉</strong>——交給別人（第 6 章的資料庫、第 9 章的 Service）處理。<br>
+           <strong>③ 給</strong>——決定回哪個畫面或轉去哪裡。</p>
+        <p>
+            <strong>「算」不是 Controller 的工作。</strong>
+            請假時數怎麼算、能不能簽這一關、超過上限沒——這些都不該寫在這裡。
+            第 9 章你會把它們搬出去，並體會為什麼。
+        </p>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 3 章檢查點</div>
+        <div class="hint">全部做到再進第 4 章。</div>
+        <ul>
+            <li><span>我能看懂 <code>{controller=Home}/{action=Index}/{id?}</code>，並說出 <code>/LeaveTypes/Details/3</code> 會呼叫哪個方法。</span></li>
+            <li><span>我自己建了 <code>LeaveTypesController</code>，<code>/LeaveTypes</code> 打得開。</span></li>
+            <li><span><code>/LeaveTypes/Details/2</code> 顯示假別名稱，<code>/LeaveTypes/Details/99</code> 回 404。</span></li>
+            <li><span>我試過把 <code>Details(int id)</code> 的參數改名，親眼看到值變成 0，然後改回來。</span></li>
+            <li><span>我背得出 MVC 的三條命名約定。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品有 12 個 Controller。最單純的是
+            <code>Controllers/HomeController.cs</code>（31 行），
+            最複雜的是 <code>Controllers/LeaveRequestsController.cs</code>（430 行）——
+            後者就是第 11 章的目標。
+        </p>
+        <p>
+            另外注意 <code>Controllers/Admin/</code> 這個子資料夾：
+            <strong>資料夾本身不影響路由</strong>（路由只看類別名），
+            它們是靠 <code>[Route("Admin/…")]</code> 屬性才有 <code>/Admin/</code> 前綴的。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch02-first-site.html"><span class="lbl">上一章</span>◀ 第 2 章 第一個網站</a>
+        <span class="spacer"></span>
+        <a href="ch04-view-razor.html"><span class="lbl">下一章</span>第 4 章 View 與 Razor ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

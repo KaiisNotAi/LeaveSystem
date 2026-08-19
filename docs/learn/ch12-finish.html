@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 12 章 收尾與接下來 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch12">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 4 · 蓋出真正的系統</div>
+    <h1 class="chapter-title">第 12 章　收尾與接下來</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        知道剩下四個功能（報表、曠課、通知、匯出）各自的關鍵設計，
+        有能力自己讀完成品的程式碼把它們補起來，
+        並且清楚自己下一步該學什麼。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2 小時</b>（讀）＋ 自行實作</span>
+        <span>📦 前置：<a href="ch11-leave-approval.html">第 11 章</a></span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#done">你已經會的東西</a></li>
+            <li><a href="#reports">報表與統計</a></li>
+            <li><a href="#absence">曠課紀錄與雙 Controller</a></li>
+            <li><a href="#notify">通知與 Email</a></li>
+            <li><a href="#export">匯出 CSV / Excel</a></li>
+            <li><a href="#next">接下來學什麼</a></li>
+            <li><a href="#extend">自己加點東西</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="done">1. 你已經會的東西</h2>
+
+    <p>從 <code>dotnet new mvc</code> 到現在，你蓋出了：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:130px;">章</th><th>能力</th></tr></thead>
+        <tbody>
+            <tr><td>2–4</td><td>路由、Controller、Action、Razor、Layout、強型別 View</td></tr>
+            <tr><td>5</td><td>表單、ViewModel、模型繫結、三層驗證、防偽權杖、PRG</td></tr>
+            <tr><td>6–7</td><td>EF Core、Migration、變更追蹤、完整 CRUD、軟刪除</td></tr>
+            <tr><td>8</td><td>一對多、多對多、<code>Include</code>、N+1、投影查詢</td></tr>
+            <tr><td>9</td><td>Service 層、介面、DI 與生命週期、xUnit 測試</td></tr>
+            <tr><td>10</td><td>BCrypt、Cookie 認證、Claims、<code>[Authorize]</code>、IDOR 防範</td></tr>
+            <tr><td>11</td><td>狀態機、規則資料表化、動態展開流程、多道權限防線</td></tr>
+        </tbody>
+    </table>
+
+    <p>
+        <strong>這已經涵蓋了一個典型 ASP.NET Core MVC 專案九成的日常工作。</strong>
+        剩下四個功能不會再有新的框架觀念，只是這些東西的重新組合——
+        所以這一章改成「講設計重點 + 指路」，讓你自己動手。
+    </p>
+
+    <h2 class="sec" id="reports">2. 報表與統計</h2>
+
+    <p>三個查詢頁，共用一個 <code>LeaveReportService</code>：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:190px;">頁面</th><th style="width:140px;">誰能看</th><th>內容</th></tr></thead>
+        <tbody>
+            <tr><td><code>/Reports</code></td><td>學員</td><td>依狀態 / 假別 / 日期篩選<strong>自己的</strong>請假單</td></tr>
+            <tr><td><code>/Reports/Summary</code></td><td>學員</td><td>各假別累計時數 + 班期上限進度條</td></tr>
+            <tr><td><code>/Reports/Admin</code></td><td>行政 / 管理員</td><td>班期 × 學員 × 假別 × 年月 四維彙總</td></tr>
+        </tbody>
+    </table>
+
+    <h3 class="sub">2.1 關鍵設計一：統計口徑要一致</h3>
+
+    <div class="callout why">
+        <span class="t">只累計 <code>Status == Approved</code></span>
+        <p>
+            這跟<a href="ch11-leave-approval.html#submit">第 11 章規則 3</a>的上限檢查<strong>必須是同一個口徑</strong>。
+        </p>
+        <p>
+            不然會出現「進度條說我用了 30 小時，但送單時卻說我用了 20 小時」這種
+            <strong>使用者完全無法理解</strong>的狀況。
+        </p>
+        <p>
+            <strong>凡是同一個數字在兩個地方出現，就要確認算法一致。</strong>
+            這種 bug 不會報錯，只會讓人不信任你的系統。
+        </p>
+    </div>
+
+    <h3 class="sub">2.2 關鍵設計二：什麼時候把資料拉回記憶體</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/LeaveReportService.cs:106</span></div>
+        <pre><code><span class="cmt">// 篩選在資料庫端做（WHERE 進得了 SQL）</span>
+<span class="kw">var</span> approved = <span class="kw">await</span> _db.LeaveRequests
+    .AsNoTracking()
+    .Include(r =&gt; r.LeaveType)
+    .Where(r =&gt; r.StudentId == studentId &amp;&amp; r.Status == LeaveStatus.Approved)
+    .ToListAsync();          <span class="cmt">// ← 這裡拉回記憶體</span>
+
+<span class="cmt">// 分組與排序在記憶體端做</span>
+<span class="kw">var</span> items = approved
+    .GroupBy(r =&gt; <span class="kw">new</span> { r.LeaveTypeId, r.LeaveType.Name, r.LeaveType.SortOrder })
+    .OrderBy(g =&gt; g.Key.SortOrder)
+    .Select(g =&gt; <span class="kw">new</span> { g.Key.Name, Total = g.Sum(r =&gt; r.TotalHours), Count = g.Count() })
+    .ToList();</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">為什麼 GroupBy 要在記憶體做</span>
+        <p>
+            <code>GroupBy</code> 在不同資料庫 provider 的翻譯行為有差異，
+            尤其還要同時依關聯表的欄位排序時，容易翻譯失敗或產生怪異的 SQL。
+        </p>
+        <p>
+            <strong>但這是有條件的取捨</strong>：單一學員的假單量本來就不大（幾十筆）。
+            如果資料量是整個機構幾萬筆，就該改成資料庫端的 <code>GROUP BY</code> 或用檢視表。
+            <strong>知道自己在做什麼取捨，比選哪一邊更重要。</strong>
+        </p>
+    </div>
+
+    <div class="callout link">
+        <span class="t">自己動手</span>
+        參考 <a href="../tutorial/06-report.html">循序圖教學站 · 06 紀錄查詢與時數統計</a>（9 步），
+        以及完成品的 <code>Services/LeaveReportService.cs</code>、<code>Controllers/ReportsController.cs</code>。
+    </div>
+
+    <h2 class="sec" id="absence">3. 曠課紀錄與雙 Controller</h2>
+
+    <p>
+        曠課跟請假<strong>完全不同</strong>：請假是事前申請、要簽核；
+        曠課是<strong>事後行政登錄的既成事實</strong>，沒有簽核流程。
+    </p>
+
+    <h3 class="sub">3.1 稽核欄位不能在 Update 時覆寫</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/AbsenceRecordService.cs</span></div>
+        <pre><code><span class="cmt">// CreateAsync：稽核欄位只在這裡寫入一次</span>
+<span class="kw">var</span> record = <span class="kw">new</span> AbsenceRecord
+{
+    StudentId = input.StudentId, OccurredAt = input.OccurredAt, Hours = input.Hours,
+    CreatedByUserId = createdByUserId,      <span class="cmt">// ← 只有這裡</span>
+    CreatedAt       = DateTime.UtcNow       <span class="cmt">// ← 只有這裡</span>
+};
+
+<span class="cmt">// UpdateAsync：刻意「不碰」這兩個欄位</span>
+record.StudentId  = input.StudentId;
+record.OccurredAt = input.OccurredAt;
+record.Hours      = input.Hours;
+record.Note       = NormalizeNote(input.Note);</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼</span>
+        如果 Update 也寫 <code>CreatedByUserId = 目前使用者</code>，
+        那 A 建立、B 只改了一個錯字，紀錄就變成「B 建立的」。
+        <strong>稽核資訊的意義是「最初是誰放進來的」，一旦被覆寫就毫無價值。</strong>
+    </div>
+
+    <h3 class="sub">3.2 兩個同名 Controller</h3>
+
+    <p>
+        專案裡有<strong>兩個都叫 <code>AbsenceRecordsController</code></strong> 的類別：
+        <code>Controllers/AbsenceRecordsController.cs</code>（學員自查，唯讀）與
+        <code>Controllers/Admin/AbsenceRecordsController.cs</code>（行政管理，CRUD）。
+    </p>
+
+    <div class="callout oops">
+        <span class="t">陷阱：Razor 會找錯 View</span>
+        <p>
+            <a href="ch03-routing-controller.html#convention">第 3 章第 3 條約定</a>：
+            <code>return View()</code> 去找 <code>Views/{Controller 名}/</code>。
+            <strong>兩個都叫 <code>AbsenceRecords</code></strong>，
+            所以行政端會載入到學員端的 View，然後因為 ViewModel 型別不合而爆掉。
+        </p>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">解法：取自完成品 Program.cs:27</span></div>
+        <pre><code><span class="cmt">// 在 View 搜尋清單「最前面」插一條路徑</span>
+builder.Services.Configure&lt;RazorViewEngineOptions&gt;(options =&gt;
+{
+    options.ViewLocationFormats.Insert(0, <span class="str">"/Views/Admin/{1}/{0}.cshtml"</span>);
+});</code></pre>
+    </div>
+
+    <p>
+        這樣 Admin 版就會優先命中 <code>Views/Admin/AbsenceRecords/</code>。
+        再配上 <code>[Route("Admin/AbsenceRecords/{action=Index}/{id?}")]</code> 分開網址，兩者就能共存。
+    </p>
+
+    <div class="callout link">
+        <span class="t">自己動手</span>
+        這個功能有一份專門的詳細文件：
+        <a href="../10-曠課紀錄教學.md"><code>docs/10-曠課紀錄教學.md</code></a>，
+        涵蓋兩層下拉選單的選型理由、日期「含當天」的處理、七個常見問題。
+        搭配 <a href="../tutorial/07-absence.html">循序圖教學站 · 07 曠課紀錄</a> 看。
+    </div>
+
+    <h2 class="sec" id="notify">4. 通知與 Email</h2>
+
+    <p>
+        送單、轉關、核准、駁回、取消時，要通知對的人。
+        完成品用一個 <code>NotificationDispatcher</code> 統一處理，
+        <strong>雙軌派送</strong>：站內通知 + Email。
+    </p>
+
+    <h3 class="sub">4.1 本章最重要的一課：通知失敗不能拖垮主流程</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Services/Notifications/NotificationDispatcher.cs:135</span></div>
+        <pre><code><span class="kw">private async</span> Task DispatchAsync(UserAccount recipient, <span class="kw">string</span> title, <span class="kw">string</span> message, <span class="kw">string</span> url, …)
+{
+    <span class="kw">try</span>
+    {
+        <span class="kw">await</span> _notifications.CreateAsync(recipient.Id, title, message, url);
+    }
+    <span class="kw">catch</span> (Exception ex)
+    {
+        _logger.LogError(ex, <span class="str">"站內通知寫入失敗（UserId={UserId}）"</span>, recipient.Id);
+        <span class="cmt">// 不往上拋！繼續往下走去寄 Email</span>
+    }
+
+    <span class="kw">if</span> (!<span class="kw">string</span>.IsNullOrWhiteSpace(recipient.Email))
+    {
+        <span class="kw">try</span>
+        {
+            <span class="kw">await</span> _emails.SendAsync(recipient.Email!, title, message, …);
+        }
+        <span class="kw">catch</span> (Exception ex)
+        {
+            _logger.LogError(ex, <span class="str">"Email 派送失敗（UserId={UserId}）"</span>, recipient.Id);
+        }
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼要把例外吞掉（這通常是壞習慣）</span>
+        <p>
+            因為通知是在 <code>SaveChangesAsync()</code> <strong>之後</strong>才呼叫的——
+            <strong>簽核已經是既成事實了</strong>。
+        </p>
+        <p>
+            這時候如果 SMTP 伺服器剛好掛了、通知丟出例外，
+            使用者會看到一個 500 錯誤頁，
+            <strong>誤以為簽核失敗而重簽一次</strong>——但第二次會被
+            <a href="ch11-leave-approval.html#approve">第 ③ 道防線</a>擋下來，
+            他就會以為系統壞了。
+        </p>
+        <p>
+            <strong>原則：「附帶效果」失敗，不能讓「主要動作」看起來失敗。</strong>
+            但一定要寫 log，不然問題會被靜靜吃掉。
+        </p>
+    </div>
+
+    <h3 class="sub">4.2 開發時怎麼測 Email</h3>
+
+    <p>不用真的架 SMTP 伺服器。MailKit 支援把信<strong>寫成檔案</strong>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">JSON</span><span class="path">appsettings.Development.json</span></div>
+        <pre><code><span class="str">"Email"</span>: {
+  <span class="str">"Mode"</span>: <span class="str">"PickupDirectory"</span>,
+  <span class="str">"PickupDirectory"</span>: <span class="str">"./mail-pickup"</span>,
+  <span class="str">"From"</span>: <span class="str">"noreply@leavesystem.local"</span>
+}</code></pre>
+    </div>
+
+    <p>
+        每封信會變成 <code>./mail-pickup/xxx.eml</code>，用記事本就能打開檢查內容。
+        上線時把 <code>Mode</code> 改成 <code>Smtp</code> 即可，程式碼一行都不用動。
+    </p>
+
+    <div class="callout link">
+        <span class="t">自己動手</span>
+        參考 <a href="../tutorial/05-notification.html">循序圖教學站 · 05 站內通知 + Email</a>（11 步），
+        裡面也解釋了 <code>NullNotificationDispatcher</code> 這個「什麼都不做的實作」在測試裡的用途。
+        設定細節在 <a href="../11-Email通知設定.md"><code>docs/11-Email通知設定.md</code></a>。
+    </div>
+
+    <h2 class="sec" id="export">5. 匯出 CSV / Excel</h2>
+
+    <p>一次 GET 產生一個含三個工作表的 <code>.xlsx</code>。關鍵設計是<strong>欄位定義只寫一份</strong>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">取自完成品：Controllers/Admin/ExportController.cs:197</span></div>
+        <pre><code><span class="kw">private static readonly</span> IReadOnlyList&lt;ExportColumn&lt;AdminLeaveDetailRow&gt;&gt; LeaveDetailColumns = <span class="kw">new</span>[]
+{
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"班期"</span>, r =&gt; r.CohortName),
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"起始"</span>, r =&gt; r.StartAt,    ExportValueType.DateTime),
+    <span class="kw">new</span> ExportColumn&lt;AdminLeaveDetailRow&gt;(<span class="str">"時數"</span>, r =&gt; r.TotalHours, ExportValueType.Hours),
+    <span class="cmt">// …</span>
+};</code></pre>
+    </div>
+
+    <p>
+        <strong>同一份定義同時餵給 CSV 與 Excel 兩個輸出器</strong>，
+        所以兩種格式的欄位順序與標題永遠一致，要加一欄只要改一個地方。
+    </p>
+
+    <h3 class="sub">5.1 兩個一定要知道的細節</h3>
+
+    <table class="doc">
+        <thead><tr><th style="width:200px;">細節</th><th>為什麼</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>CSV 要加 UTF-8 BOM</strong></td>
+                <td>Excel 開純 UTF-8（無 BOM）的 CSV 時，<strong>中文會變亂碼</strong>——
+                    它會猜成系統的 ANSI 編碼。加那 3 個位元組就正常了。</td>
+            </tr>
+            <tr>
+                <td><strong>日期與數字不要輸出成字串</strong></td>
+                <td>Excel 儲存格如果是文字，使用者就<strong>沒辦法排序、沒辦法加總、沒辦法做樞紐分析</strong>。
+                    要用原生型別。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout link">
+        <span class="t">自己動手</span>
+        參考 <a href="../tutorial/08-export.html">循序圖教學站 · 08 匯出 CSV / Excel</a>（10 步），
+        裡面解釋了 <code>ExportSheet.Create&lt;T&gt;</code> 怎麼用「型別擦除」讓三種不同型別的資料
+        塞進同一個 <code>ExportWorkbook</code> 呼叫。
+    </div>
+
+    <h2 class="sec" id="next">6. 接下來學什麼</h2>
+
+    <p>照優先順序排，前三個是<strong>實務上最快用得到的</strong>：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:210px;">主題</th><th>為什麼值得學</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>分頁與搜尋</strong></td>
+                <td>你的清單頁現在是「全部撈出來」。
+                    資料一多就會慢到不能用。<code>Skip()</code> / <code>Take()</code> 是最基本的功課。</td>
+            </tr>
+            <tr>
+                <td><strong>記錄與診斷</strong><br>（<code>ILogger</code>）</td>
+                <td>上線之後你沒辦法設中斷點。
+                    <strong>log 是唯一能知道發生什麼事的方式。</strong></td>
+            </tr>
+            <tr>
+                <td><strong>部署</strong></td>
+                <td>IIS 或 Docker、環境變數管理連線字串、
+                    正式環境的 Migration 該怎麼跑。</td>
+            </tr>
+            <tr>
+                <td><strong>Web API + 前端框架</strong></td>
+                <td>MVC 是「伺服器產生 HTML」。
+                    現在很多專案改成「後端出 JSON、前端用 React/Vue 畫」。
+                    <code>dotnet new webapi</code> 開始。</td>
+            </tr>
+            <tr>
+                <td><strong>ASP.NET Core Identity</strong></td>
+                <td>本書自己做了登入。Identity 是官方的完整方案：
+                    註冊、忘記密碼、Email 驗證、雙因素、外部登入。
+                    <strong>先自己做過一遍再用它，你會知道它在幫你做什麼。</strong></td>
+            </tr>
+            <tr>
+                <td><strong>整合測試</strong><br>（<code>WebApplicationFactory</code>）</td>
+                <td>你現在測的是 Service。
+                    整合測試可以<strong>連 HTTP 請求一起測</strong>，含路由與授權。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="extend">7. 自己加點東西</h2>
+
+    <p>
+        <strong>最好的下一步是自己動手加功能。</strong>以下依難度排，都可以在你現有的專案上做：
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:100px;">難度</th><th style="width:230px;">題目</th><th>會用到哪一章</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>★</td>
+                <td>假別加一個「顏色」欄位，<br>清單頁用色塊顯示</td>
+                <td>6（改 Entity + Migration）、4（Razor）</td>
+            </tr>
+            <tr>
+                <td>★</td>
+                <td>請假單清單加上狀態篩選下拉</td>
+                <td>3（查詢字串）、8（LINQ 條件組合）</td>
+            </tr>
+            <tr>
+                <td>★★</td>
+                <td>學員可以<strong>取消</strong>還沒被簽核的請假單</td>
+                <td>11（狀態機）、10（只能取消自己的）</td>
+            </tr>
+            <tr>
+                <td>★★</td>
+                <td>清單頁加分頁（一頁 20 筆）</td>
+                <td>8（<code>Skip</code>/<code>Take</code>）、4（分頁列）</td>
+            </tr>
+            <tr>
+                <td>★★★</td>
+                <td>簽核人可以<strong>指定代理人</strong><br>（出差時由別人代簽）</td>
+                <td>8（新關聯）、11（改 <code>GetAssignedApproverId</code>）、9（補測試）</td>
+            </tr>
+            <tr>
+                <td>★★★</td>
+                <td>請假單可以<strong>附加檔案</strong><br>（診斷證明）</td>
+                <td>新主題：檔案上傳、儲存位置、大小與型別限制</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">做「代理人」那題時，記得回頭看第 11 章第 6 節</span>
+        <code>GetAssignedApproverId</code> 在完成品裡<strong>有兩份實作</strong>
+        （<code>ApprovalService</code> 與 <code>NotificationDispatcher</code> 各一份）。
+        你改規則時<strong>兩處都要改</strong>，不然會出現「通知了 A，但只有 B 簽得下去」。
+        這是現成專案裡真實存在的技術債——
+        <a href="../tutorial/05-notification.html">循序圖教學站 05 的第 5 步</a>有標出來。
+    </div>
+
+    <h2 class="sec" id="last">8. 最後幾句</h2>
+
+    <div class="callout why">
+        <span class="t">你學到最重要的東西，其實不是語法</span>
+        <p>
+            <code>asp-for</code> 怎麼寫、<code>Include</code> 放哪裡，這些查得到。
+        </p>
+        <p>
+            真正重要的是那些「為什麼」：
+            <strong>為什麼業務規則要離開 Controller</strong>（才測得動）、
+            <strong>為什麼身分只能從 Cookie 取</strong>（不然誰都能看別人的資料）、
+            <strong>為什麼簽核人不在送單時寫死</strong>（換人才不會卡住）、
+            <strong>為什麼通知失敗不能拖垮簽核</strong>（不然使用者會重簽）。
+        </p>
+        <p>
+            這些判斷換到別的語言、別的框架<strong>一樣成立</strong>。
+            語法會過時，這些不會。
+        </p>
+    </div>
+
+    <p>
+        接下來如果你要維護<strong>完成品那個專案</strong>，
+        <a href="../tutorial/index.html">循序圖教學站</a>就是你的地圖——
+        八張圖對應八條流程，每支箭頭都標到 <code>檔案:行號</code>。
+        <strong>學完這本書之後再去看，會非常順。</strong>
+    </p>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 12 章檢查點</div>
+        <div class="hint">最後一份。</div>
+        <ul>
+            <li><span>我知道報表的統計口徑必須跟送單時的上限檢查一致，以及為什麼。</span></li>
+            <li><span>我知道稽核欄位為什麼不能在 Update 時覆寫。</span></li>
+            <li><span>我知道通知的例外為什麼要被吞掉（並寫 log），以及這麼做的前提。</span></li>
+            <li><span>我打開了 <a href="../tutorial/index.html">循序圖教學站</a>，隨便挑一張圖，能讀懂大部分步驟。</span></li>
+            <li><span>我從第 7 節挑了一題，動手加到自己的專案裡了。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">完成品的完整文件地圖</span>
+        <p>
+            <a href="../README.md"><code>docs/README.md</code></a> 是總索引。
+            照這個順序讀最順：
+            <a href="../01-需求說明.md">01 需求</a> →
+            <a href="../02-系統架構.md">02 架構</a> →
+            <a href="../03-資料模型.md">03 資料模型</a> →
+            <a href="../04-請假與簽核流程.md">04 業務規則</a> →
+            <a href="../tutorial/index.html">循序圖教學站</a>。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch11-leave-approval.html"><span class="lbl">上一章</span>◀ 第 11 章 請假與簽核</a>
+        <span class="spacer"></span>
+        <a href="index.html"><span class="lbl">結束</span>回課程地圖 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

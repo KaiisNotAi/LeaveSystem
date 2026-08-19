@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 9 章 服務層、DI 與測試 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch09">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 4 · 蓋出真正的系統</div>
+    <h1 class="chapter-title">第 9 章　服務層、DI 與測試</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        寫出這個系統<strong>第一段真正的業務規則</strong>（請假時數計算），
+        知道它為什麼不該待在 Controller 裡，並用 xUnit 測試證明它是對的。
+        <strong>這一章是整本書的轉捩點</strong>——之前在學框架怎麼用，從這裡開始在學怎麼設計。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>3 小時</b></span>
+        <span>📦 前置：<a href="ch08-relations.html">第 8 章</a>（班期、使用者、角色已建立）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#problem">先製造問題：把規則塞進 Controller</a></li>
+            <li><a href="#rule">請假時數規則</a></li>
+            <li><a href="#extract">抽成 Service</a></li>
+            <li><a href="#di">依賴注入與三種生命週期</a></li>
+            <li><a href="#test">寫第一個測試</a></li>
+            <li><a href="#tdd">TDD 的節奏</a></li>
+            <li><a href="#layers">分層的完整樣貌</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="problem">1. 先製造問題：把規則塞進 Controller</h2>
+
+    <p>
+        假設現在要做「送出請假申請」。使用者填了起訖時間，你要算出實際時數。
+        最直覺的做法是直接寫在 Controller 裡：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">❌ 先看看不該怎麼寫</span></div>
+        <pre><code>[HttpPost]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveRequestCreateViewModel input)
+{
+    <span class="kw">if</span> (!ModelState.IsValid) <span class="kw">return</span> View(input);
+
+    <span class="cmt">// ── 時數計算就這樣塞進來 ──</span>
+    <span class="kw">var</span> startAt = input.StartDate.Date.AddHours(input.StartHour);
+    <span class="kw">var</span> endAt   = input.EndDate.Date.AddHours(input.EndHour);
+
+    <span class="kw">decimal</span> total = 0m;
+    <span class="kw">for</span> (<span class="kw">var</span> day = startAt.Date; day &lt;= endAt.Date; day = day.AddDays(1))
+    {
+        <span class="cmt">// 上午 08:00~12:00 的重疊</span>
+        <span class="kw">var</span> mStart = day.AddHours(8) &gt; startAt ? day.AddHours(8) : startAt;
+        <span class="kw">var</span> mEnd   = day.AddHours(12) &lt; endAt  ? day.AddHours(12) : endAt;
+        <span class="kw">if</span> (mEnd &gt; mStart) total += (<span class="kw">decimal</span>)(mEnd - mStart).TotalHours;
+
+        <span class="cmt">// 下午 13:00~17:00 的重疊…（再來一遍）</span>
+    }
+
+    <span class="cmt">// …然後才是真正存檔…</span>
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">這樣寫會遇到什麼</span>
+        <p>
+            <strong>① 沒辦法測試。</strong>你想確認「11:00–14:00 應該算 2 小時」，
+            但這段邏輯困在一個需要 HTTP 請求、需要資料庫、需要登入的方法裡。
+            你只能開瀏覽器一次一次手動試。
+        </p>
+        <p>
+            <strong>② 沒辦法重複使用。</strong>第 12 章的匯出報表也要算時數，
+            你只能複製貼上一份——然後其中一份改了另一份沒改。
+        </p>
+        <p>
+            <strong>③ Controller 會長到 400 行。</strong>時數、上限檢查、簽核規則展開、
+            通知……全部塞進來之後，沒有人看得懂它在幹嘛。
+        </p>
+    </div>
+
+    <h2 class="sec" id="rule">2. 請假時數規則</h2>
+
+    <p>先把規則講清楚（<strong>寫程式前先把規格寫成人話</strong>，這是好習慣）：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:60px;">#</th><th>規則</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td>上課時段是 <strong>08:00–12:00</strong> 與 <strong>13:00–17:00</strong></td></tr>
+            <tr><td>2</td><td>午休 12:00–13:00 <strong>不計時數</strong></td></tr>
+            <tr><td>3</td><td>可以跨日，逐日計算與上課時段的重疊</td></tr>
+            <tr><td>4</td><td>起訖必須是<strong>整點</strong>，且介於 08:00–17:00</td></tr>
+            <tr><td>5</td><td>結束必須晚於開始</td></tr>
+            <tr><td>6</td><td>完全沒碰到上課時段（例如只選午休）＝ 無效申請</td></tr>
+        </tbody>
+    </table>
+
+    <p>幾個例子，等一下要拿來當測試案例：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:280px;">請假區間</th><th style="width:110px;">時數</th><th>為什麼</th></tr></thead>
+        <tbody>
+            <tr><td>6/9 08:00 – 6/9 12:00</td><td>4</td><td>整個上午</td></tr>
+            <tr><td>6/9 11:00 – 6/9 14:00</td><td><strong>2</strong></td><td>11–12 算 1 小時，12–13 午休不計，13–14 算 1 小時</td></tr>
+            <tr><td>6/9 08:00 – 6/9 17:00</td><td>8</td><td>整天（扣掉午休）</td></tr>
+            <tr><td>6/9 13:00 – 6/10 12:00</td><td>8</td><td>第一天下午 4 ＋ 第二天上午 4</td></tr>
+            <tr><td>6/9 12:00 – 6/9 13:00</td><td><strong>錯誤</strong></td><td>只有午休，沒碰到上課時段</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="extract">3. 抽成 Service</h2>
+
+    <p>照<a href="ch01-csharp-basics.html#interface">第 1 章第 7 節</a>的做法：先訂介面，再寫實作。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/ILeaveCalculator.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="kw">public interface</span> ILeaveCalculator
+{
+    <span class="cmt">/// &lt;summary&gt;</span>
+    <span class="cmt">/// 計算請假時數。</span>
+    <span class="cmt">/// 成功回 true 並填入 totalHours；失敗回 false 並填入 errorMessage。</span>
+    <span class="cmt">/// &lt;/summary&gt;</span>
+    <span class="kw">bool</span> TryCalculate(DateTime startAt, DateTime endAt,
+                      <span class="kw">out decimal</span> totalHours, <span class="kw">out string</span>? errorMessage);
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Services/LeaveCalculator.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Services;
+
+<span class="cmt">/// &lt;summary&gt;</span>
+<span class="cmt">/// 請假時數計算。上課時段 08:00~12:00、13:00~17:00，午休不計，可跨日。</span>
+<span class="cmt">/// &lt;/summary&gt;</span>
+<span class="kw">public class</span> LeaveCalculator : ILeaveCalculator
+{
+    <span class="kw">public bool</span> TryCalculate(DateTime startAt, DateTime endAt,
+                            <span class="kw">out decimal</span> totalHours, <span class="kw">out string</span>? errorMessage)
+    {
+        totalHours = 0m;
+        errorMessage = <span class="kw">null</span>;
+
+        <span class="cmt">// 規則 4：必須是整點</span>
+        <span class="kw">if</span> (!IsOnTheHour(startAt) || !IsOnTheHour(endAt))
+        {
+            errorMessage = <span class="str">"請假時間必須使用整點（例如 08:00、13:00）。"</span>;
+            <span class="kw">return false</span>;
+        }
+
+        <span class="cmt">// 規則 5</span>
+        <span class="kw">if</span> (endAt &lt;= startAt)
+        {
+            errorMessage = <span class="str">"結束時間必須晚於開始時間。"</span>;
+            <span class="kw">return false</span>;
+        }
+
+        <span class="cmt">// 規則 4：伺服器端也要擋，不能只靠前端下拉選單</span>
+        <span class="kw">if</span> (!IsSelectableHour(startAt.Hour) || !IsSelectableHour(endAt.Hour))
+        {
+            errorMessage = <span class="str">"請假時間需介於每日 08:00 到 17:00 的整點時段。"</span>;
+            <span class="kw">return false</span>;
+        }
+
+        <span class="kw">var</span> range = (Start: startAt, End: endAt);
+
+        <span class="cmt">// 規則 1~3：逐日算與兩個上課區段的重疊</span>
+        <span class="kw">for</span> (<span class="kw">var</span> day = startAt.Date; day &lt;= endAt.Date; day = day.AddDays(1))
+        {
+            totalHours += OverlapHours(range, (day.AddHours(8),  day.AddHours(12)));
+            totalHours += OverlapHours(range, (day.AddHours(13), day.AddHours(17)));
+        }
+
+        <span class="cmt">// 規則 6</span>
+        <span class="kw">if</span> (totalHours &lt;= 0)
+        {
+            errorMessage = <span class="str">"請假區間未涵蓋任何上課時段，請重新選擇。"</span>;
+            <span class="kw">return false</span>;
+        }
+
+        <span class="kw">return true</span>;
+    }
+
+    <span class="kw">private static bool</span> IsOnTheHour(DateTime dt)
+        =&gt; dt.Minute == 0 &amp;&amp; dt.Second == 0 &amp;&amp; dt.Millisecond == 0;
+
+    <span class="kw">private static bool</span> IsSelectableHour(<span class="kw">int</span> hour) =&gt; hour &gt;= 8 &amp;&amp; hour &lt;= 17;
+
+    <span class="cmt">// 兩個時間區間的交集有幾小時（沒交集回 0）</span>
+    <span class="kw">private static decimal</span> OverlapHours((DateTime Start, DateTime End) a,
+                                          (DateTime Start, DateTime End) b)
+    {
+        <span class="kw">var</span> start = a.Start &gt; b.Start ? a.Start : b.Start;   <span class="cmt">// 兩個開始取晚的</span>
+        <span class="kw">var</span> end   = a.End   &lt; b.End   ? a.End   : b.End;     <span class="cmt">// 兩個結束取早的</span>
+
+        <span class="kw">return</span> end &lt;= start ? 0m : (<span class="kw">decimal</span>)(end - start).TotalHours;
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">看這個類別最重要的一件事：它什麼都不依賴</span>
+        <p>
+            沒有 <code>AppDbContext</code>、沒有 <code>HttpContext</code>、沒有檔案、沒有網路。
+            <strong>純輸入 → 純輸出。</strong>
+        </p>
+        <p>
+            這種類別叫「純函式」，是<strong>最容易測試的東西</strong>——
+            不用準備資料庫、不用模擬 HTTP 請求，直接呼叫就好。第 5 節你馬上會看到差別有多大。
+        </p>
+        <p>
+            所以抽 Service 時有個原則：<strong>優先把「純計算」的部分抽出來</strong>，
+            它的投資報酬率最高。
+        </p>
+    </div>
+
+    <h2 class="sec" id="di">4. 依賴注入與三種生命週期</h2>
+
+    <h3 class="sub">4.1 登記</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs</span></div>
+        <pre><code><span class="add"><span class="kw">using</span> MyLeaveSystem.Services;</span>
+
+builder.Services.AddDbContext&lt;AppDbContext&gt;(<span class="cmt">/* … */</span>);
+
+<span class="add">builder.Services.AddScoped&lt;ILeaveCalculator, LeaveCalculator&gt;();</span></code></pre>
+    </div>
+
+    <p>這一行的意思是：「<strong>誰要 <code>ILeaveCalculator</code>，就給他一個 <code>LeaveCalculator</code>。</strong>」</p>
+
+    <h3 class="sub">4.2 使用</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Controller 只要在建構式「要求」</span></div>
+        <pre><code><span class="kw">public class</span> LeaveRequestsController : Controller
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+    <span class="kw">private readonly</span> ILeaveCalculator _calculator;
+
+    <span class="cmt">// 你不用自己 new，框架會把東西塞進來</span>
+    <span class="kw">public</span> LeaveRequestsController(AppDbContext db, ILeaveCalculator calculator)
+    {
+        _db = db;
+        _calculator = calculator;
+    }
+
+    [HttpPost]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveRequestCreateViewModel input)
+    {
+        <span class="kw">var</span> startAt = input.StartDate.Date.AddHours(input.StartHour);
+        <span class="kw">var</span> endAt   = input.EndDate.Date.AddHours(input.EndHour);
+
+        <span class="cmt">// 原本 20 行的計算，變成一行</span>
+        <span class="kw">if</span> (!_calculator.TryCalculate(startAt, endAt, <span class="kw">out var</span> hours, <span class="kw">out var</span> error))
+        {
+            ModelState.AddModelError(<span class="kw">string</span>.Empty, error!);
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="cmt">// …存檔…</span>
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼要這麼麻煩？直接 new LeaveCalculator() 不行嗎？</span>
+        <p>
+            單看這個例子，<code>new</code> 一個確實比較短。差別在<strong>換掉它的時候</strong>：
+        </p>
+        <p>
+            <strong>① 換實作不用改 Controller。</strong>
+            假設之後上課時段要改成可設定的（存在資料庫裡），
+            你寫一個 <code>ConfigurableLeaveCalculator</code>，
+            <strong>只改 <code>Program.cs</code> 那一行登記</strong>，
+            所有用到的地方自動換掉。
+        </p>
+        <p>
+            <strong>② 測試可以塞假的。</strong>測 Controller 時，
+            你可以塞一個「永遠回傳 8 小時」的假計算器，
+            專心測 Controller 自己的邏輯。
+        </p>
+        <p>
+            <strong>③ 相依物件的相依物件也自動處理。</strong>
+            <code>LeaveCalculator</code> 如果自己也需要別的東西，DI 會一路組好給你。
+            自己 <code>new</code> 的話就要手動一層一層建。
+        </p>
+    </div>
+
+    <h3 class="sub">4.3 三種生命週期</h3>
+
+    <table class="doc">
+        <thead><tr><th style="width:170px;">方法</th><th style="width:220px;">多久建一個新的</th><th>什麼時候用</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>AddScoped</code></td>
+                <td><strong>每個 HTTP 請求一個</strong></td>
+                <td><strong>預設就用這個。</strong>只要間接用到 <code>AppDbContext</code> 就必須是它。</td>
+            </tr>
+            <tr>
+                <td><code>AddTransient</code></td>
+                <td>每次要求都新建一個</td>
+                <td>很輕量、不保存狀態的小工具。</td>
+            </tr>
+            <tr>
+                <td><code>AddSingleton</code></td>
+                <td>整個程式只有一個，<br>所有請求共用</td>
+                <td>設定值、快取。<strong>要自己處理多執行緒安全。</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout oops">
+        <span class="t">最危險的錯誤：Singleton 抓住 Scoped</span>
+        <p>
+            如果你把一個用到 <code>AppDbContext</code> 的 Service 註冊成 <code>AddSingleton</code>，
+            它會<strong>永遠抓著第一個請求的那個 DbContext</strong>。
+        </p>
+        <p>
+            結果是：多個使用者共用同一個變更追蹤狀態、連線超時、
+            <code>A second operation was started on this context…</code> 之類的隨機錯誤。
+            <strong>而且只有在多人同時用的時候才會出現</strong>，本機測試永遠測不到。
+        </p>
+        <p>
+            <strong>記住規則：不確定就用 <code>AddScoped</code>。</strong>
+            完成品專案的 11 個服務全部都是 Scoped。
+        </p>
+    </div>
+
+    <h2 class="sec" id="test">5. 寫第一個測試</h2>
+
+    <p>現在來證明時數算得對。建立測試專案：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">在 MyLeaveSystem 的「上一層」資料夾</span></div>
+        <pre><code>dotnet new xunit -o MyLeaveSystem.Tests
+cd MyLeaveSystem.Tests
+dotnet add reference ../MyLeaveSystem/MyLeaveSystem.csproj</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">為什麼測試要獨立一個專案</span>
+        測試程式碼<strong>不該被部署到正式環境</strong>。獨立專案就能確保它不會被打包進去，
+        而且測試專案可以裝一些正式專案用不到的套件。
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">MyLeaveSystem.Tests/LeaveCalculatorTests.cs</span></div>
+        <pre><code><span class="kw">using</span> MyLeaveSystem.Services;
+<span class="kw">using</span> Xunit;
+
+<span class="kw">namespace</span> MyLeaveSystem.Tests;
+
+<span class="kw">public class</span> LeaveCalculatorTests
+{
+    <span class="kw">private readonly</span> ILeaveCalculator _sut = <span class="kw">new</span> LeaveCalculator();
+    <span class="cmt">// sut = System Under Test（被測試的東西），是常見的命名慣例</span>
+
+    [Fact]   <span class="cmt">// [Fact] = 一個沒有參數的測試</span>
+    <span class="kw">public void</span> 整個上午_應該是4小時()
+    {
+        <span class="cmt">// Arrange（準備）</span>
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, 8, 0, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 9, 12, 0, 0);
+
+        <span class="cmt">// Act（執行）</span>
+        <span class="kw">var</span> ok = _sut.TryCalculate(start, end, <span class="kw">out var</span> hours, <span class="kw">out var</span> error);
+
+        <span class="cmt">// Assert（驗證）</span>
+        Assert.True(ok);
+        Assert.Equal(4m, hours);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    <span class="kw">public void</span> 跨越午休_午休不計時數()
+    {
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, 11, 0, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 9, 14, 0, 0);
+
+        <span class="kw">var</span> ok = _sut.TryCalculate(start, end, <span class="kw">out var</span> hours, <span class="kw">out _</span>);
+
+        Assert.True(ok);
+        Assert.Equal(2m, hours);     <span class="cmt">// 不是 3！這就是這條規則的重點</span>
+    }
+
+    [Fact]
+    <span class="kw">public void</span> 只選午休_應該失敗()
+    {
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, 12, 0, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 9, 13, 0, 0);
+
+        <span class="kw">var</span> ok = _sut.TryCalculate(start, end, <span class="kw">out var</span> hours, <span class="kw">out var</span> error);
+
+        Assert.False(ok);
+        Assert.Equal(0m, hours);
+        Assert.NotNull(error);
+    }
+
+    <span class="cmt">// [Theory] = 同一段測試邏輯，跑多組資料</span>
+    [Theory]
+    [InlineData(8, 17, 8)]      <span class="cmt">// 整天 → 8 小時</span>
+    [InlineData(8, 12, 4)]      <span class="cmt">// 上午 → 4 小時</span>
+    [InlineData(13, 17, 4)]     <span class="cmt">// 下午 → 4 小時</span>
+    [InlineData(11, 14, 2)]     <span class="cmt">// 跨午休 → 2 小時</span>
+    [InlineData(8, 9, 1)]       <span class="cmt">// 一小時</span>
+    <span class="kw">public void</span> 同日各種區間(<span class="kw">int</span> startHour, <span class="kw">int</span> endHour, <span class="kw">decimal</span> expected)
+    {
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, startHour, 0, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 9, endHour, 0, 0);
+
+        <span class="kw">var</span> ok = _sut.TryCalculate(start, end, <span class="kw">out var</span> hours, <span class="kw">out _</span>);
+
+        Assert.True(ok);
+        Assert.Equal(expected, hours);
+    }
+
+    [Fact]
+    <span class="kw">public void</span> 跨日_第一天下午加第二天上午()
+    {
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, 13, 0, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 10, 12, 0, 0);
+
+        <span class="kw">var</span> ok = _sut.TryCalculate(start, end, <span class="kw">out var</span> hours, <span class="kw">out _</span>);
+
+        Assert.True(ok);
+        Assert.Equal(8m, hours);     <span class="cmt">// 4 + 4</span>
+    }
+
+    [Fact]
+    <span class="kw">public void</span> 非整點_應該失敗()
+    {
+        <span class="kw">var</span> start = <span class="kw">new</span> DateTime(2026, 6, 9, 8, 30, 0);
+        <span class="kw">var</span> end   = <span class="kw">new</span> DateTime(2026, 6, 9, 12, 0, 0);
+
+        Assert.False(_sut.TryCalculate(start, end, <span class="kw">out _</span>, <span class="kw">out var</span> error));
+        Assert.Contains(<span class="str">"整點"</span>, error);
+    }
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">執行測試</span></div>
+        <pre><code>dotnet test</code></pre>
+    </div>
+
+    <p>應該看到類似：<code>已通過! - 失敗: 0，通過: 9</code>。</p>
+
+    <div class="callout why">
+        <span class="t">感受一下差別</span>
+        <p>
+            這九個測試在<strong>不到一秒</strong>內跑完，
+            而且<strong>不需要資料庫、不需要瀏覽器、不需要登入</strong>。
+        </p>
+        <p>
+            如果這段邏輯還留在 Controller 裡，你要驗證這九種情況，
+            得手動開瀏覽器、登入、填表單、送出、看結果——九遍。
+            <strong>而且每次改程式都要再來一遍。</strong>
+        </p>
+        <p>這就是抽 Service 最直接的回報。</p>
+    </div>
+
+    <h3 class="sub">5.1 測試的三段式結構</h3>
+
+    <table class="doc">
+        <thead><tr><th style="width:150px;">段落</th><th>做什麼</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Arrange</strong> 準備</td><td>準備輸入資料、建立被測物件</td></tr>
+            <tr><td><strong>Act</strong> 執行</td><td>呼叫要測的那個方法。<strong>通常只有一行</strong></td></tr>
+            <tr><td><strong>Assert</strong> 驗證</td><td>檢查結果對不對</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">測試名稱用中文沒關係</span>
+        C# 允許中文識別字。測試名稱的目的是<strong>「失敗時一眼看出壞了什麼」</strong>，
+        用中文反而更清楚。完成品專案的測試也是這樣命名的。
+    </div>
+
+    <h3 class="sub">5.2 動手：故意弄壞它</h3>
+
+    <p>把 <code>LeaveCalculator</code> 裡下午時段的 13 改成 12：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">故意改壞</span></div>
+        <pre><code>totalHours += OverlapHours(range, (day.AddHours(<span class="str">12</span>), day.AddHours(17)));   <span class="cmt">// 原本是 13</span></code></pre>
+    </div>
+
+    <p>再跑 <code>dotnet test</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">輸出</span><span class="path">終端機</span></div>
+        <pre><code>失敗 跨越午休_午休不計時數 [2 ms]
+  錯誤訊息：
+   Assert.Equal() Failure: Values differ
+   Expected: 2
+   Actual:   3</code></pre>
+    </div>
+
+    <p>
+        <strong>它精準地告訴你哪條規則壞了、預期多少、實際多少。</strong>
+        改回 13，再跑一次，全綠。這就是測試在做的事。
+    </p>
+
+    <h2 class="sec" id="tdd">6. TDD 的節奏</h2>
+
+    <p>
+        剛才是「先寫程式再補測試」。反過來做叫 <strong>TDD（測試驅動開發）</strong>：
+    </p>
+
+    <ol>
+        <li><strong>紅</strong>：先寫一個會失敗的測試（因為功能還不存在）</li>
+        <li><strong>綠</strong>：寫最少的程式碼讓它通過</li>
+        <li><strong>重構</strong>：在測試保護下把程式碼整理乾淨</li>
+    </ol>
+
+    <div class="callout why">
+        <span class="t">TDD 適合什麼、不適合什麼</span>
+        <p>
+            <strong>很適合：</strong>規則明確、輸入輸出清楚的東西。
+            時數計算、簽核權限判斷、日期正規化——這些先寫測試非常順。
+        </p>
+        <p>
+            <strong>不太適合：</strong>畫面長什麼樣、版面好不好看。
+            那些用眼睛看比較快。
+        </p>
+        <p>
+            完成品專案就是這樣分的：
+            <code>Services/</code> 底下的邏輯有 106 個測試，
+            Controller 與 View 則靠手動驗收清單。<strong>不是所有東西都值得寫測試。</strong>
+        </p>
+    </div>
+
+    <h2 class="sec" id="layers">7. 分層的完整樣貌</h2>
+
+    <p>到這裡，你的專案已經有完整的分層了：</p>
+
+    <div class="filetree">瀏覽器
+  │  HTTP 請求
+  ▼
+<span class="hi">Controller</span>                          <span class="c">收 → 轉 → 給</span>
+  │  ‧ 接參數、驗證 ModelState
+  │  ‧ 決定回哪個 View / 轉去哪
+  │  ‧ <span class="c">不算業務規則</span>
+  ▼
+<span class="hi">Service</span>                             <span class="c">業務規則</span>
+  │  ‧ 時數怎麼算、能不能簽、超過上限沒
+  │  ‧ 回傳「結果物件」而不是 IActionResult
+  │  ‧ <span class="c">不碰 HttpContext</span>
+  ▼
+<span class="hi">AppDbContext（EF Core）</span>            <span class="c">資料存取</span>
+  │
+  ▼
+SQL Server</div>
+
+    <p>每一層都有一條「不做什麼」的規則，那才是分層的重點：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:150px;">這一層</th><th style="width:290px;">該做</th><th>不該做</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>Controller</strong></td>
+                <td>接參數、呼叫 Service、選畫面</td>
+                <td><strong>不寫業務規則</strong>（不然沒辦法測）</td>
+            </tr>
+            <tr>
+                <td><strong>Service</strong></td>
+                <td>業務規則、回傳結果物件</td>
+                <td><strong>不碰 <code>HttpContext</code>、不回 <code>IActionResult</code></strong>
+                    （不然又綁死在 Web 上）</td>
+            </tr>
+            <tr>
+                <td><strong>Entity</strong></td>
+                <td>描述資料長什麼樣</td>
+                <td><strong>不放跟畫面有關的東西</strong>（那是 ViewModel 的事）</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">Service 該回傳什麼</span>
+        <p>
+            不要回 <code>IActionResult</code>（那是 Web 專屬的），也盡量不要用丟例外表達「使用者做錯了」。
+            用一個小小的結果物件最好用：
+        </p>
+        <p>
+            <code>public record ApprovalActionResult(bool Success, string? ErrorMessage, ApprovalOutcome Outcome);</code>
+        </p>
+        <p>
+            Controller 拿到之後自己決定要怎麼呈現。
+            完成品專案的 <code>ApprovalService</code> 與 <code>AbsenceRecordService</code> 都是這個體例。
+        </p>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 9 章檢查點</div>
+        <div class="hint">全部做到再進第 10 章。</div>
+        <ul>
+            <li><span><code>Services/ILeaveCalculator.cs</code> 與 <code>LeaveCalculator.cs</code> 都建好了。</span></li>
+            <li><span><code>Program.cs</code> 有 <code>AddScoped&lt;ILeaveCalculator, LeaveCalculator&gt;()</code>。</span></li>
+            <li><span><code>dotnet test</code> 全部通過（至少 9 個測試）。</span></li>
+            <li><span>我故意把 13 改成 12，看到<strong>正確的那個測試失敗</strong>，然後改回來。</span></li>
+            <li><span>我能說出 Scoped / Transient / Singleton 的差別，以及為什麼用到 DbContext 的一定要 Scoped。</span></li>
+            <li><span>我能講出 Controller 與 Service 各自「不該做什麼」。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            你剛寫的 <code>LeaveCalculator</code> 跟完成品的
+            <code>Services/LeaveCalculator.cs</code> <strong>幾乎逐行相同</strong>——
+            這一章的程式碼就是照它寫的。測試對照
+            <code>LeaveSystem.Tests/Services/LeaveCalculatorTests.cs</code>。
+        </p>
+        <p>
+            完成品有 11 個 Service。全部的註冊在
+            <code>Program.cs:40–64</code>，畫成圖是
+            <a href="../tutorial/01-startup-di.html">循序圖教學站 · 01 啟動與 DI</a> 的第 4 步。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch08-relations.html"><span class="lbl">上一章</span>◀ 第 8 章 關聯資料</a>
+        <span class="spacer"></span>
+        <a href="ch10-auth.html"><span class="lbl">下一章</span>第 10 章 登入與權限 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 7 章 第一個完整 CRUD — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch07">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 3 · 資料庫</div>
+    <h1 class="chapter-title">第 7 章　第一個完整 CRUD</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        把假別管理做成<strong>完整的四件套</strong>：清單、新增、編輯、停用。
+        這一章沒有新觀念，是把第 3～6 章學的東西<strong>組成一個真正能用的功能</strong>——
+        而這個模式，之後每個管理頁面都會重複。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2 小時</b></span>
+        <span>📦 前置：<a href="ch06-efcore.html">第 6 章</a>（資料庫接好、新增功能可用）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#crud">CRUD 是哪四件事</a></li>
+            <li><a href="#edit">Edit：兩個 Action 的第二種樣貌</a></li>
+            <li><a href="#tracking">變更追蹤：為什麼不用寫 UPDATE</a></li>
+            <li><a href="#delete">刪除？還是停用？</a></li>
+            <li><a href="#concurrency">兩個人同時改同一筆</a></li>
+            <li><a href="#recap">四件套完整程式碼</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="crud">1. CRUD 是哪四件事</h2>
+
+    <table class="doc">
+        <thead><tr><th style="width:110px;">字母</th><th style="width:130px;">動作</th><th style="width:180px;">網址</th><th>需要幾個 Action</th></tr></thead>
+        <tbody>
+            <tr><td><strong>C</strong>reate</td><td>新增</td><td><code>/LeaveTypes/Create</code></td><td>2（GET 給表單、POST 收資料）</td></tr>
+            <tr><td><strong>R</strong>ead</td><td>查詢</td><td><code>/LeaveTypes</code></td><td>1（GET）</td></tr>
+            <tr><td><strong>U</strong>pdate</td><td>修改</td><td><code>/LeaveTypes/Edit/3</code></td><td>2（GET 給填好的表單、POST 收資料）</td></tr>
+            <tr><td><strong>D</strong>elete</td><td>刪除 / 停用</td><td><code>/LeaveTypes/ToggleActive/3</code></td><td>1（POST）</td></tr>
+        </tbody>
+    </table>
+
+    <p>你已經有 C 和 R 了。這一章補上 U 和 D。</p>
+
+    <h2 class="sec" id="edit">2. Edit：兩個 Action 的第二種樣貌</h2>
+
+    <p>
+        Edit 跟 Create 的骨架幾乎一樣，只差兩件事：
+        <strong>GET 時要先把現有資料填進表單</strong>，
+        <strong>POST 時要知道在改哪一筆</strong>。
+    </p>
+
+    <h3 class="sub">2.1 Edit 專用的 ViewModel</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/ViewModels/LeaveTypeEditViewModel.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">public class</span> LeaveTypeEditViewModel
+{
+    <span class="cmt">// 比 Create 多這一個：要知道在改哪一筆</span>
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Required(ErrorMessage = <span class="str">"請填寫假別名稱"</span>)]
+    [StringLength(20)]
+    [Display(Name = <span class="str">"假別名稱"</span>)]
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Required(ErrorMessage = <span class="str">"請填寫代碼"</span>)]
+    [RegularExpression(<span class="str">"^[A-Z_]+$"</span>, ErrorMessage = <span class="str">"代碼只能用大寫英文與底線"</span>)]
+    [Display(Name = <span class="str">"代碼"</span>)]
+    <span class="kw">public string</span> Code { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Range(1, 99)]
+    [Display(Name = <span class="str">"排序"</span>)]
+    <span class="kw">public int</span> SortOrder { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [StringLength(100)]
+    [Display(Name = <span class="str">"說明"</span>)]
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+    [Display(Name = <span class="str">"啟用"</span>)]
+    <span class="kw">public bool</span> IsActive { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">Id 放在 ViewModel 裡，不是又有 Over-posting 風險嗎？</span>
+        <p>
+            這次是<strong>刻意</strong>要收的：使用者確實需要告訴伺服器「我在改第 3 筆」。
+        </p>
+        <p>
+            但正因為它可以被竄改，POST 端<strong>絕對不能只信這個 Id</strong>——
+            要拿它去資料庫查出真正的那一筆，並且（在有權限概念之後）確認這個人有資格改它。
+            第 10 章之後你會反覆看到這個檢查。
+        </p>
+    </div>
+
+    <h3 class="sub">2.2 GET：把現有資料填進表單</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code>[HttpGet]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Edit(<span class="kw">int</span> id)
+{
+    <span class="kw">var</span> entity = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == id);
+    <span class="kw">if</span> (entity <span class="kw">is null</span>)
+    {
+        <span class="kw">return</span> NotFound();
+    }
+
+    <span class="cmt">// Entity → ViewModel（只挑畫面需要的欄位）</span>
+    <span class="kw">var</span> vm = <span class="kw">new</span> LeaveTypeEditViewModel
+    {
+        Id          = entity.Id,
+        Name        = entity.Name,
+        Code        = entity.Code,
+        SortOrder   = entity.SortOrder,
+        Description = entity.Description,
+        IsActive    = entity.IsActive
+    };
+
+    <span class="kw">return</span> View(vm);
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/LeaveTypes/Edit.cshtml</span></div>
+        <pre><code>@model LeaveTypeEditViewModel
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"編輯假別"</span>;
+}
+
+&lt;h1&gt;編輯假別&lt;/h1&gt;
+
+&lt;form method="post" asp-action="Edit"&gt;
+
+    @* 關鍵：把 Id 放在隱藏欄位，POST 時才帶得回來 *@
+    &lt;input type="hidden" asp-for="Id" /&gt;
+
+    &lt;div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"&gt;&lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Name" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="Name" class="form-control" /&gt;
+        &lt;span asp-validation-for="Name" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Code" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="Code" class="form-control" /&gt;
+        &lt;span asp-validation-for="Code" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="SortOrder" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="SortOrder" class="form-control" /&gt;
+        &lt;span asp-validation-for="SortOrder" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Description" class="form-label"&gt;&lt;/label&gt;
+        &lt;textarea asp-for="Description" class="form-control" rows="2"&gt;&lt;/textarea&gt;
+    &lt;/div&gt;
+
+    &lt;div class="form-check mb-3"&gt;
+        &lt;input asp-for="IsActive" class="form-check-input" /&gt;
+        &lt;label asp-for="IsActive" class="form-check-label"&gt;&lt;/label&gt;
+    &lt;/div&gt;
+
+    &lt;button type="submit" class="btn btn-primary"&gt;儲存&lt;/button&gt;
+    &lt;a asp-action="Index" class="btn btn-secondary"&gt;取消&lt;/a&gt;
+&lt;/form&gt;
+
+@section Scripts {
+    &lt;partial name="_ValidationScriptsPartial" /&gt;
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">忘記隱藏的 Id 欄位</span>
+        <p>
+            這是 Edit 頁最經典的 bug。沒有 <code>&lt;input type="hidden" asp-for="Id" /&gt;</code> 的話，
+            POST 回來時 <code>input.Id</code> 會是 <code>0</code>，
+            接著 <code>FirstOrDefaultAsync(t =&gt; t.Id == 0)</code> 查不到東西，
+            你就會看到 <strong>404 或「找不到資料」</strong>。
+        </p>
+        <p>
+            徵狀是「編輯頁打得開、填完送出卻說找不到」。看到這個徵狀，第一個檢查隱藏欄位。
+        </p>
+    </div>
+
+    <h3 class="sub">2.3 POST：更新</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code>[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Edit(LeaveTypeEditViewModel input)
+{
+    <span class="kw">if</span> (!ModelState.IsValid)
+    {
+        <span class="kw">return</span> View(input);
+    }
+
+    <span class="cmt">// ① 一定要重新從資料庫查，不能直接信任送進來的資料</span>
+    <span class="kw">var</span> entity = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == input.Id);
+    <span class="kw">if</span> (entity <span class="kw">is null</span>)
+    {
+        <span class="kw">return</span> NotFound();
+    }
+
+    <span class="kw">var</span> code = input.Code.Trim().ToUpperInvariant();
+
+    <span class="cmt">// ② 代碼不能跟「別人」重複（要排除自己，不然改別的欄位會被自己擋住）</span>
+    <span class="kw">if</span> (<span class="kw">await</span> _db.LeaveTypes.AnyAsync(t =&gt; t.Code == code &amp;&amp; t.Id != input.Id))
+    {
+        ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+        <span class="kw">return</span> View(input);
+    }
+
+    <span class="cmt">// ③ 逐一寫回。注意：沒有 _db.Update()，也沒有 UPDATE 語句。</span>
+    entity.Name        = input.Name.Trim();
+    entity.Code        = code;
+    entity.SortOrder   = input.SortOrder;
+    entity.Description = <span class="kw">string</span>.IsNullOrWhiteSpace(input.Description) ? <span class="kw">null</span> : input.Description.Trim();
+    entity.IsActive    = input.IsActive;
+
+    <span class="kw">await</span> _db.SaveChangesAsync();
+
+    TempData[<span class="str">"Success"</span>] = $<span class="str">"已更新假別「{entity.Name}」"</span>;
+    <span class="kw">return</span> RedirectToAction(nameof(Index));
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">「代碼重複」檢查要記得排除自己</span>
+        <p>
+            少了 <code>&amp;&amp; t.Id != input.Id</code> 的話，你只是想改個說明、代碼完全沒動，
+            系統卻會說「這個代碼已經被用了」——<strong>因為它查到的就是這筆自己</strong>。
+        </p>
+        <p>
+            這個 bug 在 Create 不會發生（新資料還沒有 Id），只在 Edit 出現，所以特別容易漏。
+        </p>
+    </div>
+
+    <h2 class="sec" id="tracking">3. 變更追蹤：為什麼不用寫 UPDATE</h2>
+
+    <p>
+        上面那段程式碼有個地方很奇怪：你只是<strong>改了物件的屬性</strong>，
+        然後呼叫 <code>SaveChangesAsync()</code>，就更新成功了。
+        沒有 <code>_db.Update(entity)</code>，也沒有任何 SQL。
+    </p>
+
+    <p>這叫<strong>變更追蹤（Change Tracking）</strong>：</p>
+
+    <ol>
+        <li>你用 <code>FirstOrDefaultAsync</code> 查出 <code>entity</code> 時，
+            EF Core 就<strong>記住了它原本每個欄位的值</strong></li>
+        <li>你改了 <code>entity.Name</code></li>
+        <li><code>SaveChangesAsync()</code> 時，它比對「現在的值 vs 記住的值」，
+            <strong>只把真的變了的欄位</strong>寫進 <code>UPDATE</code> 語句</li>
+    </ol>
+
+    <p>
+        把<a href="ch06-efcore.html#sql">第 6 章第 9 節</a>的 SQL 記錄打開，改一個假別的說明，你會看到：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">輸出</span><span class="path">終端機</span></div>
+        <pre><code>Executed DbCommand … [Parameters=[@p0='新的說明' (Size = 100), @p1='3']]
+      UPDATE [LeaveTypes] SET [Description] = @p0
+      WHERE [Id] = @p1;</code></pre>
+    </div>
+
+    <p><strong>只更新了 <code>Description</code> 一欄</strong>，其他沒動的欄位完全沒出現。</p>
+
+    <div class="callout tip">
+        <span class="t">什麼時候追蹤會失效</span>
+        <p>
+            如果你查詢時加了 <code>.AsNoTracking()</code>，EF Core 就<strong>不會記住原值</strong>，
+            改屬性也不會有任何效果。
+        </p>
+        <p>
+            所以規則是：<strong>只讀不改的查詢加 <code>AsNoTracking()</code></strong>（省記憶體、快一點），
+            <strong>要改的就不要加</strong>。清單頁適合加，Edit 的 GET/POST 不要加。
+        </p>
+    </div>
+
+    <h2 class="sec" id="delete">4. 刪除？還是停用？</h2>
+
+    <p>
+        真正的 <code>DELETE</code> 很危險。假設有人請過「公假」，然後你把公假這個假別刪掉——
+        那些歷史請假單的假別欄位就指向一個不存在的東西了。
+    </p>
+
+    <div class="callout why">
+        <span class="t">軟刪除：用旗標取代真刪除</span>
+        <p>
+            所以 <code>LeaveType</code> 有 <code>IsActive</code> 這個欄位。
+            「停用」的意思是：<strong>新的請假單不能再選它，但歷史資料完全不受影響</strong>。
+        </p>
+        <p>
+            這在完成品專案是一致的做法：<code>LeaveType.IsActive</code>、
+            <code>UserAccount.IsActive</code> 都是同樣的用途——
+            <strong>離職的老師不能刪掉，因為他簽過的單要留紀錄</strong>。
+        </p>
+    </div>
+
+    <h3 class="sub">4.1 動手：切換啟用狀態</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code>[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; ToggleActive(<span class="kw">int</span> id)
+{
+    <span class="kw">var</span> entity = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == id);
+    <span class="kw">if</span> (entity <span class="kw">is null</span>)
+    {
+        <span class="kw">return</span> NotFound();
+    }
+
+    entity.IsActive = !entity.IsActive;
+    <span class="kw">await</span> _db.SaveChangesAsync();
+
+    TempData[<span class="str">"Success"</span>] = entity.IsActive
+        ? $<span class="str">"已啟用「{entity.Name}」"</span>
+        : $<span class="str">"已停用「{entity.Name}」，新的請假單將不會出現此假別"</span>;
+
+    <span class="kw">return</span> RedirectToAction(nameof(Index));
+}</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">為什麼是 [HttpPost] 而不是 GET？</span>
+        <p>
+            <strong>會改變資料的操作，永遠不要用 GET。</strong>
+        </p>
+        <p>
+            如果做成 <code>&lt;a href="/LeaveTypes/ToggleActive/3"&gt;</code>，
+            那任何人只要騙管理員點一個連結（甚至塞在
+            <code>&lt;img src="…"&gt;</code> 裡讓他什麼都不用點），
+            就能改你的資料。搜尋引擎的爬蟲也會把你整個網站的資料點一輪。
+        </p>
+    </div>
+
+    <h3 class="sub">4.2 清單頁加上操作按鈕</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/LeaveTypes/Index.cshtml</span></div>
+        <pre><code>@model List&lt;LeaveType&gt;
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"假別管理"</span>;
+}
+
+&lt;h1&gt;假別管理&lt;/h1&gt;
+
+@<span class="kw">if</span> (TempData[<span class="str">"Success"</span>] != <span class="kw">null</span>)
+{
+    &lt;div class="alert alert-success"&gt;@TempData[<span class="str">"Success"</span>]&lt;/div&gt;
+}
+
+&lt;a asp-action="Create" class="btn btn-primary mb-3"&gt;＋ 新增假別&lt;/a&gt;
+
+&lt;table class="table table-striped align-middle"&gt;
+    &lt;thead&gt;
+        &lt;tr&gt;
+            &lt;th&gt;排序&lt;/th&gt;&lt;th&gt;名稱&lt;/th&gt;&lt;th&gt;代碼&lt;/th&gt;&lt;th&gt;說明&lt;/th&gt;&lt;th&gt;狀態&lt;/th&gt;&lt;th&gt;操作&lt;/th&gt;
+        &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+        @<span class="kw">foreach</span> (<span class="kw">var</span> t <span class="kw">in</span> Model)
+        {
+            &lt;tr&gt;
+                &lt;td&gt;@t.SortOrder&lt;/td&gt;
+                &lt;td&gt;@t.Name&lt;/td&gt;
+                &lt;td&gt;&lt;code&gt;@t.Code&lt;/code&gt;&lt;/td&gt;
+                &lt;td&gt;@(t.Description ?? <span class="str">"—"</span>)&lt;/td&gt;
+                &lt;td&gt;
+                    @<span class="kw">if</span> (t.IsActive)
+                    {
+                        &lt;span class="badge bg-success"&gt;啟用&lt;/span&gt;
+                    }
+                    <span class="kw">else</span>
+                    {
+                        &lt;span class="badge bg-secondary"&gt;停用&lt;/span&gt;
+                    }
+                &lt;/td&gt;
+                &lt;td&gt;
+                    &lt;a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary"&gt;編輯&lt;/a&gt;
+
+                    @* 需要 POST，所以要用一個小表單而不是連結 *@
+                    &lt;form method="post" asp-action="ToggleActive" asp-route-id="@t.Id" class="d-inline"&gt;
+                        &lt;button type="submit" class="btn btn-sm btn-outline-secondary"&gt;
+                            @(t.IsActive ? <span class="str">"停用"</span> : <span class="str">"啟用"</span>)
+                        &lt;/button&gt;
+                    &lt;/form&gt;
+                &lt;/td&gt;
+            &lt;/tr&gt;
+        }
+    &lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">asp-route-id 是什麼</span>
+        <code>asp-route-{任意名稱}</code> 會把值加進網址。
+        <code>asp-route-id="@t.Id"</code> 產生的就是 <code>/LeaveTypes/Edit/3</code>——
+        剛好對上路由樣板的 <code>{id?}</code>。
+    </div>
+
+    <h2 class="sec" id="concurrency">5. 兩個人同時改同一筆</h2>
+
+    <p>想像這個情境：</p>
+
+    <ol>
+        <li>A 打開「病假」的編輯頁</li>
+        <li>B 也打開同一筆的編輯頁</li>
+        <li>A 把名稱改成「生病假」，儲存</li>
+        <li>B 把說明改成「需附診斷證明」，儲存</li>
+    </ol>
+
+    <p>
+        結果：<strong>A 的修改被 B 蓋掉了</strong>——因為 B 的表單裡帶的還是舊的名稱「病假」。
+        這叫「<strong>後寫入者獲勝</strong>」。
+    </p>
+
+    <div class="callout tip">
+        <span class="t">本書不處理這個，但你要知道它存在</span>
+        <p>
+            解法叫「<strong>樂觀並行控制</strong>」：在 Entity 加一個
+            <code>[Timestamp] public byte[] RowVersion</code> 欄位，
+            EF Core 會在 <code>UPDATE … WHERE Id = 3 AND RowVersion = 舊值</code>，
+            對不上就丟 <code>DbUpdateConcurrencyException</code>，
+            你再提示使用者「這筆資料已被別人修改」。
+        </p>
+        <p>
+            對這個規模的系統（管理員只有一兩位）風險很低，所以完成品專案也沒做。
+            但如果你之後要做多人同時編輯的功能，記得回來查這個關鍵字。
+        </p>
+    </div>
+
+    <h2 class="sec" id="recap">6. 四件套完整程式碼</h2>
+
+    <p>把整個 Controller 對一次，確認你的跟這裡一致：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Controllers/LeaveTypesController.cs（本章完成後的樣子）</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+<span class="kw">using</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public class</span> LeaveTypesController : Controller
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+
+    <span class="kw">public</span> LeaveTypesController(AppDbContext db) =&gt; _db = db;
+
+    <span class="cmt">// ── R：清單 ──</span>
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+        =&gt; View(<span class="kw">await</span> _db.LeaveTypes.AsNoTracking().OrderBy(t =&gt; t.SortOrder).ToListAsync());
+
+    <span class="cmt">// ── C：新增 ──</span>
+    [HttpGet]
+    <span class="kw">public</span> IActionResult Create() =&gt; View(<span class="kw">new</span> LeaveTypeCreateViewModel());
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveTypeCreateViewModel input)
+    {
+        <span class="kw">if</span> (!ModelState.IsValid) <span class="kw">return</span> View(input);
+
+        <span class="kw">var</span> code = input.Code.Trim().ToUpperInvariant();
+        <span class="kw">if</span> (<span class="kw">await</span> _db.LeaveTypes.AnyAsync(t =&gt; t.Code == code))
+        {
+            ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+            <span class="kw">return</span> View(input);
+        }
+
+        _db.LeaveTypes.Add(<span class="kw">new</span> LeaveType
+        {
+            Name = input.Name.Trim(), Code = code, SortOrder = input.SortOrder,
+            Description = <span class="kw">string</span>.IsNullOrWhiteSpace(input.Description) ? <span class="kw">null</span> : input.Description.Trim(),
+            IsActive = <span class="kw">true</span>
+        });
+        <span class="kw">await</span> _db.SaveChangesAsync();
+
+        TempData[<span class="str">"Success"</span>] = $<span class="str">"已新增假別「{input.Name}」"</span>;
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+
+    <span class="cmt">// ── U：編輯 ──</span>
+    [HttpGet]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Edit(<span class="kw">int</span> id)
+    {
+        <span class="kw">var</span> e = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == id);
+        <span class="kw">if</span> (e <span class="kw">is null</span>) <span class="kw">return</span> NotFound();
+
+        <span class="kw">return</span> View(<span class="kw">new</span> LeaveTypeEditViewModel
+        {
+            Id = e.Id, Name = e.Name, Code = e.Code,
+            SortOrder = e.SortOrder, Description = e.Description, IsActive = e.IsActive
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Edit(LeaveTypeEditViewModel input)
+    {
+        <span class="kw">if</span> (!ModelState.IsValid) <span class="kw">return</span> View(input);
+
+        <span class="kw">var</span> e = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == input.Id);
+        <span class="kw">if</span> (e <span class="kw">is null</span>) <span class="kw">return</span> NotFound();
+
+        <span class="kw">var</span> code = input.Code.Trim().ToUpperInvariant();
+        <span class="kw">if</span> (<span class="kw">await</span> _db.LeaveTypes.AnyAsync(t =&gt; t.Code == code &amp;&amp; t.Id != input.Id))
+        {
+            ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+            <span class="kw">return</span> View(input);
+        }
+
+        e.Name = input.Name.Trim();
+        e.Code = code;
+        e.SortOrder = input.SortOrder;
+        e.Description = <span class="kw">string</span>.IsNullOrWhiteSpace(input.Description) ? <span class="kw">null</span> : input.Description.Trim();
+        e.IsActive = input.IsActive;
+        <span class="kw">await</span> _db.SaveChangesAsync();
+
+        TempData[<span class="str">"Success"</span>] = $<span class="str">"已更新假別「{e.Name}」"</span>;
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+
+    <span class="cmt">// ── D：停用 / 啟用（軟刪除）──</span>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; ToggleActive(<span class="kw">int</span> id)
+    {
+        <span class="kw">var</span> e = <span class="kw">await</span> _db.LeaveTypes.FirstOrDefaultAsync(t =&gt; t.Id == id);
+        <span class="kw">if</span> (e <span class="kw">is null</span>) <span class="kw">return</span> NotFound();
+
+        e.IsActive = !e.IsActive;
+        <span class="kw">await</span> _db.SaveChangesAsync();
+
+        TempData[<span class="str">"Success"</span>] = e.IsActive ? $<span class="str">"已啟用「{e.Name}」"</span> : $<span class="str">"已停用「{e.Name}」"</span>;
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">注意 Index 加了 AsNoTracking()</span>
+        清單頁只是顯示，不會改任何東西，所以不需要變更追蹤。
+        加上去之後 EF Core 少建一份快照，資料多的時候差距很明顯。
+        <strong>養成習慣：唯讀查詢一律加。</strong>
+    </div>
+
+    <h2 class="sec" id="wrap">7. 這個模式你會再寫五次</h2>
+
+    <p>
+        完成品專案有五個管理頁面用的是完全一樣的骨架：
+        使用者、班期、假別、簽核規則、曠課紀錄。
+        <strong>你剛才寫的東西，就是它們的模板。</strong>
+    </p>
+
+    <p>
+        下一章開始變難：假別是一張<strong>孤立的表</strong>，
+        但使用者要連到角色、連到班期，班期又要連回使用者（導師是誰）。
+        資料表之間開始有關聯了。
+    </p>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 7 章檢查點</div>
+        <div class="hint">全部做到再進第 8 章。</div>
+        <ul>
+            <li><span>我能從清單頁點「編輯」，看到表單<strong>已經填好現有資料</strong>，改完儲存後清單更新。</span></li>
+            <li><span>我故意刪掉 Edit.cshtml 的隱藏 Id 欄位，重現了「找不到資料」的 bug，然後加回去。</span></li>
+            <li><span>我試過「只改說明、代碼不動」也能存檔成功（排除自己的檢查有效）。</span></li>
+            <li><span>停用按鈕能切換狀態，而且用的是 POST 不是連結。</span></li>
+            <li><span>我從 SQL 記錄裡看到 <code>UPDATE</code> <strong>只更新我改過的欄位</strong>。</span></li>
+            <li><span>我能解釋為什麼用 <code>IsActive</code> 軟刪除而不是真的 <code>DELETE</code>。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            <code>Controllers/Admin/LeaveTypesController.cs</code>（146 行）就是你剛做的東西的正式版。
+            差別只有兩個：它有 <code>[Authorize(Roles = "Admin")]</code>（第 10 章），
+            以及 View 放在 <code>Views/Admin/LeaveTypes/</code>（第 12 章會解釋那個路徑技巧）。
+        </p>
+        <p>
+            想看成品畫面：<a href="../report/03-features.html">專題報告第 03 章的「3.9 其他管理與查詢畫面」</a>。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch06-efcore.html"><span class="lbl">上一章</span>◀ 第 6 章 資料庫與 EF Core</a>
+        <span class="spacer"></span>
+        <a href="ch08-relations.html"><span class="lbl">下一章</span>第 8 章 關聯資料 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

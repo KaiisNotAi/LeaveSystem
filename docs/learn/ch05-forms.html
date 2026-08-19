@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 5 章 表單、繫結與驗證 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch05">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 2 · MVC 三個字母</div>
+    <h1 class="chapter-title">第 5 章　表單、繫結與驗證</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        做出一個能<strong>送資料進來</strong>的表單，而且會驗證、會顯示錯誤訊息、
+        會擋 CSRF 攻擊、重新整理不會重複送出。這一章的模式會在後面每一個新增/編輯頁重複出現。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2.5 小時</b></span>
+        <span>📦 前置：<a href="ch04-view-razor.html">第 4 章</a>（假別清單畫得出來）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#two">一個表單需要兩個 Action</a></li>
+            <li><a href="#viewmodel">ViewModel：為什麼不直接用 Entity</a></li>
+            <li><a href="#build">動手：新增假別表單</a></li>
+            <li><a href="#binding">模型繫結是怎麼運作的</a></li>
+            <li><a href="#validate">驗證與 ModelState</a></li>
+            <li><a href="#csrf">防偽權杖：擋掉 CSRF</a></li>
+            <li><a href="#prg">PRG：為什麼一定要轉址</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="two">1. 一個表單需要兩個 Action</h2>
+
+    <p>「新增一筆資料」這件事，在瀏覽器上其實是<strong>兩次獨立的請求</strong>：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:130px;">第幾次</th><th style="width:130px;">HTTP 方法</th><th>做什麼</th></tr></thead>
+        <tbody>
+            <tr><td>第一次</td><td><code>GET</code></td><td>使用者點「新增」→ 伺服器<strong>回一張空白表單</strong></td></tr>
+            <tr><td>第二次</td><td><code>POST</code></td><td>使用者填完按送出 → 伺服器<strong>收下資料並處理</strong></td></tr>
+        </tbody>
+    </table>
+
+    <p>
+        所以 Controller 裡會有<strong>兩個同名方法</strong>，用屬性區分：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">表單的標準骨架</span></div>
+        <pre><code>[HttpGet]
+<span class="kw">public</span> IActionResult Create()
+{
+    <span class="kw">return</span> View();                <span class="cmt">// 給空白表單</span>
+}
+
+[HttpPost]
+<span class="kw">public</span> IActionResult Create(LeaveTypeCreateViewModel input)
+{
+    <span class="cmt">// 收資料、驗證、存檔</span>
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">同名方法不會打架嗎？</span>
+        <p>
+            C# 允許同名但參數不同的方法（叫「多載」）。
+            <code>[HttpGet]</code> 那個沒參數、<code>[HttpPost]</code> 那個有一個參數，所以編譯得過。
+        </p>
+        <p>
+            路由則是靠 <code>[HttpGet]</code> / <code>[HttpPost]</code> 屬性來決定
+            「這次請求該給哪一個」。<strong>GET 的那個可以省略屬性</strong>（預設就是 GET），
+            但寫出來比較清楚。
+        </p>
+    </div>
+
+    <h2 class="sec" id="viewmodel">2. ViewModel：為什麼不直接用 Entity</h2>
+
+    <p>
+        你已經有 <code>Models/LeaveType.cs</code> 了，直接拿它當表單的模型不行嗎？
+        <strong>能動，但會出兩種問題。</strong>
+    </p>
+
+    <div class="callout oops">
+        <span class="t">問題一：使用者可以塞你沒打算讓他填的欄位</span>
+        <p>
+            表單上只放了「名稱」和「代碼」，但 <code>LeaveType</code> 還有 <code>Id</code>。
+            使用者可以自己在瀏覽器開發者工具加一個
+            <code>&lt;input name="Id" value="999"&gt;</code>，
+            <strong>模型繫結會照單全收</strong>。
+        </p>
+        <p>
+            這叫「<strong>Over-posting</strong>」。在有 <code>IsAdmin</code>、<code>PasswordHash</code>
+            這種欄位的類別上，後果就很嚴重了。
+        </p>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">問題二：畫面需要的東西，資料表不會有</span>
+        <p>
+            例如「確認密碼」欄位、下拉選單的選項清單、
+            「我同意條款」的勾選框——這些都<strong>不該存進資料表</strong>，
+            但表單需要它們。
+        </p>
+    </div>
+
+    <p>
+        解法是另外做一個<strong>只為這個畫面而生</strong>的類別，叫 ViewModel：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/ViewModels/LeaveTypeCreateViewModel.cs</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">public class</span> LeaveTypeCreateViewModel
+{
+    [Required(ErrorMessage = <span class="str">"請填寫假別名稱"</span>)]
+    [StringLength(20, ErrorMessage = <span class="str">"假別名稱不可超過 20 個字"</span>)]
+    [Display(Name = <span class="str">"假別名稱"</span>)]
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Required(ErrorMessage = <span class="str">"請填寫代碼"</span>)]
+    [RegularExpression(<span class="str">"^[A-Z_]+$"</span>, ErrorMessage = <span class="str">"代碼只能用大寫英文與底線"</span>)]
+    [Display(Name = <span class="str">"代碼"</span>)]
+    <span class="kw">public string</span> Code { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    [Range(1, 99, ErrorMessage = <span class="str">"排序必須介於 1 到 99"</span>)]
+    [Display(Name = <span class="str">"排序"</span>)]
+    <span class="kw">public int</span> SortOrder { <span class="kw">get</span>; <span class="kw">set</span>; } = 1;
+
+    [StringLength(100)]
+    [Display(Name = <span class="str">"說明"</span>)]
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <p>
+        <strong>沒有 <code>Id</code>、沒有 <code>IsActive</code></strong>——
+        使用者塞什麼都沒用，因為這個類別根本沒有那些屬性。
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:210px;">屬性</th><th>作用</th></tr></thead>
+        <tbody>
+            <tr><td><code>[Required]</code></td><td>必填</td></tr>
+            <tr><td><code>[StringLength(20)]</code></td><td>最長 20 個字</td></tr>
+            <tr><td><code>[Range(1, 99)]</code></td><td>數值範圍</td></tr>
+            <tr><td><code>[RegularExpression(…)]</code></td><td>要符合這個規則運算式</td></tr>
+            <tr><td><code>[Display(Name = "假別名稱")]</code></td>
+                <td>顯示用的中文標籤。<strong>錯誤訊息裡也會用它</strong>，
+                    所以有寫的話訊息會是「假別名稱 是必要欄位」而不是「Name 是必要欄位」。</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="build">3. 動手：新增假別表單</h2>
+
+    <h3 class="sub">3.1 讓資料活過一次請求</h3>
+
+    <p>
+        資料庫要到第 6 章才會有。這一章先用一個
+        <code>static</code> 清單暫存，讓你能專心在表單本身。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> MyLeaveSystem.Models;
+<span class="add"><span class="kw">using</span> MyLeaveSystem.Models.ViewModels;</span>
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public class</span> LeaveTypesController : Controller
+{
+<span class="add">    <span class="cmt">// ⚠ 暫時的做法：static 會被所有使用者共用，重啟就消失。</span></span>
+<span class="add">    <span class="cmt">//    第 6 章會換成真的資料庫。正式專案絕對不要這樣寫。</span></span>
+<span class="add">    <span class="kw">private static readonly</span> List&lt;LeaveType&gt; _types = <span class="kw">new</span>()</span>
+<span class="add">    {</span>
+<span class="add">        <span class="kw">new</span>() { Id = 1, Name = <span class="str">"病假"</span>, Code = <span class="str">"SICK"</span>,        SortOrder = 1, Description = <span class="str">"因病無法到課"</span> },</span>
+<span class="add">        <span class="kw">new</span>() { Id = 2, Name = <span class="str">"事假"</span>, Code = <span class="str">"PERSONAL"</span>,    SortOrder = 2, Description = <span class="str">"個人事務"</span> },</span>
+<span class="add">        <span class="kw">new</span>() { Id = 3, Name = <span class="str">"喪假"</span>, Code = <span class="str">"BEREAVEMENT"</span>, SortOrder = 3, Description = <span class="str">"親屬喪事"</span> },</span>
+<span class="add">        <span class="kw">new</span>() { Id = 4, Name = <span class="str">"公假"</span>, Code = <span class="str">"OFFICIAL"</span>,    SortOrder = 4, IsActive = <span class="kw">false</span> }</span>
+<span class="add">    };</span>
+
+    <span class="kw">public</span> IActionResult Index()
+    {
+<span class="add">        <span class="kw">return</span> View(_types);</span>
+    }
+}</code></pre>
+    </div>
+
+    <h3 class="sub">3.2 GET：給空白表單</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code>[HttpGet]
+<span class="kw">public</span> IActionResult Create()
+{
+    <span class="kw">return</span> View(<span class="kw">new</span> LeaveTypeCreateViewModel());
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/LeaveTypes/Create.cshtml</span></div>
+        <pre><code>@model LeaveTypeCreateViewModel
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"新增假別"</span>;
+}
+
+&lt;h1&gt;新增假別&lt;/h1&gt;
+
+&lt;form method="post" asp-action="Create"&gt;
+
+    @* 整體錯誤訊息（不屬於任何單一欄位的）*@
+    &lt;div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"&gt;&lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Name" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="Name" class="form-control" /&gt;
+        &lt;span asp-validation-for="Name" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Code" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="Code" class="form-control" placeholder="例如 SICK" /&gt;
+        &lt;span asp-validation-for="Code" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="SortOrder" class="form-label"&gt;&lt;/label&gt;
+        &lt;input asp-for="SortOrder" class="form-control" /&gt;
+        &lt;span asp-validation-for="SortOrder" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;div class="mb-3"&gt;
+        &lt;label asp-for="Description" class="form-label"&gt;&lt;/label&gt;
+        &lt;textarea asp-for="Description" class="form-control" rows="2"&gt;&lt;/textarea&gt;
+        &lt;span asp-validation-for="Description" class="text-danger small"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;button type="submit" class="btn btn-primary"&gt;儲存&lt;/button&gt;
+    &lt;a asp-action="Index" class="btn btn-secondary"&gt;取消&lt;/a&gt;
+&lt;/form&gt;
+
+@section Scripts {
+    @* 讓驗證在瀏覽器端就先跑一次，不用等送到伺服器 *@
+    &lt;partial name="_ValidationScriptsPartial" /&gt;
+}</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">asp-for 一個屬性做了四件事</span>
+        <p>寫 <code>&lt;input asp-for="Name" /&gt;</code>，Razor 產生出來的是：</p>
+        <p><code>&lt;input id="Name" name="Name" value="" type="text"
+           data-val="true" data-val-required="請填寫假別名稱" ... /&gt;</code></p>
+        <p>
+            ① <code>name</code>（POST 回來時靠它對應）、
+            ② <code>id</code>（給 <code>&lt;label&gt;</code> 用）、
+            ③ <code>value</code>（重填時保留使用者輸入）、
+            ④ <code>data-val-*</code>（前端驗證規則，從你的 <code>[Required]</code> 讀來的）。
+        </p>
+        <p>
+            <code>&lt;label asp-for="Name"&gt;</code> 則會自動用
+            <code>[Display(Name = "假別名稱")]</code> 當文字——所以標籤裡是空的。
+        </p>
+    </div>
+
+    <h3 class="sub">3.3 POST：收下並驗證</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code>[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public</span> IActionResult Create(LeaveTypeCreateViewModel input)
+{
+    <span class="cmt">// ① 欄位層級的驗證（來自 [Required] 那些屬性）</span>
+    <span class="kw">if</span> (!ModelState.IsValid)
+    {
+        <span class="kw">return</span> View(input);       <span class="cmt">// 把使用者填過的內容一起送回去</span>
+    }
+
+    <span class="cmt">// ② 業務規則的驗證（屬性做不到的）</span>
+    <span class="kw">if</span> (_types.Any(t =&gt; t.Code == input.Code))
+    {
+        ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+        <span class="kw">return</span> View(input);
+    }
+
+    <span class="cmt">// ③ 通過了，才建立實體</span>
+    _types.Add(<span class="kw">new</span> LeaveType
+    {
+        Id          = _types.Count == 0 ? 1 : _types.Max(t =&gt; t.Id) + 1,
+        Name        = input.Name.Trim(),
+        Code        = input.Code.Trim().ToUpperInvariant(),
+        SortOrder   = input.SortOrder,
+        Description = <span class="kw">string</span>.IsNullOrWhiteSpace(input.Description) ? <span class="kw">null</span> : input.Description.Trim(),
+        IsActive    = <span class="kw">true</span>
+    });
+
+    TempData[<span class="str">"Success"</span>] = $<span class="str">"已新增假別「{input.Name}」"</span>;
+    <span class="kw">return</span> RedirectToAction(nameof(Index));    <span class="cmt">// ④ 一定要轉址</span>
+}</code></pre>
+    </div>
+
+    <h3 class="sub">3.4 在清單頁顯示成功訊息與新增按鈕</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/LeaveTypes/Index.cshtml</span></div>
+        <pre><code>&lt;h1&gt;假別管理&lt;/h1&gt;
+
+<span class="add">@<span class="kw">if</span> (TempData[<span class="str">"Success"</span>] != <span class="kw">null</span>)</span>
+<span class="add">{</span>
+<span class="add">    &lt;div class="alert alert-success"&gt;@TempData[<span class="str">"Success"</span>]&lt;/div&gt;</span>
+<span class="add">}</span>
+<span class="add"></span>
+<span class="add">&lt;a asp-action="Create" class="btn btn-primary mb-3"&gt;＋ 新增假別&lt;/a&gt;</span>
+
+&lt;p class="text-muted"&gt;共 @Model.Count 種假別&lt;/p&gt;</code></pre>
+    </div>
+
+    <p>
+        現在去 <code>/LeaveTypes</code>，按「新增假別」，填一筆送出。
+        應該會回到清單頁、看到綠色成功訊息、表格多一列。
+    </p>
+
+    <p><strong>然後故意做錯</strong>，把每一種錯誤都撞一次：</p>
+    <ul>
+        <li>名稱留空 → 「請填寫假別名稱」</li>
+        <li>代碼填小寫 <code>sick</code> → 「代碼只能用大寫英文與底線」</li>
+        <li>代碼填已存在的 <code>SICK</code> → 「這個代碼已經被用了」</li>
+        <li>排序填 <code>0</code> → 「排序必須介於 1 到 99」</li>
+    </ul>
+
+    <h2 class="sec" id="binding">4. 模型繫結是怎麼運作的</h2>
+
+    <p>
+        使用者按下送出時，瀏覽器實際傳給伺服器的是一堆<strong>純文字的鍵值對</strong>：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">HTTP</span><span class="path">POST 請求主體</span></div>
+        <pre><code>Name=產假&amp;Code=MATERNITY&amp;SortOrder=5&amp;Description=&amp;__RequestVerificationToken=CfDJ8...</code></pre>
+    </div>
+
+    <p>模型繫結做的事，就是把它變回一個 C# 物件：</p>
+
+    <ol>
+        <li>看 Action 參數的型別是 <code>LeaveTypeCreateViewModel</code></li>
+        <li>逐一列出它的屬性：<code>Name</code>、<code>Code</code>、<code>SortOrder</code>、<code>Description</code></li>
+        <li>從請求裡找<strong>同名</strong>的值（先找表單、再找路由、再找查詢字串）</li>
+        <li>轉型：<code>"5"</code> → <code>int 5</code>。<strong>轉不過去就記一筆錯誤到
+            <code>ModelState</code></strong>（例如排序填「abc」）</li>
+        <li>跑資料註解驗證（<code>[Required]</code> 那些），不合格的也記進 <code>ModelState</code></li>
+    </ol>
+
+    <div class="callout why">
+        <span class="t">所以 ModelState 裡有兩種錯誤</span>
+        <strong>轉型失敗</strong>（「abc」不是數字）與<strong>驗證失敗</strong>（沒填、太長）。
+        兩種都在 <code>!ModelState.IsValid</code> 這一關被擋下來，
+        而且都會被 <code>asp-validation-for</code> 顯示在對應欄位旁邊。
+    </div>
+
+    <h2 class="sec" id="validate">5. 驗證與 ModelState</h2>
+
+    <p>驗證有<strong>三層</strong>，缺一不可：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:120px;">層</th><th style="width:190px;">在哪裡</th><th>擋什麼 / 為什麼需要</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>前端</strong></td>
+                <td>瀏覽器 JavaScript<br>（<code>_ValidationScriptsPartial</code>）</td>
+                <td>使用者體驗：不用送出就知道填錯了。<br>
+                    <strong>完全不能信任</strong>——關掉 JS 就沒了。</td>
+            </tr>
+            <tr>
+                <td><strong>後端欄位</strong></td>
+                <td><code>[Required]</code> 等屬性<br>→ <code>ModelState.IsValid</code></td>
+                <td>真正的防線。格式、長度、範圍、必填。</td>
+            </tr>
+            <tr>
+                <td><strong>後端業務</strong></td>
+                <td>Controller / Service 裡自己寫</td>
+                <td>屬性做不到的：<strong>「代碼不能重複」</strong>要查資料才知道、
+                    「請假不能超過班期上限」要算才知道。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout oops">
+        <span class="t">絕對不要只做前端驗證</span>
+        <p>
+            任何人都可以用工具直接對你的 <code>/LeaveTypes/Create</code> 送 POST，
+            <strong>完全跳過你的網頁與 JavaScript</strong>。
+        </p>
+        <p>
+            前端驗證是「體貼」，後端驗證是「安全」。
+            <strong>前端可以省，後端不能省。</strong>
+        </p>
+    </div>
+
+    <h3 class="sub">5.1 兩種加錯誤的方式</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">AddModelError 的兩種用法</span></div>
+        <pre><code><span class="cmt">// 綁在某個欄位上 → 顯示在該欄位的 asp-validation-for 位置</span>
+ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+
+<span class="cmt">// 不綁欄位 → 顯示在 asp-validation-summary="ModelOnly" 的區塊</span>
+ModelState.AddModelError(<span class="kw">string</span>.Empty, <span class="str">"系統設定不完整，請聯絡管理員"</span>);</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">用 nameof 不要用字串</span>
+        寫 <code>nameof(input.Code)</code> 而不是 <code>"Code"</code>：
+        將來屬性改名時，<strong>編譯器會強迫你一起改</strong>，
+        寫死字串則會悄悄失效，錯誤訊息就再也不顯示了。
+    </div>
+
+    <h2 class="sec" id="csrf">6. 防偽權杖：擋掉 CSRF</h2>
+
+    <p>先看攻擊長什麼樣。假設你的網站有一個「刪除假別」的 POST：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">HTML</span><span class="path">攻擊者放在自己網站上的東西</span></div>
+        <pre><code>&lt;form action="https://你的網站/LeaveTypes/Delete/1" method="post" id="evil"&gt;&lt;/form&gt;
+&lt;script&gt;document.getElementById('evil').submit();&lt;/script&gt;</code></pre>
+    </div>
+
+    <p>
+        管理員登入你的網站後，<strong>在同一個瀏覽器</strong>打開了攻擊者的頁面。
+        瀏覽器會自動帶上你網站的 Cookie，於是這個 POST
+        <strong>看起來就像是管理員自己按的</strong>。
+    </p>
+
+    <p>防禦方式是<strong>防偽權杖</strong>：</p>
+
+    <ol>
+        <li>Razor 的 <code>&lt;form method="post"&gt;</code>
+            會<strong>自動</strong>塞一個隱藏欄位 <code>__RequestVerificationToken</code>，值是隨機的</li>
+        <li>同時發一個對應的 Cookie</li>
+        <li><code>[ValidateAntiForgeryToken]</code> 檢查兩者是否配對</li>
+    </ol>
+
+    <p>
+        攻擊者<strong>拿不到那個隨機值</strong>（瀏覽器的同源政策讓他讀不到你網站的頁面內容），
+        所以偽造的表單一定會被擋下來。
+    </p>
+
+    <div class="callout tip">
+        <span class="t">規則很簡單</span>
+        <strong>每一個 <code>[HttpPost]</code> 都要配一個 <code>[ValidateAntiForgeryToken]</code>。</strong>
+        你去看完成品專案，<code>LeaveRequestsController</code>、<code>ApprovalsController</code>、
+        <code>AccountController</code> 的每一個 POST 都有。
+        GET 不需要——因為 GET 本來就不該改變任何資料。
+    </div>
+
+    <div class="callout oops">
+        <span class="t">自己手寫 &lt;form&gt; 會漏掉權杖</span>
+        <p>
+            用 <code>&lt;form asp-action="Create"&gt;</code>（Tag Helper）才會自動加。
+            如果你寫 <code>&lt;form action="/LeaveTypes/Create"&gt;</code>（純 HTML），
+            就<strong>不會有權杖</strong>，送出時會得到
+            <code>400 Bad Request</code>。
+        </p>
+        <p>真的需要手寫的話，在表單裡加 <code>@Html.AntiForgeryToken()</code>。</p>
+    </div>
+
+    <h2 class="sec" id="prg">7. PRG：為什麼一定要轉址</h2>
+
+    <p>
+        <strong>P</strong>ost → <strong>R</strong>edirect → <strong>G</strong>et。
+        存檔成功後不要 <code>return View()</code>，要 <code>return RedirectToAction(...)</code>。
+    </p>
+
+    <p>不這樣做的話：</p>
+
+    <ol>
+        <li>使用者送出表單（POST），你直接回一個畫面</li>
+        <li>網址列還停在 <code>/LeaveTypes/Create</code>，而且瀏覽器記得「這頁是 POST 來的」</li>
+        <li>使用者按 <kbd>F5</kbd> 重新整理</li>
+        <li>瀏覽器問「要重新送出表單嗎？」，使用者按確定</li>
+        <li><strong>又新增了一筆一模一樣的資料</strong></li>
+    </ol>
+
+    <p>
+        改成轉址之後，第 2 步結束時瀏覽器已經跳到 <code>/LeaveTypes</code>（GET），
+        按 F5 重送的是那個 GET，什麼事都不會發生。
+    </p>
+
+    <div class="callout why">
+        <span class="t">這也是 TempData 存在的理由</span>
+        因為中間<strong>隔了一次轉址</strong>，<code>ViewData</code> 早就沒了。
+        <code>TempData</code> 是專門設計來撐過這一次轉址的，
+        而且<strong>讀取後就自動消失</strong>——所以成功訊息不會在你下次進清單頁時又冒出來。
+    </div>
+
+    <h2 class="sec" id="wrap">8. 這個模式你會用一輩子</h2>
+
+    <p>把這一章的骨架記起來，後面每個新增/編輯頁都是它的變形：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">MVC 表單處理的標準骨架</span></div>
+        <pre><code>[HttpGet]
+<span class="kw">public</span> IActionResult Create()
+    =&gt; View(<span class="kw">new</span> XxxViewModel());
+
+[HttpPost]
+[ValidateAntiForgeryToken]
+<span class="kw">public async</span> Task&lt;IActionResult&gt; Create(XxxViewModel input)
+{
+    <span class="kw">if</span> (!ModelState.IsValid)          <span class="cmt">// ① 欄位驗證</span>
+        <span class="kw">return</span> View(input);
+
+    <span class="kw">if</span> (<span class="cmt">/* 業務規則不符 */</span>)            <span class="cmt">// ② 業務驗證</span>
+    {
+        ModelState.AddModelError(<span class="cmt">/* … */</span>);
+        <span class="kw">return</span> View(input);
+    }
+
+    <span class="cmt">// ③ 真的做事</span>
+
+    TempData[<span class="str">"Success"</span>] = <span class="str">"…"</span>;       <span class="cmt">// ④ PRG</span>
+    <span class="kw">return</span> RedirectToAction(nameof(Index));
+}</code></pre>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 5 章檢查點</div>
+        <div class="hint">全部做到再進第 6 章。</div>
+        <ul>
+            <li><span>我能從 <code>/LeaveTypes</code> 按新增、填一筆假別、送出後回到清單看到它。</span></li>
+            <li><span>我把四種錯誤都撞過一次，看到訊息出現在正確的位置。</span></li>
+            <li><span>我知道為什麼要用 ViewModel 而不是直接用 <code>LeaveType</code>（Over-posting）。</span></li>
+            <li><span>我能說出驗證的三層，以及為什麼前端驗證不能取代後端驗證。</span></li>
+            <li><span>我知道 <code>[ValidateAntiForgeryToken]</code> 在擋什麼攻擊。</span></li>
+            <li><span>我能解釋 PRG 模式解決的問題（按 F5 重複送出）。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品的每一個表單都照這個骨架：
+            <code>Controllers/Admin/LeaveTypesController.cs</code>（最單純，就是你剛做的）、
+            <code>Controllers/LeaveRequestsController.cs:71</code>（最複雜，
+            <code>ModelState</code> 之後還有五道業務驗證）。
+        </p>
+        <p>
+            想看那條最複雜的表單流程長什麼樣：
+            <a href="../tutorial/03-leave-submit.html">循序圖教學站 · 03 學員送出請假單</a>。
+            它的第 1～2 步就是你這一章學的東西，第 3 步之後是第 6～11 章的內容。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch04-view-razor.html"><span class="lbl">上一章</span>◀ 第 4 章 View 與 Razor</a>
+        <span class="spacer"></span>
+        <a href="ch06-efcore.html"><span class="lbl">下一章</span>第 6 章 資料庫與 EF Core ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>
