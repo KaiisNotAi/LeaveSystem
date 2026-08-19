@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 2 章 第一個網站 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch02">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 1 · 準備與基礎</div>
+    <h1 class="chapter-title">第 2 章　第一個網站</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        有一個<strong>真的能在瀏覽器打開的網站</strong>，而且知道它產生的每一個資料夾是幹嘛的、
+        <code>Program.cs</code> 那三十行在做什麼。<strong>這個專案會一路用到第 12 章</strong>，
+        不要建完就刪。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>1.5～2 小時</b></span>
+        <span>📦 前置：<a href="ch00-before-you-start.html">第 0 章</a>（工具）、<a href="ch01-csharp-basics.html">第 1 章</a>（語法）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#create">建立專案</a></li>
+            <li><a href="#run">跑起來</a></li>
+            <li><a href="#tree">每個資料夾是什麼</a></li>
+            <li><a href="#program">Program.cs 逐行拆解</a></li>
+            <li><a href="#pipeline">中介軟體管線：順序為什麼重要</a></li>
+            <li><a href="#csproj">.csproj 是什麼</a></li>
+            <li><a href="#firstchange">動手：改掉首頁</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="create">1. 建立專案</h2>
+
+    <p>
+        找一個你放程式碼的地方（例如 <code>D:\code\</code>），開終端機，執行：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">建立專案</span></div>
+        <pre><code>dotnet new mvc -o MyLeaveSystem
+cd MyLeaveSystem</code></pre>
+    </div>
+
+    <table class="doc">
+        <thead><tr><th style="width:170px;">部分</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>dotnet new</code></td><td>從範本建立新專案</td></tr>
+            <tr><td><code>mvc</code></td><td>要用「ASP.NET Core MVC」這個範本。
+                （另外還有 <code>console</code>、<code>webapi</code>、<code>blazor</code> 等）</td></tr>
+            <tr><td><code>-o MyLeaveSystem</code></td><td>輸出到 <code>MyLeaveSystem</code> 這個資料夾，
+                專案名稱也會叫這個</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">想在 Visual Studio 裡做也可以</span>
+        「建立新專案」→ 搜尋「<strong>ASP.NET Core Web 應用程式（Model-View-Controller）</strong>」→
+        名稱填 <code>MyLeaveSystem</code> → 架構選 <strong>.NET 10.0</strong>，
+        「驗證類型」保持<strong>無</strong>（我們第 10 章要自己做）。產生的東西跟上面的指令一模一樣。
+    </div>
+
+    <h2 class="sec" id="run">2. 跑起來</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">在 MyLeaveSystem 資料夾裡</span></div>
+        <pre><code>dotnet run</code></pre>
+    </div>
+
+    <p>你會看到類似這樣的輸出：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">輸出</span><span class="path">終端機</span></div>
+        <pre><code>info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: https://localhost:7123
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5123
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.</code></pre>
+    </div>
+
+    <p>
+        把那個 <code>https://localhost:7123</code> 貼到瀏覽器（你的埠號會不一樣，
+        以自己終端機印出來的為準），應該會看到一個寫著「Welcome」的頁面。
+    </p>
+
+    <p><strong>恭喜，你有一個網站了。</strong>要停止它，回終端機按 <kbd>Ctrl</kbd>+<kbd>C</kbd>。</p>
+
+    <div class="callout oops">
+        <span class="t">常見錯誤一：瀏覽器說「您的連線不是私人連線」</span>
+        <p>
+            這是本機開發用的自簽憑證，瀏覽器不認識它。
+            點「進階」→「繼續前往 localhost」就好。想一勞永逸的話執行一次：
+        </p>
+        <p><code>dotnet dev-certs https --trust</code></p>
+        <p>然後重開瀏覽器。（macOS / Windows 會跳出確認視窗，按同意。）</p>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">常見錯誤二：Address already in use</span>
+        <p>
+            埠號被佔用了——通常是你上次 <code>dotnet run</code> 沒關乾淨。
+            找到那個終端機視窗按 <kbd>Ctrl</kbd>+<kbd>C</kbd>，或直接指定別的埠：
+        </p>
+        <p><code>dotnet run --urls http://localhost:5199</code></p>
+    </div>
+
+    <h2 class="sec" id="tree">3. 每個資料夾是什麼</h2>
+
+    <p>用編輯器打開 <code>MyLeaveSystem</code> 資料夾，你會看到：</p>
+
+    <div class="filetree">MyLeaveSystem/
+├── <span class="hi">Controllers/</span>                <span class="c">← C：接請求、決定回什麼</span>
+│   └── HomeController.cs
+├── <span class="hi">Models/</span>                     <span class="c">← M：資料長什麼樣</span>
+│   └── ErrorViewModel.cs
+├── <span class="hi">Views/</span>                      <span class="c">← V：畫面長什麼樣（.cshtml）</span>
+│   ├── Home/
+│   │   ├── Index.cshtml
+│   │   └── Privacy.cshtml
+│   ├── Shared/
+│   │   ├── _Layout.cshtml           <span class="c">← 每頁共用的外框</span>
+│   │   ├── _Layout.cshtml.css
+│   │   ├── Error.cshtml
+│   │   └── _ValidationScriptsPartial.cshtml
+│   ├── _ViewImports.cshtml          <span class="c">← 所有 View 共用的 using</span>
+│   └── _ViewStart.cshtml            <span class="c">← 所有 View 預設套哪個 Layout</span>
+├── <span class="hi">wwwroot/</span>                    <span class="c">← 靜態檔案，瀏覽器可直接下載</span>
+│   ├── css/site.css
+│   ├── js/site.js
+│   ├── lib/                         <span class="c">← Bootstrap、jQuery 都放這</span>
+│   └── favicon.ico
+├── Properties/
+│   └── launchSettings.json          <span class="c">← 本機啟動設定（埠號等）</span>
+├── appsettings.json                 <span class="c">← 設定檔（之後放連線字串）</span>
+├── appsettings.Development.json     <span class="c">← 開發環境專用，會蓋掉上面那份</span>
+├── Program.cs                       <span class="c">← 整支程式的進入點</span>
+├── MyLeaveSystem.csproj             <span class="c">← 專案設定與套件清單</span>
+├── bin/  obj/                       <span class="c">← 編譯產物，不用管、不要進版控</span>
+</div>
+
+    <div class="callout why">
+        <span class="t">為什麼 wwwroot 要獨立出來？</span>
+        <p>
+            <strong>只有 <code>wwwroot</code> 裡的檔案，瀏覽器能直接用網址抓到。</strong>
+            <code>wwwroot/css/site.css</code> → 網址是 <code>/css/site.css</code>。
+        </p>
+        <p>
+            這是一道安全界線：你的 <code>Program.cs</code>、<code>appsettings.json</code>
+            （裡面有資料庫密碼！）都在 <code>wwwroot</code> 外面，<strong>沒有人能用網址把它們載走</strong>。
+        </p>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">底線開頭的檔案</span>
+        <code>_Layout.cshtml</code>、<code>_ViewStart.cshtml</code>、<code>_ViewImports.cshtml</code>——
+        開頭是 <code>_</code> 的 View 是<strong>給別的 View 用的零件</strong>，
+        使用者不會直接瀏覽到它們。這是慣例，不是語法規定。
+    </div>
+
+    <h2 class="sec" id="program">4. Program.cs 逐行拆解</h2>
+
+    <p>打開 <code>Program.cs</code>，範本產生的內容大概是這樣（我把註解翻成中文）：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Program.cs（範本原始內容）</span></div>
+        <pre><code><span class="kw">var</span> builder = WebApplication.CreateBuilder(args);
+
+<span class="cmt">// ── 第一段：登記服務 ──</span>
+builder.Services.AddControllersWithViews();
+
+<span class="kw">var</span> app = builder.Build();     <span class="cmt">// ← 分界線</span>
+
+<span class="cmt">// ── 第二段：組出請求處理管線 ──</span>
+<span class="kw">if</span> (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(<span class="str">"/Home/Error"</span>);
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseRouting();
+
+app.UseAuthorization();
+
+app.MapStaticAssets();
+
+app.MapControllerRoute(
+    name: <span class="str">"default"</span>,
+    pattern: <span class="str">"{controller=Home}/{action=Index}/{id?}"</span>)
+    .WithStaticAssets();
+
+app.Run();</code></pre>
+    </div>
+
+    <p>
+        <strong>整個檔案只有兩段</strong>，中間被 <code>var app = builder.Build();</code> 切開。
+        這個分界非常重要：
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:150px;"></th><th style="width:200px;">上半段（Build 之前）</th><th>下半段（Build 之後）</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>在做什麼</strong></td>
+                <td>登記「我這個程式會用到哪些服務」</td>
+                <td>組出「每個請求要依序經過哪些處理」</td>
+            </tr>
+            <tr>
+                <td><strong>關鍵字</strong></td>
+                <td><code>builder.Services.Add…</code></td>
+                <td><code>app.Use…</code> / <code>app.Map…</code></td>
+            </tr>
+            <tr>
+                <td><strong>執行次數</strong></td>
+                <td colspan="2">兩段都<strong>只在啟動時跑一次</strong>。之後每個請求走的是下半段組出來的管線。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="sub">4.1 上半段：<code>AddControllersWithViews()</code></h3>
+
+    <p>
+        這一行告訴框架：「我要用 MVC，請把 Controller 掃描出來、把 Razor 引擎準備好」。
+        沒有它，你的 <code>HomeController</code> 就只是一個沒人理的普通類別。
+    </p>
+
+    <p>
+        後面章節你會在這裡愈加愈多行：第 6 章加 <code>AddDbContext</code>（資料庫）、
+        第 9 章加 <code>AddScoped</code>（自己的服務）、第 10 章加 <code>AddAuthentication</code>（登入）。
+    </p>
+
+    <h3 class="sub">4.2 下半段：每個 <code>app.Use…</code> 是一層</h3>
+
+    <p>
+        把一個 HTTP 請求想像成<strong>過安檢</strong>：
+        它要一關一關通過，每一關都可以檢查、修改，甚至直接把它擋下來退回去。
+        每個 <code>app.UseXxx()</code> 就是一關，<strong>順序就是註冊的順序</strong>。
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:230px;">這一關</th><th>做什麼</th></tr></thead>
+        <tbody>
+            <tr><td><code>UseExceptionHandler</code></td>
+                <td>包在最外面。裡面任何一關爆炸，都由它接住並顯示友善錯誤頁。
+                    只在<strong>非</strong>開發環境啟用——開發時你反而想看到完整的錯誤堆疊。</td></tr>
+            <tr><td><code>UseHttpsRedirection</code></td>
+                <td>用 <code>http://</code> 進來的，轉去 <code>https://</code>。</td></tr>
+            <tr><td><code>UseRouting</code></td>
+                <td><strong>看網址，決定「這個請求該交給哪個 Controller 的哪個 Action」</strong>。
+                    注意：只是「決定」，還沒真的執行。</td></tr>
+            <tr><td><code>UseAuthorization</code></td>
+                <td>檢查「這個人能不能存取剛才決定好的那個 Action」。第 10 章的主角。</td></tr>
+            <tr><td><code>MapStaticAssets</code></td>
+                <td>如果網址對應到 <code>wwwroot</code> 裡的檔案，直接回傳檔案，不用麻煩 Controller。</td></tr>
+            <tr><td><code>MapControllerRoute</code></td>
+                <td>真正把請求交給 Controller 執行。</td></tr>
+            <tr><td><code>app.Run()</code></td>
+                <td>開始監聽。<strong>這一行會一直卡住不返回</strong>，直到你按 Ctrl+C。</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="pipeline">5. 中介軟體管線：順序為什麼重要</h2>
+
+    <p>用實際的例子感受一下。<code>UseRouting</code> 一定要在 <code>UseAuthorization</code> <strong>前面</strong>，因為：</p>
+
+    <ol>
+        <li><code>UseRouting</code> 先看網址，算出「這個請求要去 <code>AdminController.Users</code>」。</li>
+        <li><code>UseAuthorization</code> 才知道要去看 <code>AdminController.Users</code> 上面掛了什麼權限規則。</li>
+    </ol>
+
+    <p>順序反過來的話，授權那一關根本還不知道要檢查哪個 Action 的規則，等於形同虛設。</p>
+
+    <div class="callout oops">
+        <span class="t">這種錯不會有編譯錯誤</span>
+        <p>
+            管線順序寫錯<strong>編譯完全正常，網站也跑得起來</strong>——
+            只是安全檢查悄悄失效，或者所有頁面莫名其妙都變成拒絕存取。
+        </p>
+        <p>
+            這就是為什麼要把順序背起來：
+            <strong>Routing → Authentication →Authorization → Map</strong>。
+            （<code>UseAuthentication</code> 你現在還沒有，第 10 章會加。）
+        </p>
+    </div>
+
+    <h3 class="sub">5.1 親眼看一次管線</h3>
+
+    <p>在 <code>UseRouting()</code> 上面插一段自己的中介軟體，印出每個請求的網址：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs</span></div>
+        <pre><code>app.UseHttpsRedirection();
+
+<span class="add"><span class="cmt">// 臨時：把每個進來的請求印出來（本節結束後刪掉）</span></span>
+<span class="add">app.Use(<span class="kw">async</span> (context, next) =&gt;</span>
+<span class="add">{</span>
+<span class="add">    Console.WriteLine($<span class="str">"→ 進來了：{context.Request.Method} {context.Request.Path}"</span>);</span>
+<span class="add">    <span class="kw">await</span> next();                       <span class="cmt">// 交給下一關</span></span>
+<span class="add">    Console.WriteLine($<span class="str">"← 回去了：{context.Response.StatusCode}"</span>);</span>
+<span class="add">});</span>
+
+app.UseRouting();</code></pre>
+    </div>
+
+    <p>存檔、<code>dotnet run</code>、開瀏覽器，看終端機：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">輸出</span><span class="path">終端機</span></div>
+        <pre><code>→ 進來了：GET /
+← 回去了：200
+→ 進來了：GET /lib/bootstrap/dist/css/bootstrap.min.css
+← 回去了：200
+→ 進來了：GET /favicon.ico
+← 回去了：200</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">注意 await next() 的前後都有輸出</span>
+        <p>
+            這說明管線是<strong>雙向</strong>的：請求「進去」時經過每一關，
+            回應「出來」時<strong>再反向經過一次</strong>。
+        </p>
+        <p>
+            所以 <code>UseExceptionHandler</code> 放在最外層才有意義——
+            它要能接住從裡面任何一層丟出來的例外。
+        </p>
+    </div>
+
+    <p><strong>看完之後把這段刪掉</strong>，它只是拿來理解用的。</p>
+
+    <h2 class="sec" id="csproj">6. .csproj 是什麼</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">XML</span><span class="path">MyLeaveSystem.csproj</span></div>
+        <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+  &lt;/PropertyGroup&gt;
+
+&lt;/Project&gt;</code></pre>
+    </div>
+
+    <table class="doc">
+        <thead><tr><th style="width:200px;">設定</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>Sdk="…Sdk.Web"</code></td><td>這是個網站專案（相對於 <code>Microsoft.NET.Sdk</code> 是一般專案）</td></tr>
+            <tr><td><code>TargetFramework</code></td><td>要跑在 .NET 10 上</td></tr>
+            <tr><td><code>Nullable</code></td><td><a href="ch01-csharp-basics.html#null">第 1 章第 3 節</a>講的 null 檢查，打開</td></tr>
+            <tr><td><code>ImplicitUsings</code></td><td>常用的 <code>using</code>（<code>System</code>、<code>System.Linq</code> 等）
+                自動幫你加，所以你的檔案上面才不用寫一長串</td></tr>
+        </tbody>
+    </table>
+
+    <p>
+        <strong>你的 <code>.csproj</code> 現在沒有任何套件參考。</strong>
+        第 6 章裝 EF Core、第 10 章裝 BCrypt 時，這裡會多出 <code>&lt;PackageReference&gt;</code> 區塊。
+    </p>
+
+    <div class="callout tip">
+        <span class="t">重要慣例：一個 class 一個檔案，檔名 = 類別名</span>
+        C# 沒有強制，但所有專案都這樣做。
+        <code>LeaveType</code> 類別就放在 <code>LeaveType.cs</code>。
+        你等一下建新檔案時請遵守，不然找檔案會找到瘋掉。
+    </div>
+
+    <h2 class="sec" id="firstchange">7. 動手：改掉首頁</h2>
+
+    <p>最後做一個小改動，確認你的修改真的會反映到畫面上。打開 <code>Views/Home/Index.cshtml</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/Home/Index.cshtml</span></div>
+        <pre><code>@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"首頁"</span>;
+}
+
+&lt;div class="text-center"&gt;
+    &lt;h1 class="display-4"&gt;學生請假系統&lt;/h1&gt;
+    &lt;p&gt;線上化請假流程，三方協作更有效率。&lt;/p&gt;
+    &lt;p class="text-muted"&gt;現在時間：@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+    </div>
+
+    <p>存檔、重新整理瀏覽器。應該會看到新標題，而且<strong>每次重新整理時間都會變</strong>。</p>
+
+    <div class="callout why">
+        <span class="t">那個 @ 是什麼？</span>
+        <p>
+            <code>.cshtml</code> 是 <strong>Razor</strong> 檔案：HTML 裡面可以插 C#。
+            <code>@</code> 就是「接下來這段是 C#，請執行它、把結果印出來」。
+        </p>
+        <p>
+            所以 <code>@DateTime.Now…</code> 是<strong>在伺服器上</strong>執行的，
+            每次請求都會重算一次，然後把算出來的字串放進送給瀏覽器的 HTML 裡。
+            第 4 章整章都在講 Razor。
+        </p>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">不用每次都重啟</span>
+        改 <code>.cshtml</code> 通常存檔後重新整理就生效。
+        但改 <code>.cs</code>（C# 程式碼）需要重新編譯——
+        用 <code>dotnet watch run</code> 取代 <code>dotnet run</code>，它會自動偵測並重啟。
+        Visual Studio 按 F5 有內建的「熱重載」，效果一樣。
+    </div>
+
+    <div class="callout oops">
+        <span class="t">改了沒反應？</span>
+        <p>三個嫌疑犯，依序檢查：</p>
+        <p><strong>①</strong> 檔案沒存檔。<strong>②</strong> 改的是 <code>.cs</code> 但沒重新編譯。
+           <strong>③</strong> 瀏覽器快取——按 <kbd>Ctrl</kbd>+<kbd>F5</kbd> 強制重新整理。</p>
+    </div>
+
+    <h2 class="sec" id="next">8. 你現在的專案長什麼樣</h2>
+
+    <p>
+        一個能跑的空殼網站：有首頁、有隱私權頁、套了 Bootstrap 樣式，
+        但<strong>沒有資料庫、沒有登入、沒有任何業務功能</strong>。
+    </p>
+
+    <p>接下來三章會把 MVC 的三個字母各講一遍：</p>
+    <ul>
+        <li><strong>第 3 章</strong>：網址是怎麼變成 <code>HomeController.Index()</code> 這個方法呼叫的（<strong>C</strong>）</li>
+        <li><strong>第 4 章</strong>：資料是怎麼從 Controller 跑到畫面上的（<strong>V</strong>）</li>
+        <li><strong>第 5 章</strong>：使用者填的表單是怎麼變回 C# 物件的（<strong>M</strong>）</li>
+    </ul>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 2 章檢查點</div>
+        <div class="hint">全部做到再進第 3 章。</div>
+        <ul>
+            <li><span><code>MyLeaveSystem</code> 專案建好了，<code>dotnet run</code> 之後能在瀏覽器打開。</span></li>
+            <li><span>我能說出 <code>Controllers</code>、<code>Views</code>、<code>wwwroot</code> 各放什麼，以及為什麼只有 <code>wwwroot</code> 能被瀏覽器直接下載。</span></li>
+            <li><span>我知道 <code>Program.cs</code> 被 <code>builder.Build()</code> 切成「登記服務」與「組管線」兩段。</span></li>
+            <li><span>我實際插過那段 <code>app.Use(...)</code>，在終端機看到請求進出的訊息（看完已刪除）。</span></li>
+            <li><span>我改了 <code>Views/Home/Index.cshtml</code> 的標題，重新整理後看到變化。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品的 <code>Program.cs</code> 有 132 行，是你現在這份的四倍多——
+            因為它多了資料庫、九個服務、Cookie 認證、啟動時自動建表。
+            但<strong>骨架完全一樣</strong>：上半段 <code>builder.Services.Add…</code>，
+            下半段 <code>app.Use…</code>。
+        </p>
+        <p>
+            兩個小差異：完成品<strong>拿掉了</strong> <code>UseHttpsRedirection()</code>
+            （本機只跑 http），並且在 <code>UseAuthorization()</code> 前面多了
+            <code>UseAuthentication()</code>。
+        </p>
+        <p>
+            想現在就看整條啟動流程的圖：
+            <a href="../tutorial/01-startup-di.html">循序圖教學站 · 01 啟動與 DI 生命週期</a>。
+            （現在會看不太懂，第 9 章之後再回來看剛剛好。）
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch01-csharp-basics.html"><span class="lbl">上一章</span>◀ 第 1 章 C# 夠用就好</a>
+        <span class="spacer"></span>
+        <a href="ch03-routing-controller.html"><span class="lbl">下一章</span>第 3 章 路由與 Controller ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

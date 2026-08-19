@@ -109,4 +109,26 @@
         const target = document.querySelector(window.location.hash);
         if (target) setTimeout(() => target.scrollIntoView({ block: 'start' }), 100);
     }
+
+    // 8. 自動載入截圖
+    //    圖檔由 tools/ScreenshotCapture 產生，命名規則為 assets/screenshots/{data-shot}.png。
+    //    載入成功才把 figure 標成 .has-shot（CSS 會藏起虛線佔位）；
+    //    載入失敗就把 <img> 移除，維持原本的佔位框，版面不會破。
+    document.querySelectorAll('figure[data-shot]').forEach((fig) => {
+        const key = fig.getAttribute('data-shot');
+        if (!key) return;
+
+        const caption = fig.querySelector('figcaption');
+        const img = new Image();
+        img.className = 'shot-img';
+        img.alt = (caption && caption.textContent.trim()) || key;
+
+        img.addEventListener('load', () => {
+            fig.classList.add('has-shot');
+            fig.insertBefore(img, caption || null);
+        });
+        img.addEventListener('error', () => { /* 尚未補圖，保留虛線佔位 */ });
+
+        img.src = 'assets/screenshots/' + key + '.png';
+    });
 })();

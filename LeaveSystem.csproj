@@ -13,6 +13,14 @@
     <None Remove="LeaveSystem.Tests\**\*" />
   </ItemGroup>
 
+  <!-- tools/ 下是離線輔助工具（截圖擷取等），不屬於網站本體，需排除避免被根目錄 glob 收進來 -->
+  <ItemGroup>
+    <Compile Remove="tools\**\*.cs" />
+    <Content Remove="tools\**\*" />
+    <EmbeddedResource Remove="tools\**\*" />
+    <None Remove="tools\**\*" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include=".github\copilot-instructions.md" />
   </ItemGroup>

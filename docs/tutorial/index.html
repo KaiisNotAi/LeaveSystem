@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>學生請假系統 — 程式流程循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="用互動循序圖說明學生請假系統每一條流程的 Controller → Service → EF Core 呼叫關係，並逐一對照真實的方法名稱與檔案行號。">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="../learn/index.html">📘 新手入門書</a>
+            <a href="index.html" class="current">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Sequence Diagrams</div>
+    <h1 class="page-title">一次看懂：每個 Controller、Service、方法是怎麼串起來的</h1>
+
+    <p class="lead">
+        <code>docs/08-程式碼閱讀指南.md</code> 用文字箭頭說明「請求會經過哪些檔案」，
+        但看不出<strong>呼叫的是哪個方法、參數是什麼、在第幾行、回傳什麼</strong>。
+        本站把八條主要流程各畫成一張循序圖，圖上每一支箭頭都標著<strong>真實的方法簽章</strong>，
+        點下去就會跳到對應的程式碼節錄與 <code>檔案:行號</code>。
+    </p>
+
+    <div class="callout" style="background:#ecfdf5; border:1px solid #a7f3d0; border-left:5px solid #10b981;
+                                border-radius:0 10px 10px 0; padding:14px 18px; margin:18px 0;">
+        <strong style="color:#047857;">📘 還沒學過 ASP.NET Core MVC？本站會太跳。</strong><br>
+        本站假設你已經懂 MVC、EF Core、DI 這些觀念，只是不熟<strong>這個專案</strong>。
+        如果你是從零開始，請先走
+        <a href="../learn/index.html"><strong>從零開始學 ASP.NET Core MVC</strong></a>——
+        那是一本從空白專案一步步蓋出這整套系統的入門書。走完再回來，這八張圖會非常好讀。
+    </div>
+
+    <section class="block">
+        <h2>怎麼使用</h2>
+        <table class="doc">
+            <thead>
+                <tr><th style="width:210px;">操作</th><th>效果</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>滑鼠移過箭頭 / 卡片</td><td>圖與程式碼互相高亮，其他步驟淡出</td></tr>
+                <tr><td>點擊箭頭</td><td>跳到下方對應的程式碼卡片</td></tr>
+                <tr><td><b>▶ 逐步播放</b></td><td>依序點亮步驟 1…N，像跟著呼叫堆疊走一次</td></tr>
+                <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>上一步 / 下一步</td></tr>
+                <tr><td><kbd>Space</kbd></td><td>播放 / 暫停</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>取消高亮</td></tr>
+                <tr><td><kbd>F</kbd> / <kbd>Home</kbd></td><td>全螢幕 / 回目錄</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="block">
+        <h2>圖例：lifeline 的顏色代表哪一層</h2>
+        <div class="diagram-panel">
+            <div class="legend" style="font-size:14px; gap:10px 22px;">
+                <span><i style="border-color:var(--layer-client)"></i> 瀏覽器 / 使用者</span>
+                <span><i style="border-color:var(--layer-pipeline)"></i> 中介軟體管線（Routing / Authentication / Authorization）</span>
+                <span><i style="border-color:var(--layer-controller)"></i> Controller（<code>Controllers/</code>）</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service（<code>Services/</code>，商業規則）</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core / AppDbContext</span>
+                <span><i style="border-color:var(--layer-db)"></i> SQL Server</span>
+                <span><i style="border-color:var(--layer-external)"></i> 外部（MailKit / 檔案系統）</span>
+            </div>
+            <p style="margin:12px 0 4px; font-size:14.5px; color:var(--text-muted);">
+                實線箭頭 ⟶ 是呼叫，虛線箭頭 ⇠ 是回傳。分層順序固定由左到右，
+                所以<strong>箭頭愈往右，代表離資料庫愈近</strong>。
+            </p>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>八條流程</h2>
+        <div class="flow-grid">
+
+            <a class="flow-card" href="01-startup-di.html">
+                <div class="no">01</div>
+                <h3>啟動與 DI 生命週期</h3>
+                <p>程式從哪一行開始跑？服務怎麼註冊？資料庫怎麼自動建好？中介軟體為什麼有順序？</p>
+                <div class="files">Program.cs · Data/AppDbContext.cs · Data/SeedData.cs</div>
+            </a>
+
+            <a class="flow-card" href="02-auth.html">
+                <div class="no">02</div>
+                <h3>登入認證與 Cookie</h3>
+                <p>帳密怎麼驗？BCrypt 比對什麼？角色怎麼變成 Claims？<code>[Authorize(Roles=…)]</code> 是拿什麼在比？</p>
+                <div class="files">AccountController.cs · AuthService.cs · BcryptPasswordHasher.cs</div>
+            </a>
+
+            <a class="flow-card" href="03-leave-submit.html">
+                <div class="no">03</div>
+                <h3>學員送出請假單</h3>
+                <p>最長的一條路：時數計算 → 班期上限檢查 → 比對簽核規則 → 依規則展開 N 關簽核步驟 → 發通知。</p>
+                <div class="files">LeaveRequestsController.cs · LeaveCalculator.cs · ApprovalRule</div>
+            </a>
+
+            <a class="flow-card" href="04-approval.html">
+                <div class="no">04</div>
+                <h3>簽核引擎：核准與駁回</h3>
+                <p>誰有權簽這一關？五道防線怎麼擋越權？核准後是轉下一關還是整張結案？</p>
+                <div class="files">ApprovalsController.cs · ApprovalService.cs</div>
+            </a>
+
+            <a class="flow-card" href="05-notification.html">
+                <div class="no">05</div>
+                <h3>站內通知 + Email 雙軌派送</h3>
+                <p>Dispatcher 怎麼找到「這一關該通知誰」？為什麼通知失敗不能讓簽核跟著失敗？</p>
+                <div class="files">NotificationDispatcher.cs · NotificationService.cs · MailKitEmailSender.cs</div>
+            </a>
+
+            <a class="flow-card" href="06-report.html">
+                <div class="no">06</div>
+                <h3>紀錄查詢與時數統計</h3>
+                <p>三種報表共用一個 Service；為什麼有些查詢要 <code>ToListAsync()</code> 之後才 GroupBy？</p>
+                <div class="files">ReportsController.cs · LeaveReportService.cs</div>
+            </a>
+
+            <a class="flow-card" href="07-absence.html">
+                <div class="no">07</div>
+                <h3>曠課紀錄 CRUD 與雙 Controller 分流</h3>
+                <p>同名的兩個 <code>AbsenceRecordsController</code> 怎麼共存？稽核欄位為什麼不能在 Update 時覆寫？</p>
+                <div class="files">Controllers/AbsenceRecordsController.cs · Controllers/Admin/… · AbsenceRecordService.cs</div>
+            </a>
+
+            <a class="flow-card" href="08-export.html">
+                <div class="no">08</div>
+                <h3>匯出 CSV / Excel</h3>
+                <p>一次 GET 怎麼變成一個多 sheet 的 .xlsx？CSV 為什麼要加 UTF-8 BOM？</p>
+                <div class="files">Admin/ExportController.cs · ClosedXmlExcelExporter.cs · CsvExporter.cs</div>
+            </a>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>搭配哪些既有文件一起看</h2>
+        <table class="doc">
+            <thead>
+                <tr><th style="width:280px;">文件</th><th>本站補足了什麼</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><a href="../02-系統架構.md">02-系統架構.md</a></td>
+                    <td>那份講「有哪些層」，本站講「一次請求實際怎麼穿過這些層」。</td>
+                </tr>
+                <tr>
+                    <td><a href="../04-請假與簽核流程.md">04-請假與簽核流程.md</a></td>
+                    <td>那份講業務規則（狀態機、門檻、口徑），本站對應到實作那些規則的方法。</td>
+                </tr>
+                <tr>
+                    <td><a href="../08-程式碼閱讀指南.md">08-程式碼閱讀指南.md</a></td>
+                    <td>那份的文字箭頭圖是純文字版；本站是可點擊、可逐步播放的版本。</td>
+                </tr>
+                <tr>
+                    <td><a href="../09-學習路徑.md">09-學習路徑.md</a></td>
+                    <td>照模組學到哪一段，就開對應的那張圖當地圖。</td>
+                </tr>
+                <tr>
+                    <td><a href="../report/index.html">專題報告投影片</a></td>
+                    <td>報告講「做了什麼」給外部看；本站講「怎麼做的」給接手的人看。</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <div class="pager">
+        <span class="spacer"></span>
+        <a href="01-startup-di.html">01 啟動與 DI 生命週期 ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

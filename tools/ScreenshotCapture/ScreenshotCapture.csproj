@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LeaveSystem.Tools.ScreenshotCapture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 驅動程式（node）已內含於套件中，使用系統既有的 Chrome（Channel = "chrome"）不需額外下載瀏覽器 -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.62.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 直接複用網站專案的 AppDbContext / Entities / BCrypt，不重寫一份資料存取 -->
+    <ProjectReference Include="..\..\LeaveSystem.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="mocks\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>05 站內通知 + Email 派送 — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html" class="current">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 05 · Notification &amp; Email Dispatch</div>
+    <h1 class="page-title">站內通知 + Email 雙軌派送</h1>
+
+    <p class="lead">
+        送單與簽核流程都只呼叫一行 <code>NotifyXxxAsync(leaveRequestId)</code>，
+        <strong>剩下的全部由 <code>NotificationDispatcher</code> 負責</strong>：
+        查出這一關該通知誰、組出標題與內文、同時寫進站內通知與寄出 Email。
+        整個檔案最重要的設計是<strong>「通知失敗絕不能讓簽核跟著失敗」</strong>。
+    </p>
+
+    <section class="block">
+        <h2>循序圖：通知當前關卡的簽核人</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 750" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="通知派送流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <line class="lifeline" x1="90" y1="52" x2="90" y2="726"/>
+                <line class="lifeline" x1="330" y1="52" x2="330" y2="726"/>
+                <line class="lifeline" x1="590" y1="52" x2="590" y2="726"/>
+                <line class="lifeline" x1="850" y1="52" x2="850" y2="726"/>
+                <line class="lifeline" x1="1110" y1="52" x2="1110" y2="726"/>
+
+                <g class="actor controller">
+                    <rect x="12" y="8" width="156" height="44"/>
+                    <text x="90" y="26">呼叫端</text>
+                    <text class="sub" x="90" y="42">Controller / Service</text>
+                </g>
+                <g class="actor service">
+                    <rect x="242" y="8" width="176" height="44"/>
+                    <text x="330" y="26">NotificationDispatcher</text>
+                    <text class="sub" x="330" y="42">INotificationDispatcher</text>
+                </g>
+                <g class="actor data">
+                    <rect x="502" y="8" width="176" height="44"/>
+                    <text x="590" y="26">AppDbContext</text>
+                    <text class="sub" x="590" y="42">EF Core</text>
+                </g>
+                <g class="actor service">
+                    <rect x="762" y="8" width="176" height="44"/>
+                    <text x="850" y="26">NotificationService</text>
+                    <text class="sub" x="850" y="42">站內通知</text>
+                </g>
+                <g class="actor external">
+                    <rect x="1022" y="8" width="176" height="44"/>
+                    <text x="1110" y="26">MailKitEmailSender</text>
+                    <text class="sub" x="1110" y="42">PickupDirectory</text>
+                </g>
+
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="90" y1="104" x2="322" y2="104"/>
+                    <text class="label" x="206" y="96">NotifySubmittedAsync(leaveRequestId)</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,150 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="168">NotifyApproverAtCurrentLevelAsync(id, isFirstSubmission: true)</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="220" x2="582" y2="220"/>
+                    <text class="label" x="456" y="212">LoadRequestAsync（含 Student.Cohort、LeaveType）</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="278" x2="582" y2="278"/>
+                    <text class="label" x="456" y="270">查 Level == CurrentLevel 的那一關</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,324 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="342">ResolveApproverUserId(cohort, step.ApproverRole)</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <g class="msg" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="394" x2="582" y2="394"/>
+                    <text class="label" x="456" y="386">UserAccounts.FirstOrDefaultAsync(收件人)</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <path class="selfpath" d="M330,440 h80 v22 h-72"/>
+                    <text class="label left" x="424" y="458">組標題 / 內文 / BuildApprovalUrl(id) → DispatchAsync</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="510" x2="842" y2="510"/>
+                    <text class="label" x="586" y="502">NotificationService.CreateAsync(userId, title, message, url)</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <g class="msg" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <line class="arrow" x1="850" y1="568" x2="598" y2="568"/>
+                    <text class="label" x="724" y="560">Notifications.Add + SaveChangesAsync</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <g class="msg" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="626" x2="1102" y2="626"/>
+                    <text class="label" x="716" y="618">若 recipient.Email 不為空 → SendAsync(...)</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+                <g class="msg ret" data-step="11">
+                    <rect class="hit" x="8" y="656" width="1184" height="46"/>
+                    <line class="arrow" x1="330" y1="684" x2="98" y2="684"/>
+                    <text class="label" x="214" y="676">總是正常返回（例外都被 try/catch 吞掉並寫 log）</text>
+                    <circle class="numbg" cx="24" cy="684" r="10"/>
+                    <text class="num" x="24" y="688" text-anchor="middle">11</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-controller)"></i> 呼叫端</span>
+                <span><i style="border-color:var(--layer-service)"></i> Service</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-external)"></i> Email</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>五個觸發點，兩種收件人</h2>
+        <table class="doc">
+            <thead>
+                <tr><th style="width:250px;">方法</th><th style="width:130px;">收件人</th><th>由誰呼叫</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>NotifySubmittedAsync</code><br><span style="font-size:12px;color:var(--text-muted)">:33</span></td>
+                    <td>第 1 關簽核人</td>
+                    <td><code>LeaveRequestsController.Create</code>（<a href="03-leave-submit.html">03</a> 第 10 步）</td>
+                </tr>
+                <tr>
+                    <td><code>NotifyApprovedNextAsync</code><br><span style="font-size:12px;color:var(--text-muted)">:36</span></td>
+                    <td>下一關簽核人</td>
+                    <td><code>ApprovalService.ApproveAsync</code>（<a href="04-approval.html">04</a> 第 11 步）</td>
+                </tr>
+                <tr>
+                    <td><code>NotifyFullyApprovedAsync</code><br><span style="font-size:12px;color:var(--text-muted)">:39</span></td>
+                    <td><strong>學員</strong></td>
+                    <td><code>ApprovalService.ApproveAsync</code>（最後一關）</td>
+                </tr>
+                <tr>
+                    <td><code>NotifyRejectedAsync</code><br><span style="font-size:12px;color:var(--text-muted)">:57</span></td>
+                    <td><strong>學員</strong></td>
+                    <td><code>ApprovalService.RejectAsync</code></td>
+                </tr>
+                <tr>
+                    <td><code>NotifyCancelledAsync</code><br><span style="font-size:12px;color:var(--text-muted)">:75</span></td>
+                    <td>當前關卡簽核人</td>
+                    <td><code>LeaveRequestsController.Cancel</code></td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top:10px;">
+            前兩個共用同一個私有方法 <code>NotifyApproverAtCurrentLevelAsync</code>
+            （<code>:104</code>），只差在標題文案；<code>isFirstSubmission</code> 這個布林值的唯一用途就是選標題。
+        </p>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">Task NotifySubmittedAsync(int leaveRequestId, CancellationToken ct = default)</span>
+                    <span class="loc">Services/Notifications/INotificationDispatcher.cs:10</span>
+                </div>
+                <p class="desc">
+                    介面刻意<strong>只收 Id</strong>，不收整個實體。呼叫端不必先把關聯載齊，
+                    Dispatcher 自己會查它需要的東西；也讓「送單」與「通知」兩件事完全解耦。
+                </p>
+                <pre><code>Task NotifySubmittedAsync(<span class="kw">int</span> leaveRequestId, CancellationToken cancellationToken = <span class="kw">default</span>);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">=&gt; NotifyApproverAtCurrentLevelAsync(id, isFirstSubmission: true, ct)</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:33–37</span>
+                </div>
+                <p class="desc">
+                    兩個公開方法只是同一段邏輯的兩個入口，用<strong>具名引數</strong>
+                    <code>isFirstSubmission:</code> 讓呼叫端一眼看出差別，
+                    比傳一個裸露的 <code>true</code> / <code>false</code> 好讀。
+                </p>
+                <pre><code><span class="kw">public</span> Task NotifySubmittedAsync(<span class="kw">int</span> id, CancellationToken ct = <span class="kw">default</span>)
+    =&gt; NotifyApproverAtCurrentLevelAsync(id, isFirstSubmission: <span class="kw">true</span>, ct);
+
+<span class="kw">public</span> Task NotifyApprovedNextAsync(<span class="kw">int</span> id, CancellationToken ct = <span class="kw">default</span>)
+    =&gt; NotifyApproverAtCurrentLevelAsync(id, isFirstSubmission: <span class="kw">false</span>, ct);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">LoadRequestAsync(leaveRequestId, ct)</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:159–165</span>
+                </div>
+                <p class="desc">
+                    一次載齊通知內容需要的三樣東西：
+                    <strong>學員姓名</strong>（Student）、<strong>班期的簽核人指派</strong>（Student.Cohort）、
+                    <strong>假別名稱</strong>（LeaveType）。查不到就靜靜返回，不丟例外。
+                </p>
+                <pre><code><span class="kw">return</span> _db.LeaveRequests
+    .Include(r =&gt; r.Student).ThenInclude(u =&gt; u.Cohort)
+    .Include(r =&gt; r.LeaveType)
+    .FirstOrDefaultAsync(r =&gt; r.Id == leaveRequestId, cancellationToken);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">_db.LeaveRequestSteps.Where(Level == req.CurrentLevel).FirstOrDefaultAsync()</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:111–114</span>
+                </div>
+                <p class="desc">
+                    <strong>「當前這一關」是查出來的，不是傳進來的。</strong>
+                    這讓同一段程式可以服務兩種情境：送單後（CurrentLevel = 1）
+                    與核准轉關後（CurrentLevel 已被 <a href="04-approval.html">04</a> 第 9 步推進）。
+                </p>
+                <pre><code><span class="kw">var</span> currentStep = <span class="kw">await</span> _db.LeaveRequestSteps
+    .Where(s =&gt; s.LeaveRequestId == leaveRequestId &amp;&amp; s.Level == req.CurrentLevel)
+    .FirstOrDefaultAsync(cancellationToken);
+<span class="kw">if</span> (currentStep <span class="kw">is null</span>) <span class="kw">return</span>;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">ResolveApproverUserId(req.Student.Cohort, currentStep.ApproverRole)</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:167–173</span>
+                </div>
+                <p class="desc">
+                    跟 <a href="04-approval.html">04 簽核</a>第 6 步的 <code>GetAssignedApproverId</code>
+                    是<strong>同一條規則的兩份實作</strong>：角色字串 → 班期上對應的 UserId。
+                    兩邊必須一致，否則會出現「通知了 A，但只有 B 簽得下去」的錯亂。
+                </p>
+                <pre><code><span class="kw">private static int</span>? ResolveApproverUserId(Cohort cohort, <span class="kw">string</span> role) =&gt; role <span class="kw">switch</span>
+{
+    RoleTutor          =&gt; cohort.TutorUserId,
+    RoleSectionChief   =&gt; cohort.SectionChiefUserId,
+    RoleBranchDirector =&gt; cohort.BranchDirectorUserId,
+    _ =&gt; <span class="kw">null</span>
+};</code></pre>
+                <div class="callout warn">
+                    <div class="t">這是一個已知的重複</div>
+                    <code>ApprovalService.GetAssignedApproverId</code> 與此方法邏輯相同但各寫一份。
+                    未來若要調整簽核人解析規則（例如加代理人），<strong>兩處都要改</strong>。
+                    可以考慮抽成共用的 <code>CohortApproverResolver</code>。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">_db.UserAccounts.FirstOrDefaultAsync(u =&gt; u.Id == approverId.Value, ct)</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:119–120</span>
+                </div>
+                <p class="desc">
+                    上一步拿到的只是 Id，這裡才把<strong>收件人本人</strong>撈出來——
+                    因為第 10 步要用他的 <code>Email</code> 欄位。
+                    班期沒指派該角色（<code>approverId is null</code>）就靜靜返回，單子照樣停在那一關等人來簽。
+                </p>
+                <pre><code><span class="kw">var</span> approver = <span class="kw">await</span> _db.UserAccounts
+    .FirstOrDefaultAsync(u =&gt; u.Id == approverId.Value, cancellationToken);
+<span class="kw">if</span> (approver <span class="kw">is null</span>) <span class="kw">return</span>;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">BuildApprovalUrl(id) → DispatchAsync(approver, title, message, url, ct)</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:122–127, 176</span>
+                </div>
+                <p class="desc">
+                    標題依 <code>isFirstSubmission</code> 分兩種；內文帶入學員姓名、假別、時數。
+                    <code>BuildApprovalUrl</code> 產生的<strong>相對路徑</strong>會存進通知，
+                    讓使用者從通知中心一鍵跳到那張單。
+                </p>
+                <pre><code><span class="kw">var</span> url = BuildApprovalUrl(leaveRequestId);
+<span class="kw">var</span> title = isFirstSubmission
+    ? <span class="str">"您有新的請假申請待簽核"</span>
+    : <span class="str">"有請假申請進入您這一關待簽核"</span>;
+<span class="kw">var</span> message = $<span class="str">"學員 {req.Student.DisplayName} 送出的請假申請（{req.LeaveType?.Name} {req.TotalHours:0.##}h）需要您簽核。"</span>;
+<span class="kw">await</span> DispatchAsync(approver, title, message, url, cancellationToken);
+
+<span class="cmt">// :176</span>
+<span class="kw">private static string</span> BuildApprovalUrl(<span class="kw">int</span> id) =&gt; $<span class="str">"/Approvals/Details/{id}"</span>;</code></pre>
+                <div class="callout">
+                    <div class="t">歷史包袱</div>
+                    這個方法曾經寫成單數的 <code>/Approvals/Detail/{id}</code>，讓舊通知點下去 404。
+                    修正之後，<code>Program.cs:101</code> 還留了一段 <code>ExecuteSqlRaw</code>
+                    在每次啟動時把資料庫裡的舊連結一併修好。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">DispatchAsync — 站內通知那一軌</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:135–144</span>
+                </div>
+                <p class="desc">
+                    <strong>本檔最關鍵的設計。</strong>站內通知包在自己的 <code>try/catch</code> 裡：
+                    寫失敗就寫一行 log，然後<strong>繼續往下走</strong>去寄 Email。
+                    兩軌互不影響，也都不會把例外拋回簽核流程。
+                </p>
+                <pre><code><span class="kw">try</span>
+{
+    <span class="kw">await</span> _notifications.CreateAsync(recipient.Id, title, message, url);
+}
+<span class="kw">catch</span> (Exception ex)
+{
+    _logger.LogError(ex, <span class="str">"站內通知寫入失敗（UserId={UserId}）"</span>, recipient.Id);
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">NotificationService.CreateAsync(userId, title, message, url)</span>
+                    <span class="loc">Services/NotificationService.cs:17–31 · ViewComponents/NotificationBadgeViewComponent.cs:21</span>
+                </div>
+                <p class="desc">
+                    單純的一筆 insert：<code>IsRead = false</code>、<code>CreatedAt = UtcNow</code>。
+                    導覽列那顆 🔔 徽章就是 <code>NotificationBadgeViewComponent</code>
+                    呼叫 <code>GetUnreadCountAsync(userId)</code> 數出來的。
+                </p>
+                <pre><code><span class="kw">var</span> notification = <span class="kw">new</span> Notification
+{
+    UserId = userId, Title = title, Message = message, Url = url,
+    IsRead = <span class="kw">false</span>, CreatedAt = DateTime.UtcNow
+};
+_db.Notifications.Add(notification);
+<span class="kw">await</span> _db.SaveChangesAsync();
+<span class="kw">return</span> notification.Id;</code></pre>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">DispatchAsync — Email 那一軌</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:146–156</span>
+                </div>
+                <p class="desc">
+                    <strong>沒填 Email 的帳號就只有站內通知</strong>，不會報錯。
+                    開發環境的 <code>Email:Mode = "PickupDirectory"</code>，
+                    <code>MailKitEmailSender</code> 不會真的連 SMTP，
+                    而是把 <code>.eml</code> 檔丟進 <code>./mail-pickup/</code>，用記事本就能打開檢查。
+                </p>
+                <pre><code><span class="kw">if</span> (!<span class="kw">string</span>.IsNullOrWhiteSpace(recipient.Email))
+{
+    <span class="kw">try</span>
+    {
+        <span class="kw">await</span> _emails.SendAsync(recipient.Email!, title, message, cancellationToken);
+    }
+    <span class="kw">catch</span> (Exception ex)
+    {
+        _logger.LogError(ex, <span class="str">"Email 派送失敗（UserId={UserId}, Email={Email}）"</span>,
+                         recipient.Id, recipient.Email);
+    }
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="11">
+                <div class="head">
+                    <span class="badge-num">11</span>
+                    <span class="sig">最外層 try/catch 保證不往上拋</span>
+                    <span class="loc">Services/Notifications/NotificationDispatcher.cs:106, 129–132</span>
+                </div>
+                <p class="desc">
+                    整個 <code>NotifyApproverAtCurrentLevelAsync</code> 又被一層 <code>try/catch</code> 包住。
+                    <strong>為什麼要包三層？</strong>因為它是在
+                    <code>ApprovalService.SaveChangesAsync()</code> <em>之後</em>才被呼叫的——
+                    簽核已經是既成事實。這時若通知丟出例外，
+                    使用者會看到一個 500 錯誤頁，<strong>誤以為簽核沒成功而重簽一次</strong>。
+                </p>
+                <pre><code><span class="kw">private async</span> Task NotifyApproverAtCurrentLevelAsync(<span class="kw">int</span> id, <span class="kw">bool</span> isFirst, CancellationToken ct)
+{
+    <span class="kw">try</span>
+    {
+        <span class="cmt">// …第 3~7 步…</span>
+    }
+    <span class="kw">catch</span> (Exception ex)
+    {
+        _logger.LogError(ex, <span class="str">"通知簽核人失敗（RequestId={Id}）"</span>, leaveRequestId);
+    }
+}</code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>NullNotificationDispatcher：測試用的空實作</h2>
+        <p>
+            檔案最後（<code>NotificationDispatcher.cs:182–189</code>）還有一個什麼都不做的實作：
+        </p>
+        <pre style="background:var(--code-bg); color:var(--code-text); border-radius:8px; padding:14px; overflow-x:auto; font-size:13px;"><code><span class="kw">public class</span> NullNotificationDispatcher : INotificationDispatcher
+{
+    <span class="kw">public</span> Task NotifySubmittedAsync(<span class="kw">int</span> id, CancellationToken ct = <span class="kw">default</span>) =&gt; Task.CompletedTask;
+    <span class="kw">public</span> Task NotifyApprovedNextAsync(<span class="kw">int</span> id, CancellationToken ct = <span class="kw">default</span>) =&gt; Task.CompletedTask;
+    <span class="cmt">// …其餘同理</span>
+}</code></pre>
+        <p>
+            這是 <strong>Null Object 模式</strong>。測試
+            <code>ApprovalService</code> 的簽核邏輯時，不想每次都連帶測到通知與 Email，
+            就把這個空實作注進去——比在 Service 裡到處寫 <code>if (_notifications != null)</code> 乾淨得多。
+            正式環境注入哪一個，由 <a href="01-startup-di.html">01 啟動流程</a>第 4 步的 DI 決定。
+        </p>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>送出一張請假單，然後打開專案根目錄的 <code>mail-pickup/</code> 資料夾——
+                裡面會多一個 <code>.eml</code> 檔，用記事本開就能看到剛才組出來的標題與內文。</li>
+            <li>把某個簽核人帳號的 <code>Email</code> 欄位清空，再送一張單：
+                <strong>站內通知照樣進來，但不會產生 .eml</strong>。</li>
+            <li>在 <code>NotificationService.CreateAsync</code> 第一行故意
+                <code>throw new Exception("test")</code>，然後簽核一張單——
+                <strong>簽核仍然成功</strong>，只是通知沒進來、Output 視窗多一行 LogError。
+                <strong>看過就改回來。</strong></li>
+            <li>把 <code>appsettings.json</code> 的 <code>Email:Mode</code> 改成 <code>"Smtp"</code>
+                但不啟動任何 SMTP 伺服器，再簽核一次：Email 那軌會失敗並寫 log，
+                但站內通知與簽核都不受影響。</li>
+            <li>在 <code>NotificationDispatcher.cs:116</code>（<code>ResolveApproverUserId</code>）設中斷點，
+                簽核一張 3 關的單，看第 2 關通知的收件人是<strong>科長</strong>而不是導師。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="04-approval.html">◀ 04 簽核引擎</a>
+        <span class="spacer"></span>
+        <a href="06-report.html">06 紀錄查詢與時數統計 ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

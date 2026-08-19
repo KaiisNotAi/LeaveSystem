@@ -274,6 +274,70 @@ figure.screenshot-placeholder.small .ph-box {
     font-size: 16px;
 }
 
+/* ===== 已補上的實際截圖 =====
+   slides.js 會掃描 figure[data-shot] 自動插入 <img>；
+   圖檔載入成功才會加上 .has-shot，因此尚未補圖的位置仍維持虛線佔位、版面不會壞。 */
+figure.screenshot-placeholder.has-shot .ph-box { display: none; }
+
+figure.screenshot-placeholder .shot-img {
+    display: block;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    border: 1px solid var(--primary-light);
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    background: #fff;
+}
+figure.screenshot-placeholder.small .shot-img { max-width: 100%; }
+
+/* 同一欄放多張截圖時，要限制每張的高度。
+   投影片是固定 16:9 且 overflow:hidden，圖片若按原始比例撐開，第二張會被裁掉。
+   以容器查詢單位 cqh（投影片高度的百分比）設上限，縮放時仍維持長寬比。 */
+section.slide { container-type: size; }
+
+.two-col figure.screenshot-placeholder .ph-box,
+.two-col figure.screenshot-placeholder .shot-img {
+    max-height: 31cqh;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+}
+/* 該欄只有一張圖時可以放大 */
+.two-col > div > figure.screenshot-placeholder:only-child .ph-box,
+.two-col > div > figure.screenshot-placeholder:only-child .shot-img {
+    max-height: 66cqh;
+}
+
+/* 整寬截圖（不在雙欄裡）：讓圖片吃掉 .content 剩下的高度，超出就等比縮小。
+   :has() 讓這條規則只影響「真的有整寬截圖」的投影片，其餘版面完全不受影響。 */
+section.slide .content:has(> figure.screenshot-placeholder) {
+    display: flex;
+    flex-direction: column;
+}
+section.slide .content > figure.screenshot-placeholder {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+section.slide .content > figure.screenshot-placeholder > .ph-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+}
+section.slide .content > figure.screenshot-placeholder > .shot-img {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    /* width 交給長寬比推算，邊框才會貼齊圖片而不是整條欄位 */
+    width: auto;
+    max-width: 100%;
+    align-self: center;
+    object-fit: contain;
+}
+
 /* 雙欄 slide */
 .two-col {
     display: grid;

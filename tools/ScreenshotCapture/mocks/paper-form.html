@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>導入系統前的請假作業示意</title>
+<!--
+  這是「導入系統前」的作業方式示意圖，供專題報告 01 製作動機章節使用。
+  純屬示意：不使用任何真實單位名稱、真實表單格式或真實個人資料。
+  由 tools/ScreenshotCapture 以 Chrome 渲染成 paper-form.png。
+-->
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
+        background: #e9e4d8;
+        background-image:
+            radial-gradient(circle at 18% 22%, rgba(255,255,255,.55), transparent 55%),
+            radial-gradient(circle at 82% 78%, rgba(0,0,0,.05), transparent 50%);
+    }
+
+    .stage {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        /* 第一列吃掉所有剩餘高度，避免版面下緣留一大塊空白 */
+        grid-template-rows: 1fr auto auto;
+        gap: 34px;
+        padding: 34px 40px 22px;
+        height: 900px;
+    }
+
+    .col { display: flex; flex-direction: column; min-height: 0; }
+
+    .col-title {
+        font-size: 21px;
+        font-weight: 700;
+        color: #4a4034;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .col-title .tag {
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        background: #8a7355;
+        border-radius: 999px;
+        padding: 3px 11px;
+        letter-spacing: .05em;
+    }
+
+    /* ── 左：紙本假單 ───────────────────────────── */
+    .paper {
+        flex: 1;
+        background: #fdfbf4;
+        border: 1px solid #cdc3ad;
+        border-radius: 3px;
+        padding: 26px 30px;
+        box-shadow: 0 14px 30px rgba(60, 48, 30, .22), 0 2px 0 #f4efe2 inset;
+        transform: rotate(-1.1deg);
+        position: relative;
+        font-family: "DFKai-SB", "標楷體", "Microsoft JhengHei", serif;
+        display: flex;
+        flex-direction: column;
+    }
+    /* 咖啡漬（放在左下留白處，避免壓到表格文字） */
+    .paper::after {
+        content: "";
+        position: absolute;
+        left: 54px; bottom: 34px;
+        width: 96px; height: 96px;
+        border-radius: 50%;
+        border: 9px solid rgba(150, 105, 55, .17);
+        background: rgba(170, 125, 70, .07);
+    }
+
+    .paper h2 {
+        text-align: center;
+        font-size: 27px;
+        letter-spacing: .34em;
+        color: #2f2a22;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #2f2a22;
+        margin-bottom: 4px;
+    }
+    .paper .no {
+        text-align: right;
+        font-size: 13px;
+        color: #8b8172;
+        margin: 8px 0 14px;
+        letter-spacing: .08em;
+    }
+
+    table.form { width: 100%; border-collapse: collapse; font-size: 16px; }
+    table.form th, table.form td {
+        border: 1px solid #6f6552;
+        padding: 9px 11px;
+        color: #2f2a22;
+    }
+    table.form th {
+        background: #efe8d6;
+        width: 88px;
+        font-weight: 500;
+        letter-spacing: .12em;
+        text-align: center;
+    }
+    .hand {
+        font-family: "DFKai-SB", "標楷體", cursive;
+        color: #1c3f7a;
+        font-size: 19px;
+        letter-spacing: .04em;
+        white-space: nowrap;
+    }
+    .hand.wrap { white-space: normal; }
+
+    .sign-row { display: flex; gap: 12px; margin-top: 16px; }
+    .sign-box {
+        flex: 1;
+        border: 1px solid #6f6552;
+        min-height: 104px;
+        display: flex;
+        flex-direction: column;
+    }
+    .sign-box .lbl {
+        background: #efe8d6;
+        border-bottom: 1px solid #6f6552;
+        text-align: center;
+        font-size: 14px;
+        letter-spacing: .14em;
+        padding: 5px 0;
+        color: #2f2a22;
+    }
+    .sign-box .body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: #b9ae99;
+        letter-spacing: .1em;
+    }
+    .sign-box.done .body { color: #1c3f7a; font-size: 26px; font-family: "DFKai-SB", "標楷體", serif; }
+
+    .stamp {
+        position: absolute;
+        right: 40px; bottom: 16px;
+        width: 100px; height: 100px;
+        border: 5px double #c0392b;
+        border-radius: 8px;
+        color: #c0392b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 18px;
+        line-height: 1.35;
+        letter-spacing: .1em;
+        transform: rotate(11deg);
+        opacity: .78;
+        font-family: "DFKai-SB", "標楷體", serif;
+    }
+
+    /* ── 右：LINE 群組 ──────────────────────────── */
+    .chat {
+        flex: 1;
+        background: #7a94ab;
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 14px 30px rgba(40, 55, 70, .28);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .chat-head {
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 2px 4px 12px;
+        border-bottom: 1px solid rgba(255,255,255,.25);
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        letter-spacing: .04em;
+    }
+    .msgs { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 11px; }
+
+    .msg { display: flex; gap: 9px; max-width: 84%; }
+    .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+    .avatar {
+        width: 34px; height: 34px; border-radius: 50%;
+        background: #d8cdbb; color: #5c5040;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700; flex: none;
+    }
+    .bubble {
+        background: #fff;
+        border-radius: 4px 14px 14px 14px;
+        padding: 8px 12px;
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: #24303a;
+        box-shadow: 0 1px 2px rgba(0,0,0,.12);
+    }
+    .msg.me .bubble { background: #b7e07a; border-radius: 14px 4px 14px 14px; }
+    .name { font-size: 11.5px; color: rgba(255,255,255,.86); margin-bottom: 3px; }
+    .time { font-size: 10.5px; color: rgba(255,255,255,.7); align-self: flex-end; flex: none; }
+
+    /* ── 底部痛點 ──────────────────────────────── */
+    .pains {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        align-items: start;
+        gap: 12px;
+    }
+    .pain {
+        background: rgba(255,255,255,.72);
+        border-left: 4px solid #b0442f;
+        border-radius: 4px;
+        padding: 9px 12px;
+    }
+    .pain b { display: block; font-size: 14px; color: #8e3524; margin-bottom: 2px; }
+    .pain span { font-size: 12.5px; color: #55493c; line-height: 1.5; }
+
+    .footnote {
+        grid-column: 1 / -1;
+        text-align: center;
+        font-size: 12px;
+        color: #8a7f6d;
+        letter-spacing: .06em;
+    }
+</style>
+</head>
+<body>
+<div class="stage">
+
+    <!-- 左欄：紙本假單 -->
+    <div class="col">
+        <div class="col-title"><span class="tag">導入前 ①</span>紙本假單，逐關送簽</div>
+
+        <div class="paper">
+            <div class="stamp">尚未<br>核章</div>
+
+            <h2>請假申請單</h2>
+            <div class="no">單號：＿＿＿＿　收件日期：＿＿＿</div>
+
+            <table class="form">
+                <tr>
+                    <th>姓　名</th>
+                    <td class="hand">王小明</td>
+                    <th>班　期</th>
+                    <td class="hand">第 一 班</td>
+                </tr>
+                <tr>
+                    <th>假　別</th>
+                    <td class="hand" style="font-size:17px;">■ 病假　□ 事假　□ 喪假　□ 公假</td>
+                    <th>時　數</th>
+                    <td class="hand">４ 小時（？）</td>
+                </tr>
+                <tr>
+                    <th>起　訖</th>
+                    <td colspan="3" class="hand">９ 月 １５ 日 08:00 ～ 同日 12:00</td>
+                </tr>
+                <tr>
+                    <th>事　由</th>
+                    <td colspan="3" class="hand wrap" style="height:62px; vertical-align:top;">
+                        因流感發燒需在家休養半日，已預約上午門診。
+                    </td>
+                </tr>
+            </table>
+
+            <div class="sign-row">
+                <div class="sign-box done">
+                    <div class="lbl">導　師</div>
+                    <div class="body">方 ✓</div>
+                </div>
+                <div class="sign-box">
+                    <div class="lbl">科　長</div>
+                    <div class="body">（出差中）</div>
+                </div>
+                <div class="sign-box">
+                    <div class="lbl">分署長</div>
+                    <div class="body">（待送簽）</div>
+                </div>
+                <div class="sign-box">
+                    <div class="lbl">行政存查</div>
+                    <div class="body">（未收件）</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右欄：LINE 群組 -->
+    <div class="col">
+        <div class="col-title"><span class="tag">導入前 ②</span>群組口頭通報，無紀錄可查</div>
+
+        <div class="chat">
+            <div class="chat-head"><span>班級聯絡群組（38）</span><span>⋯</span></div>
+            <div class="msgs">
+                <div class="msg">
+                    <div class="avatar">明</div>
+                    <div>
+                        <div class="name">王小明</div>
+                        <div class="bubble">老師早，我今天發燒要去看醫生，上午請假～</div>
+                    </div>
+                    <div class="time">07:42</div>
+                </div>
+
+                <div class="msg me">
+                    <div class="avatar">方</div>
+                    <div>
+                        <div class="bubble">收到。記得回來補假單，不然會被登曠課。</div>
+                    </div>
+                    <div class="time">07:55</div>
+                </div>
+
+                <div class="msg">
+                    <div class="avatar">蓉</div>
+                    <div>
+                        <div class="name">林佳蓉</div>
+                        <div class="bubble">老師，我上週那張假單科長簽了嗎？我想確認一下 🙏</div>
+                    </div>
+                    <div class="time">09:10</div>
+                </div>
+
+                <div class="msg me">
+                    <div class="avatar">方</div>
+                    <div>
+                        <div class="bubble">我再幫你問問，單子好像還在科長那邊……</div>
+                    </div>
+                    <div class="time">09:31</div>
+                </div>
+
+                <div class="msg">
+                    <div class="avatar">婷</div>
+                    <div>
+                        <div class="name">行政 吳雅婷</div>
+                        <div class="bubble">月底要交出勤統計，請各位老師把手上的假單先送過來，我要一張一張加總。</div>
+                    </div>
+                    <div class="time">16:20</div>
+                </div>
+
+                <div class="msg">
+                    <div class="avatar">豪</div>
+                    <div>
+                        <div class="name">黃志豪</div>
+                        <div class="bubble">請問我這學期總共請幾小時了？快到上限了嗎？</div>
+                    </div>
+                    <div class="time">17:05</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部痛點 -->
+    <div class="pains" style="grid-column: 1 / -1;">
+        <div class="pain"><b>進度不透明</b><span>單子在誰手上、簽到第幾關，只能靠人問。</span></div>
+        <div class="pain"><b>統計靠人工</b><span>時數逐張手加，月底才知道誰超過上限。</span></div>
+        <div class="pain"><b>紀錄易遺失</b><span>紙本與群組訊息分散，事後難以查證。</span></div>
+        <div class="pain"><b>規則不一致</b><span>幾小時要送到哪一關，各班認定不同。</span></div>
+    </div>
+
+    <div class="footnote">※ 本圖為專題報告之情境示意，非任何真實單位之表單格式或真實個人資料。</div>
+</div>
+</body>
+</html>

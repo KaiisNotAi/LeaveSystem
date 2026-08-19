@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 0 章 開始之前 — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch00">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 1 · 準備與基礎</div>
+    <h1 class="chapter-title">第 0 章　開始之前</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        知道自己接下來要蓋出什麼、電腦上該裝哪些東西、以及這本書該怎麼讀才不會半路陣亡。
+        <strong>這一章不寫程式</strong>，但請不要跳過——第 3 節那幾個指令沒跑過，第 2 章會卡住。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>30～60 分鐘</b>（大部分在等安裝）</span>
+        <span>💻 需要 <b>Windows / macOS / Linux 皆可</b></span>
+        <span>📦 本章不需要前置章節</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#what">你要蓋的是什麼</a></li>
+            <li><a href="#words">先認識三個詞</a></li>
+            <li><a href="#install">把工具裝好</a></li>
+            <li><a href="#db">資料庫怎麼選</a></li>
+            <li><a href="#howto">這本書怎麼讀</a></li>
+            <li><a href="#mindset">給新手的四個心理準備</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="what">1. 你要蓋的是什麼</h2>
+
+    <p>
+        一套<strong>學生請假管理系統</strong>。真實情境是這樣的：某個職訓機構的請假流程，
+        原本是學員先用 LINE 通知導師、再寫紙本假單、實體傳給導師簽、
+        導師轉給科長、科長轉給分署長，最後行政人員把資料手動打進 Excel。
+    </p>
+
+    <p>整條流程有三種載體、四個關卡，每一環都可能延遲或遺失。你要蓋的系統要解決這件事：</p>
+
+    <table class="doc">
+        <thead>
+            <tr><th style="width:150px;">角色</th><th>系統要幫他做到</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>學員</strong></td>
+                <td>線上送出請假申請、隨時查看簽到第幾關、自動累計自己請了幾小時、快到上限時看得到</td>
+            </tr>
+            <tr>
+                <td><strong>簽核人</strong><br>（導師 / 科長 / 分署長）</td>
+                <td>一個待辦清單看完所有待簽的單、核准或駁回並留下意見、看得到該學員的累計請假狀況</td>
+            </tr>
+            <tr>
+                <td><strong>行政人員</strong></td>
+                <td>管理帳號 / 班期 / 假別 / 簽核門檻、登錄曠課、彙總報表、匯出 CSV 與 Excel</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>其中有幾條規則，是這個系統之所以有趣的地方——你在第 11 章會親手把它們寫出來：</p>
+
+    <ul>
+        <li><strong>時數不等於時段。</strong>上課時段是 08:00–12:00 與 13:00–17:00，
+            午休不計。請 11:00–14:00 只算 2 小時。</li>
+        <li><strong>簽幾關由時數決定。</strong>8 小時內導師決行；8～24 小時要加簽科長；
+            超過 24 小時還要再加分署長。而且這個門檻<strong>是資料表裡的設定，不是寫死在程式裡</strong>。</li>
+        <li><strong>每個班期有請假上限。</strong>總上課時數的 10%，超過就送不出去。</li>
+    </ul>
+
+    <div class="callout link">
+        <span class="t">想先看成品長什麼樣？</span>
+        打開 <a href="../report/03-features.html">專題報告的第 03 章</a>，
+        裡面有系統每一個畫面的實際截圖。看過再回來，你會比較知道自己在往哪裡走。
+    </div>
+
+    <h2 class="sec" id="words">2. 先認識三個詞</h2>
+
+    <p>這三個詞會在整本書出現幾百次，先建立粗略印象就好，後面章節會慢慢變清楚。</p>
+
+    <h3 class="sub">ASP.NET Core</h3>
+    <p>
+        微軟出的<strong>網站開發框架</strong>，用 C# 語言寫。
+        它幫你處理掉「聽網路連線、解析 HTTP 請求、把回應送回去」這些沒人想自己寫的事，
+        你只要負責「收到這個網址時，該回什麼內容」。
+    </p>
+
+    <h3 class="sub">MVC</h3>
+    <p>
+        一種把程式碼<strong>分成三堆</strong>的組織方式，是為了讓程式碼別全部糊成一團：
+    </p>
+    <table class="doc">
+        <thead><tr><th style="width:130px;">字母</th><th style="width:150px;">中文</th><th>負責什麼</th></tr></thead>
+        <tbody>
+            <tr><td><strong>M</strong>odel</td><td>模型</td><td>資料長什麼樣。例如「一張請假單有學員、假別、起訖時間、時數、狀態」。</td></tr>
+            <tr><td><strong>V</strong>iew</td><td>檢視</td><td>畫面長什麼樣。就是那些 HTML。</td></tr>
+            <tr><td><strong>C</strong>ontroller</td><td>控制器</td><td>中間的協調者。收到請求 → 去拿資料 → 決定要給哪個畫面。</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">為什麼要分三堆？</span>
+        <p>
+            想像你把「查資料庫」「算請假時數」「產生 HTML」全寫在同一個方法裡。
+            一開始只有 20 行，很爽。等到規則變複雜、畫面要改版，
+            你會發現<strong>改畫面就有可能弄壞計算邏輯</strong>，而且完全沒辦法單獨測試計算對不對。
+        </p>
+        <p>
+            分開之後，每一塊都只需要理解一件事。這是本書第 9 章的主題，
+            到時候你會親自把一段業務規則從 Controller 搬出來，體會差別。
+        </p>
+    </div>
+
+    <h3 class="sub">Entity Framework Core（EF Core）</h3>
+    <p>
+        讓你<strong>用 C# 操作資料庫，而不用自己寫 SQL</strong> 的工具。
+        你寫 <code>db.LeaveRequests.Where(r =&gt; r.Status == Approved)</code>，
+        它翻譯成 <code>SELECT * FROM LeaveRequests WHERE Status = 2</code> 送去資料庫。
+        第 6 章開始用。
+    </p>
+
+    <h2 class="sec" id="install">3. 把工具裝好</h2>
+
+    <h3 class="sub">3.1 .NET SDK（必裝）</h3>
+    <p>
+        SDK 就是「編譯器 + 執行環境 + 命令列工具」的合稱。到
+        <strong>dotnet.microsoft.com/download</strong> 下載 <strong>.NET 10 SDK</strong>（不是 Runtime，要 SDK）。
+    </p>
+    <p>裝完後，開一個新的終端機視窗（一定要新開，舊的讀不到剛裝好的路徑），輸入：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">確認安裝成功</span></div>
+        <pre><code>dotnet --version</code></pre>
+    </div>
+
+    <p>應該會印出類似 <code>10.0.302</code> 的版本號。看到版本號就成功了。</p>
+
+    <div class="callout oops">
+        <span class="t">常見錯誤：'dotnet' 不是內部或外部命令</span>
+        <p>
+            幾乎都是<strong>終端機開太早</strong>。安裝程式把 <code>dotnet</code> 加進系統路徑後，
+            已經開著的終端機不會知道。關掉重開一個，再試一次。
+        </p>
+        <p>還是不行的話，登出再登入（或重開機）一次。</p>
+    </div>
+
+    <h3 class="sub">3.2 編輯器（二選一）</h3>
+    <table class="doc">
+        <thead><tr><th style="width:200px;">選項</th><th>適合誰</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>Visual Studio 2026<br>Community 版</strong><br>（免費，Windows）</td>
+                <td>
+                    <strong>新手建議選這個。</strong>按 <kbd>F5</kbd> 就會編譯、啟動網站、開瀏覽器，一鍵到底。
+                    中斷點除錯的體驗最好——本書很多「動手做」都要你設中斷點看變數，
+                    這在 Visual Studio 裡最直覺。缺點是安裝檔很大（好幾 GB）。
+                    安裝時記得勾選「<strong>ASP.NET 與網頁開發</strong>」工作負載。
+                </td>
+            </tr>
+            <tr>
+                <td><strong>VS Code</strong><br>（免費，跨平台）</td>
+                <td>
+                    輕量、開得快。需要另外安裝 <strong>C# Dev Kit</strong> 擴充套件。
+                    macOS / Linux 使用者選這個。
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="sub">3.3 資料庫用戶端（建議裝）</h3>
+    <p>
+        你會需要一個工具「用眼睛看資料庫裡到底有什麼」。
+        Windows 上裝 <strong>SQL Server Management Studio（SSMS）</strong>，免費。
+        或者用 VS Code 的 <strong>SQL Server</strong> 擴充套件也可以。
+    </p>
+    <p>
+        這不是必要的——EF Core 會幫你建表——但當你的資料跟預期不一樣時，
+        <strong>能直接下 SQL 看一眼，比猜半小時有效得多</strong>。
+    </p>
+
+    <h2 class="sec" id="db">4. 資料庫怎麼選</h2>
+
+    <p>本書用 <strong>SQL Server</strong>。你有三個選擇，任一個都可以：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:190px;">選項</th><th style="width:130px;">平台</th><th>說明</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>SQL Server<br>Developer 版</strong></td>
+                <td>Windows</td>
+                <td>免費、功能完整。本書的完成品專案用的就是這個。連線字串是 <code>Server=.;</code></td>
+            </tr>
+            <tr>
+                <td><strong>SQL Server<br>LocalDB</strong></td>
+                <td>Windows</td>
+                <td>裝 Visual Studio 時會順便裝好，最省事。連線字串是
+                    <code>Server=(localdb)\\MSSQLLocalDB;</code></td>
+            </tr>
+            <tr>
+                <td><strong>Docker 容器</strong></td>
+                <td>macOS / Linux</td>
+                <td><code>mcr.microsoft.com/mssql/server</code> 映像檔。
+                    連線字串是 <code>Server=localhost,1433;User Id=sa;Password=…;</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout tip">
+        <span class="t">先不用煩惱連線字串</span>
+        第 6 章才會真的用到資料庫，到時候會有一整節在講連線字串怎麼寫。
+        現在只要<strong>確定其中一個裝起來了</strong>就好。
+    </div>
+
+    <h2 class="sec" id="howto">5. 這本書怎麼讀</h2>
+
+    <h3 class="sub">5.1 你會看到的幾種框</h3>
+
+    <div class="callout why">
+        <span class="t">這是「為什麼」框</span>
+        解釋某個設計為什麼要這樣做。<strong>這種框最值得慢慢讀</strong>——
+        語法查得到，「為什麼」查不到。
+    </div>
+
+    <div class="callout oops">
+        <span class="t">這是「常見錯誤」框</span>
+        新手在這一步最容易撞到的牆，以及錯誤訊息長什麼樣。卡住時先來這裡找。
+    </div>
+
+    <div class="callout tip">
+        <span class="t">這是「提示」框</span>
+        小技巧、快捷鍵、可以先跳過的細節。
+    </div>
+
+    <div class="callout link">
+        <span class="t">這是「對照完成品」框</span>
+        告訴你這一段在真正的專案裡對應哪個檔案，以及可以去
+        <a href="../tutorial/index.html">循序圖教學站</a>看哪一張圖。
+    </div>
+
+    <h3 class="sub">5.2 程式碼區塊的標籤</h3>
+    <p>每個程式碼區塊左上角會標明它是什麼：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/Entities/LeaveType.cs</span></div>
+        <pre><code><span class="cmt">// 綠色「新增檔案」＝ 從無到有建立這個檔案，整段貼進去</span></code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs</span></div>
+        <pre><code><span class="cmt">// 橘色「修改」＝ 在既有檔案裡改，我會標出改哪裡</span>
+<span class="kw">var</span> builder = WebApplication.CreateBuilder(args);
+<span class="add">builder.Services.AddControllersWithViews();   <span class="cmt">// ← 這種底色的是新增的行</span></span></code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">在專案資料夾執行</span></div>
+        <pre><code><span class="cmt"># 藍色「終端機」＝ 在命令列打的指令</span>
+dotnet build</code></pre>
+    </div>
+
+    <h3 class="sub">5.3 檢查點</h3>
+    <p>
+        每章結尾有一份檢查點清單。<strong>那不是給你打勾好看的</strong>——
+        每一項都是「你的專案現在應該要能做到的事」。
+        如果有一項做不到，代表前面某一步漏了，繼續往下讀只會愈錯愈遠。
+    </p>
+
+    <h2 class="sec" id="mindset">6. 給新手的四個心理準備</h2>
+
+    <ol>
+        <li>
+            <strong>看不懂的先記下來，不要停。</strong>
+            很多觀念要到後面幾章才會「啊，原來是為了這個」。
+            開一個檔案記下你的疑問，每讀完一章回去看，你會發現有些已經自己解開了。
+        </li>
+        <li>
+            <strong>錯誤訊息是朋友，不是敵人。</strong>
+            紅字不是罵你，是在告訴你哪一行、缺什麼。
+            <strong>把錯誤訊息第一行完整讀完</strong>——新手最常見的失誤就是看到紅字就慌，其實答案就寫在上面。
+        </li>
+        <li>
+            <strong>一天最多兩小時。</strong>
+            這種東西是靠「隔天回來突然懂了」在進步的，不是靠一次坐八小時。
+        </li>
+        <li>
+            <strong>抄一遍比複製貼上有用。</strong>
+            程式碼區塊有複製按鈕，但前幾章請盡量自己打。
+            打錯 → 看錯誤訊息 → 修好，這個循環才是真正在學東西。
+        </li>
+    </ol>
+
+    <div class="callout tip">
+        <span class="t">如果你身邊有 AI 助手</span>
+        遇到看不懂的地方，可以直接問它「解釋 <code>Program.cs</code> 第 12 行在做什麼」、
+        「為什麼這裡要用介面」、「我改了 X 然後壞了，這是錯誤訊息：…」。
+        但<strong>先自己讀一遍再問</strong>，不然你只是在看別人寫作業。
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 0 章檢查點</div>
+        <div class="hint">全部做到再進第 1 章。勾選紀錄會存在你的瀏覽器。</div>
+        <ul>
+            <li><span>我能說出這個系統要解決的問題，以及三種角色各要用它做什麼。</span></li>
+            <li><span>我知道 M、V、C 分別負責什麼。</span></li>
+            <li><span><code>dotnet --version</code> 印得出版本號（10.x 開頭）。</span></li>
+            <li><span>Visual Studio 或 VS Code 已經裝好，而且能開啟資料夾。</span></li>
+            <li><span>SQL Server（任一種）已經裝好，或我知道等第 6 章再回頭處理。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        本章提到的需求與角色，在完成品專案裡對應
+        <a href="../01-需求說明.md"><code>docs/01-需求說明.md</code></a>；
+        整體分層概念對應 <a href="../02-系統架構.md"><code>docs/02-系統架構.md</code></a>。
+        現在讀會有點吃力，第 9 章之後再回頭看就很順了。
+    </div>
+
+    <div class="pager">
+        <a href="index.html"><span class="lbl">上一頁</span>◀ 課程地圖</a>
+        <span class="spacer"></span>
+        <a href="ch01-csharp-basics.html"><span class="lbl">下一章</span>第 1 章 C# 夠用就好 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>01 啟動與 DI 生命週期 — 循序圖教學站</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/tutorial.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">🔎 程式流程循序圖教學站</a></div>
+        <nav>
+            <a href="index.html">目錄</a>
+            <a href="01-startup-di.html" class="current">01 啟動</a>
+            <a href="02-auth.html">02 認證</a>
+            <a href="03-leave-submit.html">03 送單</a>
+            <a href="04-approval.html">04 簽核</a>
+            <a href="05-notification.html">05 通知</a>
+            <a href="06-report.html">06 報表</a>
+            <a href="07-absence.html">07 曠課</a>
+            <a href="08-export.html">08 匯出</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="page-kicker">Flow 01 · Startup &amp; Dependency Injection</div>
+    <h1 class="page-title">啟動與 DI 生命週期</h1>
+
+    <p class="lead">
+        按下 F5 之後、第一個 HTTP 請求進來之前，<code>Program.cs</code> 做完了三件事：
+        <strong>① 把所有服務登記到 DI 容器</strong>、
+        <strong>② 把資料庫結構同步到最新並補上種子資料</strong>、
+        <strong>③ 依固定順序組出中介軟體管線</strong>。
+        這三件事的順序寫錯，後面每一條流程都會壞。
+    </p>
+
+    <section class="block">
+        <h2>循序圖</h2>
+        <div class="diagram-panel">
+            <div class="diagram-toolbar">
+                <button data-action="play">▶ 逐步播放</button>
+                <button class="ghost" data-action="next-step">下一步 ▸</button>
+                <button class="ghost" data-action="reset">✕ 取消高亮</button>
+                <span class="step-readout"></span>
+            </div>
+
+            <div class="diagram-scroll">
+            <svg class="seq" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="應用程式啟動流程循序圖">
+                <defs>
+                    <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+                    </marker>
+                    <marker id="seq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+                    </marker>
+                    <marker id="seq-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+                    </marker>
+                </defs>
+
+                <!-- lifelines -->
+                <line class="lifeline" x1="100" y1="52" x2="100" y2="775"/>
+                <line class="lifeline" x1="350" y1="52" x2="350" y2="775"/>
+                <line class="lifeline" x1="600" y1="52" x2="600" y2="775"/>
+                <line class="lifeline" x1="850" y1="52" x2="850" y2="775"/>
+                <line class="lifeline" x1="1100" y1="52" x2="1100" y2="775"/>
+
+                <!-- actors -->
+                <g class="actor client">
+                    <rect x="10" y="8" width="180" height="44"/>
+                    <text x="100" y="26">dotnet run</text>
+                    <text class="sub" x="100" y="42">.NET 主機</text>
+                </g>
+                <g class="actor pipeline">
+                    <rect x="260" y="8" width="180" height="44"/>
+                    <text x="350" y="26">Program.cs</text>
+                    <text class="sub" x="350" y="42">組裝進入點</text>
+                </g>
+                <g class="actor service">
+                    <rect x="510" y="8" width="180" height="44"/>
+                    <text x="600" y="26">DI 容器</text>
+                    <text class="sub" x="600" y="42">IServiceCollection</text>
+                </g>
+                <g class="actor data">
+                    <rect x="760" y="8" width="180" height="44"/>
+                    <text x="850" y="26">AppDbContext</text>
+                    <text class="sub" x="850" y="42">EF Core</text>
+                </g>
+                <g class="actor db">
+                    <rect x="1010" y="8" width="180" height="44"/>
+                    <text x="1100" y="26">SQL Server</text>
+                    <text class="sub" x="1100" y="42">LeaveSystem</text>
+                </g>
+
+                <!-- 1 -->
+                <g class="msg" data-step="1">
+                    <rect class="hit" x="8" y="76" width="1184" height="46"/>
+                    <line class="arrow" x1="100" y1="104" x2="342" y2="104"/>
+                    <text class="label" x="225" y="96">WebApplication.CreateBuilder(args)</text>
+                    <circle class="numbg" cx="24" cy="104" r="10"/>
+                    <text class="num" x="24" y="108" text-anchor="middle">1</text>
+                </g>
+                <!-- 2 -->
+                <g class="msg" data-step="2">
+                    <rect class="hit" x="8" y="134" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="162" x2="592" y2="162"/>
+                    <text class="label" x="475" y="154">AddControllersWithViews()</text>
+                    <circle class="numbg" cx="24" cy="162" r="10"/>
+                    <text class="num" x="24" y="166" text-anchor="middle">2</text>
+                </g>
+                <!-- 3 -->
+                <g class="msg" data-step="3">
+                    <rect class="hit" x="8" y="192" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="220" x2="592" y2="220"/>
+                    <text class="label" x="475" y="212">AddDbContext&lt;AppDbContext&gt;(…)</text>
+                    <circle class="numbg" cx="24" cy="220" r="10"/>
+                    <text class="num" x="24" y="224" text-anchor="middle">3</text>
+                </g>
+                <!-- 4 -->
+                <g class="msg" data-step="4">
+                    <rect class="hit" x="8" y="250" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="278" x2="592" y2="278"/>
+                    <text class="label" x="475" y="270">AddScoped × 11 個服務介面</text>
+                    <circle class="numbg" cx="24" cy="278" r="10"/>
+                    <text class="num" x="24" y="282" text-anchor="middle">4</text>
+                </g>
+                <!-- 5 -->
+                <g class="msg" data-step="5">
+                    <rect class="hit" x="8" y="308" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="336" x2="592" y2="336"/>
+                    <text class="label" x="475" y="328">AddAuthentication().AddCookie(…)</text>
+                    <circle class="numbg" cx="24" cy="336" r="10"/>
+                    <text class="num" x="24" y="340" text-anchor="middle">5</text>
+                </g>
+                <!-- 6 -->
+                <g class="msg ret" data-step="6">
+                    <rect class="hit" x="8" y="366" width="1184" height="46"/>
+                    <line class="arrow" x1="600" y1="394" x2="358" y2="394"/>
+                    <text class="label" x="475" y="386">builder.Build() → WebApplication</text>
+                    <circle class="numbg" cx="24" cy="394" r="10"/>
+                    <text class="num" x="24" y="398" text-anchor="middle">6</text>
+                </g>
+                <!-- 7 -->
+                <g class="msg" data-step="7">
+                    <rect class="hit" x="8" y="424" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="452" x2="842" y2="452"/>
+                    <text class="label" x="600" y="444">GetRequiredService&lt;AppDbContext&gt;()</text>
+                    <circle class="numbg" cx="24" cy="452" r="10"/>
+                    <text class="num" x="24" y="456" text-anchor="middle">7</text>
+                </g>
+                <!-- 8 -->
+                <g class="msg" data-step="8">
+                    <rect class="hit" x="8" y="482" width="1184" height="46"/>
+                    <line class="arrow" x1="850" y1="510" x2="1092" y2="510"/>
+                    <text class="label" x="975" y="502">db.Database.Migrate()</text>
+                    <circle class="numbg" cx="24" cy="510" r="10"/>
+                    <text class="num" x="24" y="514" text-anchor="middle">8</text>
+                </g>
+                <!-- 9 -->
+                <g class="msg" data-step="9">
+                    <rect class="hit" x="8" y="540" width="1184" height="46"/>
+                    <line class="arrow" x1="350" y1="568" x2="842" y2="568"/>
+                    <text class="label" x="600" y="560">SeedData.Initialize(db)</text>
+                    <circle class="numbg" cx="24" cy="568" r="10"/>
+                    <text class="num" x="24" y="572" text-anchor="middle">9</text>
+                </g>
+                <!-- 10 -->
+                <g class="msg" data-step="10">
+                    <rect class="hit" x="8" y="598" width="1184" height="46"/>
+                    <line class="arrow" x1="850" y1="626" x2="1092" y2="626"/>
+                    <text class="label" x="975" y="618">SaveChanges()（角色/假別/規則）</text>
+                    <circle class="numbg" cx="24" cy="626" r="10"/>
+                    <text class="num" x="24" y="630" text-anchor="middle">10</text>
+                </g>
+                <!-- 11 -->
+                <g class="msg" data-step="11">
+                    <rect class="hit" x="8" y="656" width="1184" height="46"/>
+                    <path class="selfpath" d="M350,672 h80 v22 h-72"/>
+                    <text class="label left" x="444" y="690">UseRouting → UseAuthentication → UseAuthorization</text>
+                    <circle class="numbg" cx="24" cy="684" r="10"/>
+                    <text class="num" x="24" y="688" text-anchor="middle">11</text>
+                </g>
+                <!-- 12 -->
+                <g class="msg" data-step="12">
+                    <rect class="hit" x="8" y="714" width="1184" height="46"/>
+                    <path class="selfpath" d="M350,730 h80 v22 h-72"/>
+                    <text class="label left" x="444" y="748">MapControllerRoute(…) → app.Run()</text>
+                    <circle class="numbg" cx="24" cy="742" r="10"/>
+                    <text class="num" x="24" y="746" text-anchor="middle">12</text>
+                </g>
+            </svg>
+            </div>
+
+            <div class="legend">
+                <span><i style="border-color:var(--layer-client)"></i> 主機</span>
+                <span><i style="border-color:var(--layer-pipeline)"></i> 組裝進入點</span>
+                <span><i style="border-color:var(--layer-service)"></i> DI 容器</span>
+                <span><i style="border-color:var(--layer-data)"></i> EF Core</span>
+                <span><i style="border-color:var(--layer-db)"></i> 資料庫</span>
+                <span>實線＝呼叫，虛線＝回傳</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>程式碼對照</h2>
+        <div class="steps">
+
+            <article class="step-card" data-step="1">
+                <div class="head">
+                    <span class="badge-num">1</span>
+                    <span class="sig">WebApplication.CreateBuilder(args)</span>
+                    <span class="loc">Program.cs:13</span>
+                </div>
+                <p class="desc">
+                    建立 builder，它同時握有<strong>設定來源</strong>（<code>appsettings.json</code>、環境變數、命令列）
+                    與<strong>DI 容器</strong>（<code>builder.Services</code>）。整支程式只有這一個進入點，沒有 <code>Startup.cs</code>。
+                </p>
+                <pre><code>var builder = WebApplication.CreateBuilder(args);</code></pre>
+            </article>
+
+            <article class="step-card" data-step="2">
+                <div class="head">
+                    <span class="badge-num">2</span>
+                    <span class="sig">builder.Services.AddControllersWithViews()</span>
+                    <span class="loc">Program.cs:21</span>
+                </div>
+                <p class="desc">
+                    註冊 MVC。緊接著第 27 行還額外插了一條 View 搜尋路徑，
+                    讓 <code>Controllers/Admin/XxxController</code> 的 View 可以放在 <code>Views/Admin/Xxx/</code>——
+                    這正是<a href="07-absence.html">曠課那條流程</a>兩個同名 Controller 能共存的關鍵。
+                </p>
+                <pre><code>builder.Services.AddControllersWithViews();
+
+builder.Services.Configure&lt;RazorViewEngineOptions&gt;(options =&gt;
+{
+    options.ViewLocationFormats.Insert(0, <span class="str">"/Views/Admin/{1}/{0}.cshtml"</span>);
+});</code></pre>
+            </article>
+
+            <article class="step-card" data-step="3">
+                <div class="head">
+                    <span class="badge-num">3</span>
+                    <span class="sig">AddDbContext&lt;AppDbContext&gt;(o =&gt; o.UseSqlServer(cs))</span>
+                    <span class="loc">Program.cs:32</span>
+                </div>
+                <p class="desc">
+                    連線字串從 <code>ConnectionStrings:DefaultConnection</code> 讀。
+                    <code>AddDbContext</code> 預設是 <strong>Scoped</strong>：一個 HTTP 請求一個 DbContext 實例，
+                    所以同一次請求裡 Controller 與 Service 拿到的是<strong>同一個</strong>追蹤上下文。
+                </p>
+                <pre><code>builder.Services.AddDbContext&lt;AppDbContext&gt;(options =&gt;
+{
+    <span class="kw">var</span> connectionString = builder.Configuration.GetConnectionString(<span class="str">"DefaultConnection"</span>)
+        ?? <span class="kw">throw new</span> InvalidOperationException(<span class="str">"找不到連線字串 DefaultConnection…"</span>);
+    options.UseSqlServer(connectionString);
+});</code></pre>
+            </article>
+
+            <article class="step-card" data-step="4">
+                <div class="head">
+                    <span class="badge-num">4</span>
+                    <span class="sig">AddScoped&lt;介面, 實作&gt;() × 11</span>
+                    <span class="loc">Program.cs:40–64</span>
+                </div>
+                <p class="desc">
+                    每一條後續流程用到的 Service 都在這裡登記。
+                    <strong>Controller 只認介面</strong>（<code>IApprovalService</code>），不認實作，
+                    所以測試時可以換成假的實作而不用改 Controller。
+                </p>
+                <pre><code><span class="cmt">// 認證（Phase 1）</span>
+builder.Services.AddScoped&lt;IPasswordHasher, BcryptPasswordHasher&gt;();
+builder.Services.AddScoped&lt;IAuthService, AuthService&gt;();
+<span class="cmt">// 時數計算（Phase 3）／簽核引擎（Phase 4）</span>
+builder.Services.AddScoped&lt;ILeaveCalculator, LeaveCalculator&gt;();
+builder.Services.AddScoped&lt;IApprovalService, ApprovalService&gt;();
+<span class="cmt">// 報表（Phase 5）／曠課（Phase 6）／匯出（Phase 8）</span>
+builder.Services.AddScoped&lt;ILeaveReportService, LeaveReportService&gt;();
+builder.Services.AddScoped&lt;IAbsenceRecordService, AbsenceRecordService&gt;();
+builder.Services.AddScoped&lt;ICsvExporter, CsvExporter&gt;();
+builder.Services.AddScoped&lt;IExcelExporter, ClosedXmlExcelExporter&gt;();
+<span class="cmt">// 通知 + Email（Phase 7）</span>
+builder.Services.AddScoped&lt;INotificationService, NotificationService&gt;();
+builder.Services.AddScoped&lt;IEmailSender, MailKitEmailSender&gt;();
+builder.Services.AddScoped&lt;INotificationDispatcher, NotificationDispatcher&gt;();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="5">
+                <div class="head">
+                    <span class="badge-num">5</span>
+                    <span class="sig">AddAuthentication(Cookie).AddCookie(options =&gt; …)</span>
+                    <span class="loc">Program.cs:70</span>
+                </div>
+                <p class="desc">
+                    本系統<strong>不使用 ASP.NET Core Identity</strong>，而是自訂帳號表 + Cookie。
+                    這裡設定的 <code>LoginPath</code> 就是「未登入時被踢去哪」——
+                    也是為什麼 <code>/</code> 未登入會變成登入頁（見 <a href="02-auth.html">02 認證</a>）。
+                </p>
+                <pre><code>.AddCookie(options =&gt;
+{
+    options.LoginPath = <span class="str">"/Account/Login"</span>;          <span class="cmt">// 未登入 → 轉這裡</span>
+    options.AccessDeniedPath = <span class="str">"/Account/AccessDenied"</span>; <span class="cmt">// 角色不足 → 轉這裡</span>
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = <span class="kw">true</span>;
+    options.Cookie.Name = <span class="str">"LeaveSystem.Auth"</span>;
+    options.Cookie.HttpOnly = <span class="kw">true</span>;                  <span class="cmt">// JS 讀不到，降低 XSS 風險</span>
+});</code></pre>
+            </article>
+
+            <article class="step-card" data-step="6">
+                <div class="head">
+                    <span class="badge-num">6</span>
+                    <span class="sig">var app = builder.Build();</span>
+                    <span class="loc">Program.cs:81</span>
+                </div>
+                <p class="desc">
+                    <strong>分界線。</strong>這一行之後 DI 容器就<strong>封板</strong>了，再也不能 <code>AddXxx</code>。
+                    上面是「登記」，下面是「使用」。
+                </p>
+                <pre><code><span class="kw">var</span> app = builder.Build();</code></pre>
+            </article>
+
+            <article class="step-card" data-step="7">
+                <div class="head">
+                    <span class="badge-num">7</span>
+                    <span class="sig">scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;()</span>
+                    <span class="loc">Program.cs:87–89</span>
+                </div>
+                <p class="desc">
+                    <code>AppDbContext</code> 是 Scoped，而啟動當下<strong>還沒有任何 HTTP 請求</strong>，
+                    因此必須自己 <code>CreateScope()</code> 開一個範圍才拿得到；用完隨 <code>using</code> 釋放。
+                </p>
+                <pre><code><span class="kw">using</span> (<span class="kw">var</span> scope = app.Services.CreateScope())
+{
+    <span class="kw">var</span> db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();
+    <span class="cmt">// …Migrate() 與 SeedData 都在這個 scope 裡跑</span>
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="8">
+                <div class="head">
+                    <span class="badge-num">8</span>
+                    <span class="sig">db.Database.Migrate()</span>
+                    <span class="loc">Program.cs:97</span>
+                </div>
+                <p class="desc">
+                    每次啟動都會：資料庫不存在就<strong>建立</strong> → 讀 <code>__EFMigrationsHistory</code>
+                    找出尚未套用的 Migration → 依序執行 <code>Up()</code> → 標記為已套用。
+                    這就是為什麼隊友 <code>git pull</code> 之後只要 F5，資料表就自動同步。
+                </p>
+                <pre><code>db.Database.Migrate();</code></pre>
+                <div class="callout warn">
+                    <div class="t">注意</div>
+                    緊接在 :101 還有一段 <code>ExecuteSqlRaw</code>，把歷史通知裡錯誤的
+                    <code>/Approvals/Detail/</code> 修正成 <code>/Approvals/Details/</code>。
+                    這是「資料修補」而非 schema 變更，所以沒有做成 Migration。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="9">
+                <div class="head">
+                    <span class="badge-num">9</span>
+                    <span class="sig">SeedData.Initialize(db)</span>
+                    <span class="loc">Program.cs:105 · Data/SeedData.cs:28</span>
+                </div>
+                <p class="desc">
+                    寫入系統最低限度的可用資料：<strong>6 個角色 → 預設 Admin 帳號 → 4 種假別 → 3 條簽核規則</strong>。
+                    每一段都先 <code>if (db.Xxx.Any()) return;</code>，因此<strong>可以重複執行</strong>。
+                </p>
+                <pre><code><span class="kw">public static void</span> Initialize(AppDbContext db)
+{
+    SeedRoles(db);        <span class="cmt">// 6 個角色字典</span>
+    SeedAdminUser(db);    <span class="cmt">// Admin / Admin@123</span>
+    SeedLeaveTypes(db);   <span class="cmt">// 病假 事假 喪假 公假</span>
+    SeedApprovalRules(db);<span class="cmt">// 0~8h / 8.01~24h / 24.01h~</span>
+    db.SaveChanges();
+}</code></pre>
+            </article>
+
+            <article class="step-card" data-step="10">
+                <div class="head">
+                    <span class="badge-num">10</span>
+                    <span class="sig">db.SaveChanges()</span>
+                    <span class="loc">Data/SeedData.cs</span>
+                </div>
+                <p class="desc">
+                    第 3 步註冊的三條 <code>ApprovalRule</code> 在這裡真正落地，
+                    <a href="03-leave-submit.html">03 送單流程</a>第 6 步就是靠它們決定「這張單要簽幾關」。
+                </p>
+                <pre><code><span class="kw">new</span> ApprovalRule { MinHours = 0m,     MaxHours = 8m,   RequiredRoles = <span class="str">"[\"Tutor\"]"</span> },
+<span class="kw">new</span> ApprovalRule { MinHours = 8.01m,  MaxHours = 24m,  RequiredRoles = <span class="str">"[\"Tutor\",\"SectionChief\"]"</span> },
+<span class="kw">new</span> ApprovalRule { MinHours = 24.01m, MaxHours = <span class="kw">null</span>, RequiredRoles = <span class="str">"[\"Tutor\",\"SectionChief\",\"BranchDirector\"]"</span> },</code></pre>
+            </article>
+
+            <article class="step-card" data-step="11">
+                <div class="head">
+                    <span class="badge-num">11</span>
+                    <span class="sig">UseRouting → UseAuthentication → UseAuthorization</span>
+                    <span class="loc">Program.cs:119–123</span>
+                </div>
+                <p class="desc">
+                    中介軟體是<strong>依註冊順序</strong>串成一條管線，每個請求照順序穿過。
+                    這三個的順序不能換：先知道「要去哪個 Action」，才知道「這個 Action 需不需要登入」；
+                    先算出「你是誰」（Authentication），才能判斷「你能不能」（Authorization）。
+                </p>
+                <pre><code>app.UseRouting();
+app.UseAuthentication();   <span class="cmt">// 讀 Cookie → 還原 ClaimsPrincipal（你是誰）</span>
+app.UseAuthorization();    <span class="cmt">// 比對 [Authorize(Roles=…)]（你能不能）</span></code></pre>
+                <div class="callout danger">
+                    <div class="t">順序寫反會怎樣</div>
+                    把 <code>UseAuthorization()</code> 放到 <code>UseAuthentication()</code> 前面，
+                    授權階段拿到的 <code>User</code> 會是空的匿名身分，
+                    <strong>所有掛 <code>[Authorize]</code> 的頁面都會變成永遠拒絕</strong>，而且不會有編譯錯誤。
+                </div>
+            </article>
+
+            <article class="step-card" data-step="12">
+                <div class="head">
+                    <span class="badge-num">12</span>
+                    <span class="sig">MapControllerRoute(…) · app.Run()</span>
+                    <span class="loc">Program.cs:127–132</span>
+                </div>
+                <p class="desc">
+                    註冊預設路由樣板 <code>{controller=Home}/{action=Index}/{id?}</code>，
+                    然後 <code>app.Run()</code> 開始監聽。從這一刻起，
+                    後面七張圖描述的流程才會開始被觸發。
+                </p>
+                <pre><code>app.MapControllerRoute(
+    name: <span class="str">"default"</span>,
+    pattern: <span class="str">"{controller=Home}/{action=Index}/{id?}"</span>)
+    .WithStaticAssets();
+
+app.Run();</code></pre>
+            </article>
+
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>關鍵設計決策</h2>
+        <table class="doc">
+            <thead><tr><th style="width:270px;">決策</th><th>為什麼</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>服務一律用 <code>AddScoped</code></td>
+                    <td>Service 內部都持有 <code>AppDbContext</code>；若註冊成 Singleton，
+                        會把一個 Scoped 的 DbContext 抓成長生命週期物件，導致跨請求共用追蹤狀態而爆炸。</td>
+                </tr>
+                <tr>
+                    <td>啟動時就 <code>Migrate()</code></td>
+                    <td>這是<strong>教學／單機專案</strong>的取捨：換來「pull 完 F5 就能跑」。
+                        正式多節點部署時會改成部署腳本執行 <code>dotnet ef database update</code>，
+                        避免多個執行個體同時搶著 migrate。</td>
+                </tr>
+                <tr>
+                    <td>種子資料寫在程式而非 SQL 腳本</td>
+                    <td>密碼要經過 BCrypt 雜湊，SQL 腳本寫不出來；而且可以用 <code>Any()</code> 做冪等判斷。</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="block">
+        <h2>自己動手驗證</h2>
+        <ol class="hands-on">
+            <li>在 <code>Program.cs:97</code>（<code>db.Database.Migrate()</code>）設中斷點，F5，觀察它在<strong>第一個請求進來之前</strong>就停住。</li>
+            <li>把 <code>appsettings.json</code> 的 <code>Database=LeaveSystem</code> 改成一個不存在的名字再 F5，
+                看它自動把整個資料庫建起來，然後改回去。</li>
+            <li>把 <code>app.UseAuthentication()</code> 與 <code>app.UseAuthorization()</code> 對調，
+                登入後開任何頁面都會被踢回登入頁——親眼看過一次就不會忘記順序。<strong>記得改回來。</strong></li>
+            <li>把 <code>AddScoped&lt;IApprovalService, ApprovalService&gt;()</code> 註解掉，
+                開 <code>/Approvals</code>，看它丟出 <code>Unable to resolve service for type…</code>——
+                這就是 DI 沒登記的長相。</li>
+        </ol>
+    </section>
+
+    <div class="pager">
+        <a href="index.html">◀ 回目錄</a>
+        <span class="spacer"></span>
+        <a href="02-auth.html">02 登入認證與 Cookie ▶</a>
+    </div>
+</main>
+
+<script src="assets/tutorial.js"></script>
+</body>
+</html>

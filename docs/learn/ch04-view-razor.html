@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 4 章 View 與 Razor — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch04">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 2 · MVC 三個字母</div>
+    <h1 class="chapter-title">第 4 章　View 與 Razor</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        能把 Controller 裡的資料<strong>畫成一張真正的 HTML 表格</strong>，
+        看得懂 <code>.cshtml</code> 的語法，並知道 Layout、<code>_ViewStart</code>、
+        <code>_ViewImports</code> 這三個底線檔案在做什麼。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2 小時</b></span>
+        <span>📦 前置：<a href="ch03-routing-controller.html">第 3 章</a>（LeaveTypesController 已建立）</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#find">View 是怎麼被找到的</a></li>
+            <li><a href="#razor">Razor 語法速成</a></li>
+            <li><a href="#model">動手：把資料畫成表格</a></li>
+            <li><a href="#layout">Layout：共用的外框</a></li>
+            <li><a href="#underscore">三個底線檔案</a></li>
+            <li><a href="#viewdata">ViewData 與 TempData</a></li>
+            <li><a href="#escape">Razor 幫你擋掉的攻擊</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="find">1. View 是怎麼被找到的</h2>
+
+    <p>
+        <a href="ch03-routing-controller.html#convention">第 3 章的第 3 條約定</a>：
+        <code>return View()</code> 會去找
+        <code>Views/{Controller 名}/{Action 名}.cshtml</code>。
+    </p>
+
+    <p>先實際撞一次牆。把 <code>LeaveTypesController.Index</code> 改成回傳 View：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">public</span> IActionResult Index()
+{
+<span class="add">    <span class="kw">return</span> View();</span>
+}</code></pre>
+    </div>
+
+    <p>開 <code>/LeaveTypes</code>，你會看到一個錯誤頁：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">錯誤訊息</span><span class="path">瀏覽器</span></div>
+        <pre><code>InvalidOperationException: The view 'Index' was not found.
+The following locations were searched:
+/Views/LeaveTypes/Index.cshtml
+/Views/Shared/Index.cshtml</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">這是好錯誤</span>
+        它<strong>直接把找過的路徑列出來</strong>。以後看到 View 找不到，
+        先讀這個清單，再去比對你的檔案實際放在哪——通常就是資料夾名稱打錯或少個 s。
+    </div>
+
+    <p>照它說的，建立 <code>Views/LeaveTypes/</code> 資料夾與 <code>Index.cshtml</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Views/LeaveTypes/Index.cshtml</span></div>
+        <pre><code>@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"假別管理"</span>;
+}
+
+&lt;h1&gt;假別管理&lt;/h1&gt;
+&lt;p&gt;這是我的第一個 View。&lt;/p&gt;</code></pre>
+    </div>
+
+    <p>重新整理，畫面出來了——而且<strong>自動套上了跟首頁一樣的導覽列與頁尾</strong>。第 4 節會解釋為什麼。</p>
+
+    <h2 class="sec" id="razor">2. Razor 語法速成</h2>
+
+    <p>
+        <code>.cshtml</code> 就是 HTML，加上一個特殊符號 <code>@</code>：
+        <strong>看到 <code>@</code>，後面就是 C#</strong>。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">Razor</span><span class="path">六種你會一直用的寫法</span></div>
+        <pre><code>@* 這是 Razor 的註解，不會出現在瀏覽器原始碼裡 *@
+
+@{
+    <span class="cmt">// 大括號區塊：可以寫任意多行 C#（不會輸出東西）</span>
+    <span class="kw">var</span> today = DateTime.Today;
+    <span class="kw">var</span> greeting = today.DayOfWeek == DayOfWeek.Monday ? <span class="str">"週一加油"</span> : <span class="str">"你好"</span>;
+}
+
+@* 1. 輸出一個值 *@
+&lt;p&gt;今天是 @today.ToString(<span class="str">"yyyy-MM-dd"</span>)&lt;/p&gt;
+
+@* 2. 輸出複雜運算式要用小括號包起來 *@
+&lt;p&gt;明天是 @(today.AddDays(1).ToString(<span class="str">"MM/dd"</span>))&lt;/p&gt;
+
+@* 3. if 判斷 *@
+@<span class="kw">if</span> (today.DayOfWeek == DayOfWeek.Sunday)
+{
+    &lt;p&gt;今天放假&lt;/p&gt;
+}
+<span class="kw">else</span>
+{
+    &lt;p&gt;今天要上課&lt;/p&gt;
+}
+
+@* 4. 迴圈 *@
+@<span class="kw">foreach</span> (<span class="kw">var</span> n <span class="kw">in</span> <span class="kw">new</span>[] { <span class="str">"病假"</span>, <span class="str">"事假"</span>, <span class="str">"公假"</span> })
+{
+    &lt;span class="badge"&gt;@n&lt;/span&gt;
+}
+
+@* 5. 要輸出一個真正的 @ 符號，打兩次 *@
+&lt;p&gt;聯絡信箱：admin@@example.com&lt;/p&gt;</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">最常見的 Razor 錯誤：忘記 @@</span>
+        <p>
+            在 <code>.cshtml</code> 裡直接寫 <code>Admin@123</code>，
+            Razor 會以為 <code>@123</code> 是 C# 而報一堆奇怪的編譯錯誤。
+        </p>
+        <p>
+            完成品的登入頁就有這個情況——你去看
+            <code>Views/Account/Login.cshtml</code>，它寫的是
+            <code>Admin@@123</code>，畫面上才會正確顯示成 <code>Admin@123</code>。
+        </p>
+    </div>
+
+    <h2 class="sec" id="model">3. 動手：把資料畫成表格</h2>
+
+    <p>
+        現在做真正有用的事。先在 <code>Models</code> 建一個假別類別
+        （這個檔案<strong>第 6 章會直接沿用</strong>變成資料表）：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Models/LeaveType.cs</span></div>
+        <pre><code><span class="kw">namespace</span> MyLeaveSystem.Models;
+
+<span class="kw">public class</span> LeaveType
+{
+    <span class="kw">public int</span>     Id          { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public string</span>  Name        { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+    <span class="kw">public string</span>  Code        { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+    <span class="kw">public bool</span>    IsActive    { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">true</span>;
+    <span class="kw">public int</span>     SortOrder   { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <p>Controller 造幾筆資料傳給 View：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="add"><span class="kw">using</span> MyLeaveSystem.Models;</span>
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public class</span> LeaveTypesController : Controller
+{
+    <span class="kw">public</span> IActionResult Index()
+    {
+<span class="add">        <span class="cmt">// 暫時寫死。第 6 章會換成從資料庫讀。</span></span>
+<span class="add">        <span class="kw">var</span> types = <span class="kw">new</span> List&lt;LeaveType&gt;</span>
+<span class="add">        {</span>
+<span class="add">            <span class="kw">new</span>() { Id = 1, Name = <span class="str">"病假"</span>, Code = <span class="str">"SICK"</span>,        SortOrder = 1, Description = <span class="str">"因病無法到課"</span> },</span>
+<span class="add">            <span class="kw">new</span>() { Id = 2, Name = <span class="str">"事假"</span>, Code = <span class="str">"PERSONAL"</span>,    SortOrder = 2, Description = <span class="str">"個人事務"</span> },</span>
+<span class="add">            <span class="kw">new</span>() { Id = 3, Name = <span class="str">"喪假"</span>, Code = <span class="str">"BEREAVEMENT"</span>, SortOrder = 3, Description = <span class="str">"親屬喪事"</span> },</span>
+<span class="add">            <span class="kw">new</span>() { Id = 4, Name = <span class="str">"公假"</span>, Code = <span class="str">"OFFICIAL"</span>,    SortOrder = 4, IsActive = <span class="kw">false</span> }</span>
+<span class="add">        };</span>
+<span class="add"></span>
+<span class="add">        <span class="kw">return</span> View(types);      <span class="cmt">// ← 把資料交給 View</span></span>
+    }
+}</code></pre>
+    </div>
+
+    <p>View 收下它，畫成表格：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/LeaveTypes/Index.cshtml</span></div>
+        <pre><code>@* 第一行宣告：這個 View 收到的資料是什麼型別 *@
+@model List&lt;MyLeaveSystem.Models.LeaveType&gt;
+
+@{
+    ViewData[<span class="str">"Title"</span>] = <span class="str">"假別管理"</span>;
+}
+
+&lt;h1&gt;假別管理&lt;/h1&gt;
+&lt;p class="text-muted"&gt;共 @Model.Count 種假別&lt;/p&gt;
+
+&lt;table class="table table-striped"&gt;
+    &lt;thead&gt;
+        &lt;tr&gt;
+            &lt;th&gt;排序&lt;/th&gt;&lt;th&gt;名稱&lt;/th&gt;&lt;th&gt;代碼&lt;/th&gt;&lt;th&gt;說明&lt;/th&gt;&lt;th&gt;狀態&lt;/th&gt;
+        &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+        @<span class="kw">foreach</span> (<span class="kw">var</span> t <span class="kw">in</span> Model.OrderBy(x =&gt; x.SortOrder))
+        {
+            &lt;tr&gt;
+                &lt;td&gt;@t.SortOrder&lt;/td&gt;
+                &lt;td&gt;@t.Name&lt;/td&gt;
+                &lt;td&gt;&lt;code&gt;@t.Code&lt;/code&gt;&lt;/td&gt;
+                &lt;td&gt;@(t.Description ?? <span class="str">"—"</span>)&lt;/td&gt;
+                &lt;td&gt;
+                    @<span class="kw">if</span> (t.IsActive)
+                    {
+                        &lt;span class="badge bg-success"&gt;啟用&lt;/span&gt;
+                    }
+                    <span class="kw">else</span>
+                    {
+                        &lt;span class="badge bg-secondary"&gt;停用&lt;/span&gt;
+                    }
+                &lt;/td&gt;
+            &lt;/tr&gt;
+        }
+    &lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+    </div>
+
+    <p>重新整理 <code>/LeaveTypes</code>——一張有斑馬紋、有狀態徽章的表格。</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:190px;">寫法</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>@model List&lt;…&gt;</code></td>
+                <td><strong>小寫 m</strong>。宣告這個 View 期待收到什麼型別，一個檔案只能有一行，通常放第一行。</td></tr>
+            <tr><td><code>@Model</code></td>
+                <td><strong>大寫 M</strong>。實際收到的那個物件。因為上面宣告過型別，
+                    所以編輯器有自動完成、打錯會編譯失敗。</td></tr>
+            <tr><td><code>@(t.Description ?? "—")</code></td>
+                <td>複雜運算式要用小括號包住，Razor 才知道 C# 到哪裡結束。</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">為什麼強型別 View 很重要</span>
+        <p>
+            你也可以用弱型別的 <code>ViewBag</code> / <code>ViewData</code> 傳資料，
+            但那樣打錯屬性名稱<strong>要等到執行時才會發現</strong>，而且沒有自動完成。
+        </p>
+        <p>
+            用 <code>@model</code> 的話，把 <code>@t.Nmae</code> 打錯字，
+            <strong>編譯就直接失敗</strong>。本書之後一律用強型別。
+        </p>
+    </div>
+
+    <h2 class="sec" id="layout">4. Layout：共用的外框</h2>
+
+    <p>
+        你剛才那個 View 只寫了 <code>&lt;h1&gt;</code> 和 <code>&lt;table&gt;</code>，
+        <strong>沒有 <code>&lt;html&gt;</code>、<code>&lt;head&gt;</code>、導覽列</strong>，
+        但畫面上卻都有。那些來自 <code>Views/Shared/_Layout.cshtml</code>。
+    </p>
+
+    <p>打開它，找到這一行：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">Razor</span><span class="path">Views/Shared/_Layout.cshtml</span></div>
+        <pre><code>&lt;main role="main" class="pb-3"&gt;
+    @RenderBody()      @* ← 你的 View 內容會被塞進這個位置 *@
+&lt;/main&gt;</code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">Layout 解決什麼問題</span>
+        沒有 Layout 的話，你的 20 個頁面都要各自寫一份導覽列。
+        改一個選單項目就要改 20 個檔案，而且一定會漏掉一兩個。
+        <strong>共用的部分寫一次，各頁只寫自己不同的地方。</strong>
+    </div>
+
+    <h3 class="sub">4.1 動手：在導覽列加一個連結</h3>
+
+    <p>找到 <code>_Layout.cshtml</code> 裡的導覽列區塊，加一項：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/Shared/_Layout.cshtml</span></div>
+        <pre><code>&lt;li class="nav-item"&gt;
+    &lt;a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy"&gt;Privacy&lt;/a&gt;
+&lt;/li&gt;
+<span class="add">&lt;li class="nav-item"&gt;</span>
+<span class="add">    &lt;a class="nav-link text-dark" asp-area="" asp-controller="LeaveTypes" asp-action="Index"&gt;假別管理&lt;/a&gt;</span>
+<span class="add">&lt;/li&gt;</span></code></pre>
+    </div>
+
+    <p>重新整理任何一頁，導覽列都多了「假別管理」。</p>
+
+    <div class="callout why">
+        <span class="t">asp-controller / asp-action 是什麼？為什麼不直接寫 href="/LeaveTypes"？</span>
+        <p>
+            這叫 <strong>Tag Helper</strong>。Razor 會在<strong>伺服器上</strong>把它算成正確的
+            <code>href</code>，所以最後送到瀏覽器的仍然是普通的
+            <code>&lt;a href="/LeaveTypes"&gt;</code>。
+        </p>
+        <p>
+            好處是：如果哪天你的網站要部署到子路徑（例如
+            <code>https://example.com/leave/</code>），
+            或者你改了路由樣板，<strong>Tag Helper 產生的網址會自動跟著對</strong>，
+            手寫的 <code>href</code> 則會全部壞掉。
+        </p>
+        <p>
+            這也是為什麼打錯 Controller 名字時<strong>不會編譯失敗</strong>——
+            Tag Helper 只是產生字串，不會驗證真的有那個 Controller。連結壞掉要自己點過才知道。
+        </p>
+    </div>
+
+    <h2 class="sec" id="underscore">5. 三個底線檔案</h2>
+
+    <table class="doc">
+        <thead><tr><th style="width:200px;">檔案</th><th>作用</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>Views/_ViewStart.cshtml</code></td>
+                <td>
+                    <strong>每個 View 開始渲染前都會先跑這個。</strong>
+                    它的內容通常只有一行 <code>Layout = "_Layout";</code>——
+                    這就是為什麼你什麼都沒寫，Layout 卻自動套上了。
+                </td>
+            </tr>
+            <tr>
+                <td><code>Views/_ViewImports.cshtml</code></td>
+                <td>
+                    <strong>所有 View 共用的 <code>@using</code> 與 Tag Helper 註冊。</strong>
+                    在這裡加 <code>@using MyLeaveSystem.Models</code>，
+                    每個 View 就都不用再寫一次完整命名空間。
+                </td>
+            </tr>
+            <tr>
+                <td><code>Views/Shared/_Layout.cshtml</code></td>
+                <td>版面外框本身。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="sub">5.1 動手：讓 @model 可以少打字</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/_ViewImports.cshtml</span></div>
+        <pre><code>@using MyLeaveSystem
+<span class="add">@using MyLeaveSystem.Models</span>
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers</code></pre>
+    </div>
+
+    <p>之後 View 第一行就能簡寫：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Views/LeaveTypes/Index.cshtml</span></div>
+        <pre><code>@model List&lt;LeaveType&gt;      @* 不用再寫 MyLeaveSystem.Models.LeaveType *@</code></pre>
+    </div>
+
+    <h2 class="sec" id="viewdata">6. ViewData 與 TempData</h2>
+
+    <p>
+        <code>@model</code> 是傳「主要資料」的正式管道。
+        另外有兩個弱型別的口袋，各有各的用途：
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:150px;"></th><th style="width:200px;">活多久</th><th>典型用途</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><code>ViewData[...]</code></td>
+                <td>只在<strong>這一次</strong>渲染有效</td>
+                <td>頁面標題（你已經在用了：<code>ViewData["Title"]</code>）、下拉選單的選項</td>
+            </tr>
+            <tr>
+                <td><code>TempData[...]</code></td>
+                <td><strong>撐過一次轉址</strong>，讀取後就消失</td>
+                <td>「儲存成功！」這類提示訊息</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        <code>TempData</code> 的存在是因為<strong>轉址（Redirect）會產生一個全新的請求</strong>，
+        <code>ViewData</code> 撐不過去。第 5 章講 PRG 模式時會實際用到。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">TempData 的典型用法</span></div>
+        <pre><code><span class="cmt">// Controller：存好之後轉址</span>
+TempData[<span class="str">"Success"</span>] = <span class="str">"假別已新增"</span>;
+<span class="kw">return</span> RedirectToAction(nameof(Index));</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">Razor</span><span class="path">Layout 或 View 裡顯示</span></div>
+        <pre><code>@<span class="kw">if</span> (TempData[<span class="str">"Success"</span>] != <span class="kw">null</span>)
+{
+    &lt;div class="alert alert-success"&gt;@TempData[<span class="str">"Success"</span>]&lt;/div&gt;
+}</code></pre>
+    </div>
+
+    <h2 class="sec" id="escape">7. Razor 幫你擋掉的攻擊</h2>
+
+    <p>
+        這件事很重要，而且是<strong>預設就保護你</strong>的，所以很多人不知道它存在。
+    </p>
+
+    <p>假設某個假別的說明被人填成：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">惡意輸入</span><span class="path">使用者填進資料庫的內容</span></div>
+        <pre><code>&lt;script&gt;alert('你被駭了');&lt;/script&gt;</code></pre>
+    </div>
+
+    <p>
+        你的 View 寫 <code>@t.Description</code>。
+        <strong>Razor 會自動把它轉義</strong>，送到瀏覽器的是：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">實際輸出</span><span class="path">瀏覽器收到的 HTML</span></div>
+        <pre><code>&amp;lt;script&amp;gt;alert('你被駭了');&amp;lt;/script&amp;gt;</code></pre>
+    </div>
+
+    <p>畫面上會<strong>原樣顯示那串文字</strong>，而不是執行它。這就擋掉了 XSS 攻擊。</p>
+
+    <div class="callout oops">
+        <span class="t">唯一會破功的地方：Html.Raw</span>
+        <p>
+            <code>@Html.Raw(t.Description)</code> 的意思是「不要轉義，原樣塞進 HTML」。
+            對<strong>使用者輸入的內容</strong>用它，等於直接開門讓人執行任意 JavaScript。
+        </p>
+        <p>
+            規則很簡單：<strong>除非你 100% 確定那段 HTML 是你自己產生的，否則永遠不要用
+            <code>Html.Raw</code></strong>。
+        </p>
+    </div>
+
+    <h2 class="sec" id="wrap">8. 你現在有什麼了</h2>
+
+    <p>
+        一條完整的「<strong>網址 → Controller → 資料 → View → HTML</strong>」路徑。
+        這就是 MVC 最核心的循環，之後所有功能都只是這條路徑的變形。
+    </p>
+
+    <p>
+        但目前資料是<strong>寫死在 Controller 裡</strong>的——重新啟動就回到原樣，
+        也沒辦法新增。接下來兩章分別解決這兩件事：
+    </p>
+    <ul>
+        <li><strong>第 5 章</strong>：讓使用者能透過表單<strong>送資料進來</strong></li>
+        <li><strong>第 6 章</strong>：把資料<strong>存進資料庫</strong>，重開機也還在</li>
+    </ul>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 4 章檢查點</div>
+        <div class="hint">全部做到再進第 5 章。</div>
+        <ul>
+            <li><span>我故意讓 View 找不到過一次，看懂了那個「searched locations」清單。</span></li>
+            <li><span><code>/LeaveTypes</code> 顯示一張有四筆資料的表格，公假那筆顯示「停用」徽章。</span></li>
+            <li><span>我能說出 <code>@model</code>（小寫）與 <code>@Model</code>（大寫）的差別。</span></li>
+            <li><span>導覽列多了「假別管理」連結，每一頁都看得到。</span></li>
+            <li><span>我知道 <code>_ViewStart.cshtml</code> 是 Layout 自動套用的原因，也知道 <code>Html.Raw</code> 為什麼危險。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品的 <code>Views/Admin/LeaveTypes/Index.cshtml</code> 就是你剛做的東西的完整版
+            （多了新增/編輯按鈕）。<code>Views/Shared/_Layout.cshtml</code>
+            則比你的複雜很多：導覽列會<strong>依角色顯示不同選單</strong>
+            （<code>@if (User.IsInRole("Student"))</code>），還有一個通知徽章。
+            那些是第 10 章之後的內容。
+        </p>
+        <p>
+            順帶一提，你可以在<a href="../report/03-features.html">專題報告第 03 章</a>
+            看到這個頁面最後長什麼樣。
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch03-routing-controller.html"><span class="lbl">上一章</span>◀ 第 3 章 路由與 Controller</a>
+        <span class="spacer"></span>
+        <a href="ch05-forms.html"><span class="lbl">下一章</span>第 5 章 表單、繫結與驗證 ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

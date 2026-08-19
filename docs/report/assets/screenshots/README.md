@@ -1,52 +1,81 @@
 # 截圖資產目錄
 
-本資料夾存放專題報告投影片使用的實際截圖。目前所有位置皆為虛線佔位 (`<figure class="screenshot-placeholder" data-shot="...">`)，補圖時將 PNG 檔命名為 `{data-shot}.png` 放入此資料夾即可（可在 CSS 中改為自動載入，或維持佔位以避免破版）。
+本資料夾存放專題報告投影片使用的截圖。
 
-## 命名規則
+投影片端不需要逐頁改 HTML：`assets/slides.js` 會掃描每個 `<figure data-shot="xxx">`，
+自動嘗試載入本資料夾的 `xxx.png`。
 
-- 檔名：`{data-shot}.png`（小寫、連字號分隔）
-- 建議尺寸：1600×900（16:9）或 1280×720
-- 格式：PNG（若需含透明背景）或 JPG
+- **載入成功** → figure 加上 `.has-shot`，顯示圖片（`slides.css` 會藏掉虛線佔位）。
+- **載入失敗**（還沒補圖）→ 維持原本的虛線佔位框，**版面不會壞**。
+
+因此要補新圖，只要把檔案放進本資料夾、檔名對上 `data-shot` 即可。
+
+## 產生方式（可重跑）
+
+截圖由 `tools/ScreenshotCapture` 自動擷取：以 Playwright 驅動**系統既有的 Chrome**
+（`Channel = "chrome"`，不下載額外瀏覽器），啟動網站於 `http://localhost:5199`，
+用示範帳號逐頁登入擷取。
+
+```powershell
+# 1. 寫入示範資料（冪等；帳號前綴 demo.，密碼 Demo@123）
+dotnet run --project tools/ScreenshotCapture -- --seed
+
+# 2. 擷取全部截圖到本資料夾
+dotnet run --project tools/ScreenshotCapture -- --capture
+
+# 3. 截完後移除示範資料（既有真實資料完全不受影響）
+dotnet run --project tools/ScreenshotCapture -- --rollback
+```
+
+其他模式：
+
+| 指令 | 用途 |
+|------|------|
+| `--all` | `--seed` 後接 `--capture` |
+| `--mocks` | 只重繪 `tools/ScreenshotCapture/mocks/` 下的示意圖，不啟動網站 |
+| `--preview docs/report <輸出目錄>` | 把每張投影片單獨渲染成 PNG，用來檢查有沒有破版 |
+
+**規格**：1600×900 視窗 × `DeviceScaleFactor = 2`（輸出 3200×1800），
+`zh-TW` 語系、`Asia/Taipei` 時區，`FullPage = false` 以維持 16:9 比例。
 
 ## 截圖清單
 
-| # | data-shot key | 對應章節 | 頁面路徑 | 建議畫面狀態 |
-|---|--------------|---------|---------|-------------|
-| 1 | `paper-form` | 01 動機 | — | 舊紙本假單 / LINE 群組訊息示意 |
-| 2 | `home-page` | 02 簡介 | `/` | 未登入首頁 |
-| 3 | `login` | 03.1 帳號 | `/Account/Login` | 登入頁面（可含錯誤提示） |
-| 4 | `user-list` | 03.1 帳號 | `/Admin/Users` | 使用者列表（含多角色資料） |
-| 5 | `cohort-edit` | 03.2 班期 | `/Admin/Cohorts/Edit/1` | 班期編輯頁（指派導師/科長/分署長） |
-| 6 | `leave-type-list` | 03.2 假別 | `/Admin/LeaveTypes` | 假別清單 |
-| 7 | `approval-rule` | 03.2 規則 | `/Admin/ApprovalRules` | 簽核門檻設定 |
-| 8 | `leave-create` | 03.3 請假 | `/LeaveRequests/Create` | 學員送單表單（含時段下拉） |
-| 9 | `leave-my` | 03.3 請假 | `/LeaveRequests` | 學員的我的請假單 |
-| 10 | `approvals-index` | 03.4 簽核 | `/Approvals` | 簽核人待辦清單 |
-| 11 | `approval-details` | 03.4 簽核 | `/Approvals/Details/1` | 單張簽核詳情（核准/駁回按鈕） |
-| 12 | `reports-index` | 03.5 報表 | `/Reports` | 學員紀錄查詢（三條件篩選） |
-| 13 | `reports-summary` | 03.5 報表 | `/Reports/Summary` | 學員累計時數 + 班期上限進度條 |
-| 14 | `reports-admin` | 03.5 報表 | `/Reports/Admin` | 行政彙總報表 |
-| 15 | `absence-admin` | 03.6 曠課 | `/Admin/AbsenceRecords` | 行政曠課列表 |
-| 16 | `absence-my` | 03.6 曠課 | `/AbsenceRecords` | 學員自查曠課 |
-| 17 | `notification-badge` | 03.7 通知 | 任一頁 | 導覽列 🔔 未讀徽章 |
-| 18 | `notification-list` | 03.7 通知 | `/Notifications` | 通知中心 |
-| 19 | `export-page` | 03.8 匯出 | `/Admin/Export` | 匯出設定頁 |
-| 20 | `export-excel` | 03.8 匯出 | — | 匯出的 Excel 多 sheet 畫面 |
-| 21 | `first-login` | 04 使用 | `/Account/Login` | 使用預設 `Admin/Admin@123` 登入 |
-| 22 | `student-flow` | 04 使用 | 多頁 | 學員送單完整流程截圖拼貼 |
-| 23 | `approver-flow` | 04 使用 | 多頁 | 簽核人處理流程截圖拼貼 |
-| 24 | `staff-flow` | 04 使用 | 多頁 | 行政管理與匯出流程截圖拼貼 |
+| # | data-shot key | 狀態 | 擷取角色 | 頁面路徑 |
+|---|--------------|------|---------|---------|
+| 1 | `paper-form` | ✅ 已補 | — | `mocks/paper-form.html`（導入前情境示意圖） |
+| 2 | `home-page` | ✅ 已補 | demo.stu01 | `/`（**需登入**，`HomeController.Index` 有 `[Authorize]`） |
+| 3 | `login` | ✅ 已補 | 未登入 | `/Account/Login` |
+| 4 | `first-login` | ✅ 已補 | 未登入 | `/Account/Login`（已填入預設 `Admin` 帳密、尚未送出） |
+| 5 | `user-list` | ✅ 已補 | demo.admin | `/Admin/Users` |
+| 6 | `cohort-edit` | ✅ 已補 | demo.admin | `/Admin/Cohorts/Edit/{示範班期Id}` |
+| 7 | `leave-type-list` | ✅ 已補 | demo.admin | `/Admin/LeaveTypes` |
+| 8 | `approval-rule` | ✅ 已補 | demo.admin | `/Admin/ApprovalRules` |
+| 9 | `leave-create` | ✅ 已補 | demo.stu01 | `/LeaveRequests/Create`（表單已填好） |
+| 10 | `leave-my` | ✅ 已補 | demo.stu01 | `/LeaveRequests` |
+| 11 | `approvals-index` | ✅ 已補 | demo.tutor | `/Approvals` |
+| 12 | `approval-details` | ✅ 已補 | demo.tutor | `/Approvals/Details/{id}` |
+| 13 | `reports-index` | ✅ 已補 | demo.stu01 | `/Reports` |
+| 14 | `reports-summary` | ✅ 已補 | demo.stu01 | `/Reports/Summary` |
+| 15 | `reports-admin` | ✅ 已補 | demo.staff | `/Reports/Admin` |
+| 16 | `absence-admin` | ✅ 已補 | demo.staff | `/Admin/AbsenceRecords` |
+| 17 | `absence-my` | ✅ 已補 | demo.stu01 | `/AbsenceRecords` |
+| 18 | `notification-badge` | ✅ 已補 | demo.stu01 | 導覽列元素截圖（`header`，含 🔔 未讀徽章） |
+| 19 | `notification-list` | ✅ 已補 | demo.stu01 | `/Notifications` |
+| 20 | `export-page` | ✅ 已補 | demo.staff | `/Admin/Export` |
+| 21 | `export-excel` | ⬜ 未補 | — | 需開啟下載的 `.xlsx` 實際擷取 Excel 視窗，非瀏覽器畫面 |
+| 22 | `student-flow` | ⬜ 未補 | — | 學員流程拼貼（送單 → 查進度 → 收通知） |
+| 23 | `approver-flow` | ⬜ 未補 | — | 簽核人流程拼貼（待辦 → 詳情 → 核准/駁回） |
+| 24 | `staff-flow` | ⬜ 未補 | — | 行政流程拼貼（建立 → 查詢 → 匯出） |
 
-## 補圖流程
+未補的 4 張在投影片中維持虛線佔位，不影響版面。
 
-1. 於本機以預設 `Admin / Admin@123` 登入，補齊測試資料。
-2. 依上表逐一擷取對應畫面，存成 `{key}.png` 放入本目錄。
-3. 若要讓 HTML 自動顯示截圖取代佔位，於 `assets/slides.css` 加上：
-	```css
-	figure.screenshot-placeholder[data-shot="login"] .ph-box {
-	  background: url("./screenshots/login.png") center/contain no-repeat;
-	  border: 0;
-	}
-	figure.screenshot-placeholder[data-shot="login"] .ph-box::before { content: ""; }
-	```
-   （或以 JS 統一掃描 `[data-shot]` 動態注入 `<img>`。）
+## 示範資料
+
+`--seed` 只做**新增**，不修改也不刪除任何既有資料列（既有帳號的密碼雜湊尤其不動）：
+
+- 新建 1 個班期 `115-1 示範班（報告截圖用）`（總時數 900、上限 10% ＝ 90 小時）
+- 新建 9 個 `demo.*` 帳號（3 學員 / 導師 / 科長 / 分署長 / 行政 / 管理員），密碼一律 `Demo@123`
+- 11 張涵蓋 Pending（停在第 1/2/3 關）、Approved、Rejected、Cancelled 的請假單與簽核步驟
+- 5 筆曠課紀錄、6 則站內通知（含未讀，讓 🔔 徽章有數字）
+
+`--rollback` 以 `demo.` 帳號前綴與示範班期名稱反查，一次移除上述全部資料。

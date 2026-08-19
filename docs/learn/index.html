@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>從零開始學 ASP.NET Core MVC — 用學生請假系統當教材</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="給完全新手的 ASP.NET Core MVC 入門書：從 dotnet new mvc 的空白專案開始，一步步蓋出一套完整的學生請假系統。">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="index">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="../tutorial/index.html">循序圖教學站 →</a>
+        <a class="hdr-link" href="../README.md">文件總索引</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">ASP.NET CORE MVC · 從空白專案開始</div>
+    <h1 class="chapter-title">用「學生請假系統」當教材，從零學會 ASP.NET Core MVC</h1>
+
+    <div class="chapter-goal">
+        <span class="t">這本書要帶你做什麼</span>
+        你會從一個<strong>完全空白的專案</strong>開始（就是 <code>dotnet new mvc</code> 產生的那個），
+        一章一章把功能疊上去，最後蓋出一套跟 <code>E:\伺服器程式\LeaveSystem</code>
+        <strong>結構相同</strong>的請假管理系統：帳號登入、三級簽核、報表統計、曠課紀錄、Email 通知、Excel 匯出。
+    </div>
+
+    <p>
+        本書假設你<strong>連 C# 都不熟</strong>。第 1 章會把後面用得到的 C# 語法補齊，
+        但不會把 C# 從頭教到尾——只教「蓋這個系統會用到的那些」。
+    </p>
+
+    <div class="callout why">
+        <span class="t">為什麼要自己重蓋一遍，不直接讀現成的程式碼？</span>
+        <p>
+            因為讀懂跟寫得出來是兩回事。直接翻 3,800 行的現成專案，
+            你會看到「一堆東西已經在那裡」，但不知道<strong>它們是為了解決什麼問題才被加進去的</strong>。
+        </p>
+        <p>
+            本書的順序刻意跟專案的開發順序一致：每一章都先讓你遇到一個<strong>具體的麻煩</strong>，
+            再引進解決它的觀念。例如你會先把業務規則寫在 Controller 裡，
+            親身體會它變得多難測試，第 9 章才引進 Service 層。
+        </p>
+    </div>
+
+    <div class="overall">
+        <div class="big">0 / 13 章完成</div>
+        <div class="rail"><i></i></div>
+        <button type="button">清除進度紀錄</button>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">進度是怎麼記的</span>
+        每章結尾有一份「檢查點」，勾完就算完成，紀錄存在你自己的瀏覽器裡。
+        若你是用 <code>file://</code> 直接開這份文件，某些瀏覽器會禁止儲存——
+        那勾選仍然可用，只是關掉分頁就會忘記。
+    </div>
+
+    <h2 class="sec" id="map">課程地圖</h2>
+
+    <div class="track">
+        <h3><span class="part">PART 1</span> 準備與基礎</h3>
+        <p>把工具裝好、把 C# 補到夠用、讓第一個網頁跑起來。</p>
+        <div class="ch-list">
+            <a class="ch-item" href="ch00-before-you-start.html" data-chapter="ch00" data-checks="5">
+                <span class="no">00</span>
+                <span class="name">開始之前</span>
+                <span class="desc">你會做出什麼、要裝哪些東西、怎麼用這本書</span>
+            </a>
+            <a class="ch-item" href="ch01-csharp-basics.html" data-chapter="ch01" data-checks="6">
+                <span class="no">01</span>
+                <span class="name">C# 夠用就好</span>
+                <span class="desc">變數、class、集合、LINQ、介面、async — 只講後面用得到的</span>
+            </a>
+            <a class="ch-item" href="ch02-first-site.html" data-chapter="ch02" data-checks="5">
+                <span class="no">02</span>
+                <span class="name">第一個網站</span>
+                <span class="desc"><code>dotnet new mvc</code>、每個資料夾是什麼、Program.cs 在做什麼</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="track">
+        <h3><span class="part">PART 2</span> MVC 三個字母</h3>
+        <p>網址怎麼變成方法呼叫、資料怎麼畫到畫面、表單送出後發生什麼事。</p>
+        <div class="ch-list">
+            <a class="ch-item" href="ch03-routing-controller.html" data-chapter="ch03" data-checks="5">
+                <span class="no">03</span>
+                <span class="name">路由與 Controller</span>
+                <span class="desc">網址 → Controller → Action，以及 <code>IActionResult</code> 的各種回傳</span>
+            </a>
+            <a class="ch-item" href="ch04-view-razor.html" data-chapter="ch04" data-checks="5">
+                <span class="no">04</span>
+                <span class="name">View 與 Razor</span>
+                <span class="desc">Razor 語法、Layout、把資料從 Controller 帶到畫面</span>
+            </a>
+            <a class="ch-item" href="ch05-forms.html" data-chapter="ch05" data-checks="6">
+                <span class="no">05</span>
+                <span class="name">表單、繫結與驗證</span>
+                <span class="desc">ViewModel、模型繫結、ModelState、防偽權杖、PRG 模式</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="track">
+        <h3><span class="part">PART 3</span> 資料庫</h3>
+        <p>讓資料活過重新啟動。EF Core、Migration、CRUD 四件套、資料表之間的關聯。</p>
+        <div class="ch-list">
+            <a class="ch-item" href="ch06-efcore.html" data-chapter="ch06" data-checks="6">
+                <span class="no">06</span>
+                <span class="name">資料庫與 EF Core</span>
+                <span class="desc">Entity、DbContext、連線字串、Migration 是什麼</span>
+            </a>
+            <a class="ch-item" href="ch07-first-crud.html" data-chapter="ch07" data-checks="6">
+                <span class="no">07</span>
+                <span class="name">第一個完整 CRUD</span>
+                <span class="desc">做出「假別管理」：新增 / 查詢 / 修改 / 停用</span>
+            </a>
+            <a class="ch-item" href="ch08-relations.html" data-chapter="ch08" data-checks="5">
+                <span class="no">08</span>
+                <span class="name">關聯資料</span>
+                <span class="desc">使用者、角色、班期：一對多、多對多、<code>Include</code> 與 N+1</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="track">
+        <h3><span class="part">PART 4</span> 蓋出真正的系統</h3>
+        <p>業務規則往哪擺、怎麼確定它是對的、怎麼擋住不該進來的人。</p>
+        <div class="ch-list">
+            <a class="ch-item" href="ch09-services-di-tests.html" data-chapter="ch09" data-checks="6">
+                <span class="no">09</span>
+                <span class="name">服務層、DI 與測試</span>
+                <span class="desc">把規則搬出 Controller、依賴注入、寫第一個 xUnit 測試</span>
+            </a>
+            <a class="ch-item" href="ch10-auth.html" data-chapter="ch10" data-checks="6">
+                <span class="no">10</span>
+                <span class="name">登入與權限</span>
+                <span class="desc">密碼雜湊、Cookie 認證、Claims、<code>[Authorize]</code> 與角色</span>
+            </a>
+            <a class="ch-item" href="ch11-leave-approval.html" data-chapter="ch11" data-checks="6">
+                <span class="no">11</span>
+                <span class="name">請假與簽核</span>
+                <span class="desc">狀態機、依時數展開 N 關簽核、防止越權簽核</span>
+            </a>
+            <a class="ch-item" href="ch12-finish.html" data-chapter="ch12" data-checks="5">
+                <span class="no">12</span>
+                <span class="name">收尾與接下來</span>
+                <span class="desc">報表、曠課、通知、匯出的導覽，以及你可以自己加什麼</span>
+            </a>
+        </div>
+    </div>
+
+    <h2 class="sec" id="how">這本書跟其他文件的分工</h2>
+
+    <table class="doc">
+        <thead>
+            <tr><th style="width:210px;">文件</th><th style="width:130px;">給誰</th><th>回答什麼問題</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>本書</strong><br><code>docs/learn/</code></td>
+                <td>完全新手</td>
+                <td>「ASP.NET Core MVC 是什麼？<strong>我要怎麼自己寫出來？</strong>」<br>
+                    從空白專案開始，一步步蓋。</td>
+            </tr>
+            <tr>
+                <td><a href="../tutorial/index.html">循序圖教學站</a><br><code>docs/tutorial/</code></td>
+                <td>已經懂 MVC 的人</td>
+                <td>「<strong>現有這套系統</strong>的某條流程，是哪些方法串起來的？」<br>
+                    八張可點擊的循序圖，標到 <code>檔案:行號</code>。</td>
+            </tr>
+            <tr>
+                <td><a href="../08-程式碼閱讀指南.md">08-程式碼閱讀指南</a></td>
+                <td>要接手維護的人</td>
+                <td>「該從哪個檔案開始讀？」</td>
+            </tr>
+            <tr>
+                <td><a href="../04-請假與簽核流程.md">04-請假與簽核流程</a></td>
+                <td>需要確認規則的人</td>
+                <td>「業務規則到底是怎麼定的？」狀態機、門檻、統計口徑。</td>
+            </tr>
+            <tr>
+                <td><a href="../report/index.html">專題報告投影片</a></td>
+                <td>報告評審</td>
+                <td>「這個系統做了什麼？」含實際畫面截圖。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="callout link">
+        <span class="t">兩本可以搭著看</span>
+        本書每章結尾都會有一個「<strong>對照完成品</strong>」區塊，
+        告訴你這一章做的東西在真正的專案裡長什麼樣、在哪個檔案，
+        以及可以去循序圖教學站看哪一張圖。
+        <strong>學完本書之後，循序圖教學站會變得非常好讀。</strong>
+    </div>
+
+    <h2 class="sec" id="start">怎麼開始</h2>
+
+    <ol>
+        <li>先讀 <a href="ch00-before-you-start.html"><strong>第 0 章</strong></a>，把 .NET SDK 與資料庫裝好。</li>
+        <li>照順序讀。每章都假設你做完了前一章，<strong>跳章會卡住</strong>。</li>
+        <li>每章結尾的檢查點要真的動手做過再勾——那是確認你的專案跟書上一致的方法。</li>
+        <li>卡住的時候：先看該章的「<strong>⚠️ 常見錯誤</strong>」框，八成你遇到的就在裡面。</li>
+    </ol>
+
+    <div class="callout tip">
+        <span class="t">操作提示</span>
+        <kbd>←</kbd> <kbd>→</kbd> 可以直接翻上一章 / 下一章，<kbd>Home</kbd> 回到這頁。
+        程式碼區塊右上角有「複製」按鈕。
+    </div>
+
+    <div class="pager">
+        <span class="spacer"></span>
+        <a href="ch00-before-you-start.html">
+            <span class="lbl">下一章</span>
+            第 0 章 開始之前 ▶
+        </a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>

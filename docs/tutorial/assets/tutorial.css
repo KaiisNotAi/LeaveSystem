@@ -1,0 +1,489 @@
+/* ===================================================================
+   學生請假系統 — 互動循序圖教學站
+   配色沿用專題報告 (docs/report/assets/slides.css) 的深藍 + 橘
+   完全不依賴任何外部資源，直接以 file:// 開啟也能正常運作
+   =================================================================== */
+
+:root {
+    --primary: #1e3a8a;
+    --primary-light: #3b5bdb;
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --code-bg: #0f172a;
+    --code-text: #e2e8f0;
+    --success: #10b981;
+    --danger: #ef4444;
+    --radius: 12px;
+    --shadow: 0 10px 30px rgba(30, 58, 138, 0.10);
+
+    /* 分層顏色：循序圖的 lifeline 與程式碼卡片共用同一組語意 */
+    --layer-client: #64748b;
+    --layer-pipeline: #7c3aed;
+    --layer-controller: #1e3a8a;
+    --layer-service: #0e7490;
+    --layer-data: #b45309;
+    --layer-db: #15803d;
+    --layer-external: #be185d;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Microsoft JhengHei", "Noto Sans TC", "PingFang TC", "Segoe UI", sans-serif;
+    color: var(--text);
+    background: linear-gradient(180deg, #eef2ff 0%, var(--bg) 240px);
+    line-height: 1.7;
+    scroll-behavior: smooth;
+}
+
+code, kbd, .mono {
+    font-family: "Cascadia Code", "Consolas", "Menlo", monospace;
+}
+
+/* ===== 頂部導覽 ===== */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+}
+.site-header .bar {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.site-header .brand {
+    font-weight: 700;
+    font-size: 17px;
+    white-space: nowrap;
+}
+.site-header .brand a { color: #fff; text-decoration: none; }
+.site-header nav {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+.site-header nav a {
+    color: rgba(255, 255, 255, .85);
+    text-decoration: none;
+    font-size: 13.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.site-header nav a:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+.site-header nav a.current {
+    background: var(--accent);
+    color: #1f2937;
+    font-weight: 700;
+}
+
+/* ===== 版面 ===== */
+main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+}
+
+h1.page-title {
+    font-size: 34px;
+    color: var(--primary);
+    margin: 8px 0 4px;
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 10px;
+}
+.page-kicker {
+    font-size: 13px;
+    letter-spacing: .18em;
+    color: var(--accent-dark);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.lead {
+    font-size: 18px;
+    color: var(--text);
+    background: #fffbeb;
+    border-left: 5px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 18px 0 26px;
+}
+
+section.block { margin: 34px 0; }
+section.block > h2 {
+    font-size: 23px;
+    color: var(--primary);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+section.block > h2::before {
+    content: "";
+    width: 6px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+/* ===== 循序圖 ===== */
+.diagram-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 18px 10px;
+}
+.diagram-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+}
+.diagram-toolbar button {
+    background: var(--primary);
+    color: #fff;
+    border: 0;
+    border-radius: 7px;
+    padding: 7px 15px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+}
+.diagram-toolbar button:hover { background: var(--primary-light); }
+.diagram-toolbar button.ghost {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary-light);
+}
+.diagram-toolbar button.ghost:hover { background: #eef2ff; }
+.diagram-toolbar .step-readout {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+.diagram-toolbar .step-readout b { color: var(--accent-dark); }
+
+.diagram-scroll { overflow-x: auto; }
+svg.seq {
+    display: block;
+    width: 100%;
+    min-width: 900px;
+    height: auto;
+}
+
+/* lifeline 與參與者 */
+svg.seq .lifeline {
+    stroke: #cbd5e1;
+    stroke-width: 1.5;
+    stroke-dasharray: 6 6;
+}
+svg.seq .actor rect {
+    rx: 8;
+    fill: #fff;
+    stroke-width: 2;
+}
+svg.seq .actor text {
+    font-size: 14px;
+    font-weight: 700;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+svg.seq .actor .sub {
+    font-size: 11px;
+    font-weight: 400;
+    fill: var(--text-muted);
+}
+
+svg.seq .actor.client rect { stroke: var(--layer-client); }
+svg.seq .actor.client text { fill: var(--layer-client); }
+svg.seq .actor.pipeline rect { stroke: var(--layer-pipeline); }
+svg.seq .actor.pipeline text { fill: var(--layer-pipeline); }
+svg.seq .actor.controller rect { stroke: var(--layer-controller); }
+svg.seq .actor.controller text { fill: var(--layer-controller); }
+svg.seq .actor.service rect { stroke: var(--layer-service); }
+svg.seq .actor.service text { fill: var(--layer-service); }
+svg.seq .actor.data rect { stroke: var(--layer-data); }
+svg.seq .actor.data text { fill: var(--layer-data); }
+svg.seq .actor.db rect { stroke: var(--layer-db); }
+svg.seq .actor.db text { fill: var(--layer-db); }
+svg.seq .actor.external rect { stroke: var(--layer-external); }
+svg.seq .actor.external text { fill: var(--layer-external); }
+
+/* 訊息箭頭 */
+svg.seq .msg { cursor: pointer; transition: opacity .18s; }
+svg.seq .msg .hit { fill: transparent; }
+svg.seq .msg .arrow {
+    stroke: #334155;
+    stroke-width: 2;
+    marker-end: url(#seq-arrow);
+}
+svg.seq .msg .label {
+    font-size: 13px;
+    fill: #1f2937;
+    text-anchor: middle;
+}
+svg.seq .msg .num {
+    font-size: 11px;
+    font-weight: 700;
+    fill: #fff;
+}
+svg.seq .msg .numbg { fill: var(--primary-light); }
+
+/* 回傳訊息用虛線 */
+svg.seq .msg.ret .arrow {
+    stroke-dasharray: 7 5;
+    stroke: #64748b;
+    marker-end: url(#seq-arrow-ret);
+}
+svg.seq .msg.ret .label { fill: var(--text-muted); font-style: italic; }
+
+/* 自我呼叫（同一條 lifeline 上的迴圈） */
+svg.seq .msg .selfpath {
+    fill: none;
+    stroke: #334155;
+    stroke-width: 2;
+    marker-end: url(#seq-arrow);
+}
+svg.seq .msg .label.left { text-anchor: start; }
+
+/* 高亮狀態 */
+svg.seq.has-active .msg { opacity: .3; }
+svg.seq.has-active .msg.active { opacity: 1; }
+svg.seq .msg.active .arrow,
+svg.seq .msg.active .selfpath {
+    stroke: var(--accent-dark);
+    stroke-width: 3.2;
+    marker-end: url(#seq-arrow-hot);
+}
+svg.seq .msg.active .label { fill: var(--accent-dark); font-weight: 700; }
+svg.seq .msg.active .numbg { fill: var(--accent-dark); }
+
+/* 註記框 */
+svg.seq .note rect {
+    fill: #fffbeb;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    rx: 6;
+}
+svg.seq .note text { font-size: 12px; fill: #92400e; }
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 2px solid;
+    display: inline-block;
+}
+
+/* ===== 程式碼對照卡片 ===== */
+.steps { display: grid; gap: 14px; }
+
+.step-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    scroll-margin-top: 90px;
+    transition: border-color .18s, box-shadow .18s, transform .18s;
+    cursor: pointer;
+}
+.step-card:hover { border-left-color: var(--primary-light); }
+.step-card.active {
+    border-left-color: var(--accent-dark);
+    box-shadow: 0 8px 22px rgba(217, 119, 6, .22);
+    transform: translateX(3px);
+}
+
+.step-card .head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.step-card .badge-num {
+    background: var(--primary-light);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 2px 9px;
+    flex: none;
+}
+.step-card.active .badge-num { background: var(--accent-dark); }
+.step-card .sig {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    word-break: break-all;
+}
+.step-card .loc {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-left: auto;
+    white-space: nowrap;
+}
+.step-card .desc { font-size: 15px; margin: 8px 0 0; }
+.step-card .desc code {
+    background: #eef2ff;
+    color: var(--primary);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 13.5px;
+}
+
+.step-card pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 10px 0 0;
+}
+.step-card pre .cmt { color: #7f9cc0; }
+.step-card pre .kw { color: #93c5fd; }
+.step-card pre .str { color: #fca5a5; }
+
+/* ===== 一般表格 / 提示 ===== */
+table.doc {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    font-size: 15px;
+}
+table.doc th {
+    background: var(--primary);
+    color: #fff;
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+}
+table.doc td {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+}
+table.doc tbody tr:nth-child(even) { background: #f9fafb; }
+table.doc code { font-size: 13px; color: var(--primary); }
+
+.callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--primary-light);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 18px;
+    margin: 12px 0;
+}
+.callout.warn { border-left-color: var(--accent-dark); background: #fffbeb; }
+.callout.danger { border-left-color: var(--danger); background: #fef2f2; }
+.callout .t { font-weight: 700; color: var(--primary); margin-bottom: 2px; }
+.callout.warn .t { color: var(--accent-dark); }
+.callout.danger .t { color: var(--danger); }
+
+ol.hands-on { padding-left: 24px; }
+ol.hands-on li { margin: 8px 0; }
+
+/* ===== 首頁卡片 ===== */
+.flow-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 16px;
+}
+.flow-card {
+    display: block;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: var(--shadow);
+    transition: transform .15s, border-color .15s;
+}
+.flow-card:hover { transform: translateY(-3px); border-color: var(--primary-light); }
+.flow-card .no {
+    font-family: "Cascadia Code", monospace;
+    font-size: 13px;
+    color: var(--accent-dark);
+    font-weight: 700;
+}
+.flow-card h3 { margin: 4px 0 6px; color: var(--primary); font-size: 19px; }
+.flow-card p { margin: 0; font-size: 14.5px; color: var(--text-muted); }
+.flow-card .files {
+    margin-top: 10px;
+    font-family: "Cascadia Code", monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+/* ===== 頁尾上一頁 / 下一頁 ===== */
+.pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 46px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+.pager a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+}
+.pager a:hover { border-color: var(--primary-light); background: #eef2ff; }
+.pager .spacer { flex: 1; }
+
+kbd {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 12.5px;
+}
+
+/* ===== 小螢幕 ===== */
+@media (max-width: 820px) {
+    h1.page-title { font-size: 26px; }
+    .step-card .loc { margin-left: 0; width: 100%; }
+}

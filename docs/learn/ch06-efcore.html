@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第 6 章 資料庫與 EF Core — 從零開始學 ASP.NET Core MVC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/learn.css">
+</head>
+<body data-chapter="ch06">
+
+<header class="site-header">
+    <div class="bar">
+        <div class="brand"><a href="index.html">📘 從零開始學 ASP.NET Core MVC</a></div>
+        <span class="spacer"></span>
+        <select class="chapter-jump" aria-label="跳到章節"></select>
+        <a class="hdr-link" href="index.html">課程地圖</a>
+    </div>
+    <div class="progress-rail"><i></i></div>
+</header>
+
+<main>
+    <div class="chapter-kicker">PART 3 · 資料庫</div>
+    <h1 class="chapter-title">第 6 章　資料庫與 EF Core</h1>
+
+    <div class="chapter-goal">
+        <span class="t">本章結束時你會</span>
+        讓資料<strong>活過重新啟動</strong>。你會裝好 EF Core、建立 <code>AppDbContext</code>、
+        用 Migration 讓程式自己把資料表建出來，並把第 5 章那個 <code>static</code> 清單換成真的資料庫。
+    </div>
+
+    <div class="meta-row">
+        <span>⏱ 預估時間 <b>2.5～3 小時</b></span>
+        <span>📦 前置：<a href="ch05-forms.html">第 5 章</a>（新增假別表單能用）、SQL Server 已安裝</span>
+    </div>
+
+    <div class="toc-box">
+        <div class="t">本章目錄</div>
+        <ol>
+            <li><a href="#why">ORM 是什麼、為什麼要用</a></li>
+            <li><a href="#install">安裝套件</a></li>
+            <li><a href="#entity">Entity：一個類別 = 一張表</a></li>
+            <li><a href="#context">AppDbContext</a></li>
+            <li><a href="#conn">連線字串與註冊</a></li>
+            <li><a href="#migration">Migration：讓程式建表</a></li>
+            <li><a href="#use">動手：把 static 清單換掉</a></li>
+            <li><a href="#seed">種子資料</a></li>
+            <li><a href="#sql">看 EF Core 到底送了什麼 SQL</a></li>
+        </ol>
+    </div>
+
+    <h2 class="sec" id="why">1. ORM 是什麼、為什麼要用</h2>
+
+    <p>
+        資料庫講的是 SQL、表格、資料列。C# 講的是類別、物件、集合。
+        <strong>ORM（物件關聯對應）就是中間的翻譯官。</strong>
+    </p>
+
+    <table class="doc">
+        <thead><tr><th style="width:200px;">資料庫的世界</th><th>C# 的世界</th></tr></thead>
+        <tbody>
+            <tr><td>資料表 <code>LeaveTypes</code></td><td>類別 <code>LeaveType</code></td></tr>
+            <tr><td>欄位 <code>Name nvarchar(20)</code></td><td>屬性 <code>public string Name { get; set; }</code></td></tr>
+            <tr><td>一列資料</td><td>一個物件實體</td></tr>
+            <tr><td><code>SELECT * FROM LeaveTypes WHERE IsActive = 1</code></td>
+                <td><code>db.LeaveTypes.Where(t =&gt; t.IsActive)</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout why">
+        <span class="t">為什麼不自己寫 SQL 就好？</span>
+        <p>
+            <strong>① 型別安全。</strong>SQL 字串打錯要執行才知道；
+            LINQ 打錯<strong>編譯就失敗</strong>。改了屬性名稱，編譯器會幫你找出所有要改的地方。
+        </p>
+        <p>
+            <strong>② SQL Injection。</strong>自己拼字串 SQL 很容易寫出
+            <code>"… WHERE Name = '" + name + "'"</code>，
+            使用者輸入 <code>' OR '1'='1</code> 就能撈走全部資料。
+            EF Core 一律用參數化查詢，<strong>從根本上不會有這個問題</strong>。
+        </p>
+        <p>
+            <strong>③ Migration。</strong>改了類別，一行指令就能把資料表跟著改，
+            而且改動有版本紀錄可以進 git。這是第 6 節的主題。
+        </p>
+    </div>
+
+    <h2 class="sec" id="install">2. 安裝套件</h2>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">在 MyLeaveSystem 資料夾</span></div>
+        <pre><code>dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Microsoft.EntityFrameworkCore.Tools</code></pre>
+    </div>
+
+    <table class="doc">
+        <thead><tr><th style="width:290px;">套件</th><th>用途</th></tr></thead>
+        <tbody>
+            <tr><td><code>…EntityFrameworkCore.SqlServer</code></td><td>SQL Server 的驅動程式（換資料庫就換這個）</td></tr>
+            <tr><td><code>…EntityFrameworkCore.Design</code></td><td>產生 Migration 需要的東西</td></tr>
+            <tr><td><code>…EntityFrameworkCore.Tools</code></td><td>Visual Studio 套件管理主控台的指令</td></tr>
+        </tbody>
+    </table>
+
+    <p>還要裝一個<strong>全域命令列工具</strong>（整台電腦裝一次就好）：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">任何位置</span></div>
+        <pre><code>dotnet tool install --global dotnet-ef
+
+<span class="cmt"># 確認裝好了</span>
+dotnet ef --version</code></pre>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">已經裝過但版本太舊</span>
+        <p>把 <code>install</code> 換成 <code>update</code>：</p>
+        <p><code>dotnet tool update --global dotnet-ef</code></p>
+        <p><strong>命令列工具的版本要 ≥ 套件版本</strong>，不然產生 Migration 時會報錯。</p>
+    </div>
+
+    <p>裝完後打開 <code>.csproj</code>，你會看到多了一個區塊——這就是第 2 章說的 <code>&lt;PackageReference&gt;</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">XML</span><span class="path">MyLeaveSystem.csproj（自動產生）</span></div>
+        <pre><code>&lt;ItemGroup&gt;
+  &lt;PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" /&gt;
+  &lt;PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9"&gt;
+    &lt;PrivateAssets&gt;all&lt;/PrivateAssets&gt;
+  &lt;/PackageReference&gt;
+  &lt;PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9"&gt;
+    &lt;PrivateAssets&gt;all&lt;/PrivateAssets&gt;
+  &lt;/PackageReference&gt;
+&lt;/ItemGroup&gt;</code></pre>
+    </div>
+
+    <h2 class="sec" id="entity">3. Entity：一個類別 = 一張表</h2>
+
+    <p>
+        好消息：你的 <code>Models/LeaveType.cs</code> <strong>已經可以直接當 Entity 用了</strong>。
+        只要按照幾個慣例，EF Core 就看得懂。
+    </p>
+
+    <p>把它移到 <code>Models/Entities/</code> 資料夾（跟完成品專案一致），並補上資料庫用的屬性：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Models/Entities/LeaveType.cs（從 Models/ 移過來）</span></div>
+        <pre><code><span class="kw">using</span> System.ComponentModel.DataAnnotations;
+
+<span class="kw">namespace</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">public class</span> LeaveType
+{
+    <span class="cmt">// 慣例：叫 Id 或 LeaveTypeId 的屬性，會自動變成主鍵 + 自動編號</span>
+    <span class="kw">public int</span> Id { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+<span class="add">    [Required]</span>
+<span class="add">    [MaxLength(20)]        <span class="cmt">// → nvarchar(20)，不寫的話是 nvarchar(max)</span></span>
+    <span class="kw">public string</span> Name { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+<span class="add">    [Required]</span>
+<span class="add">    [MaxLength(30)]</span>
+    <span class="kw">public string</span> Code { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">string</span>.Empty;
+
+    <span class="kw">public bool</span> IsActive  { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="kw">true</span>;
+    <span class="kw">public int</span>  SortOrder { <span class="kw">get</span>; <span class="kw">set</span>; }
+
+<span class="add">    [MaxLength(100)]</span>
+    <span class="cmt">// string? → 資料庫欄位允許 NULL；string → NOT NULL</span>
+    <span class="kw">public string</span>? Description { <span class="kw">get</span>; <span class="kw">set</span>; }
+}</code></pre>
+    </div>
+
+    <p>記得把用到它的地方 <code>using</code> 改成新的命名空間（Controller 與 <code>_ViewImports.cshtml</code>）。</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:210px;">你寫的</th><th>資料庫會變成</th></tr></thead>
+        <tbody>
+            <tr><td><code>public int Id</code></td><td>主鍵，<code>IDENTITY</code> 自動編號</td></tr>
+            <tr><td><code>public string Name</code></td><td><code>nvarchar(…) NOT NULL</code></td></tr>
+            <tr><td><code>public string? Description</code></td><td><code>nvarchar(…) NULL</code></td></tr>
+            <tr><td><code>[MaxLength(20)]</code></td><td><code>nvarchar(20)</code></td></tr>
+            <tr><td><code>public decimal Hours</code></td><td><code>decimal(18,2)</code></td></tr>
+            <tr><td><code>public bool IsActive</code></td><td><code>bit</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="sec" id="context">4. AppDbContext</h2>
+
+    <p>
+        <code>DbContext</code> 代表「一次跟資料庫打交道的工作階段」。
+        它負責：知道有哪些資料表、追蹤你改了哪些物件、把變更寫回去。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Data/AppDbContext.cs</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">namespace</span> MyLeaveSystem.Data;
+
+<span class="kw">public class</span> AppDbContext : DbContext
+{
+    <span class="cmt">// 設定（連線字串等）由外面注入進來，這個類別自己不決定連哪個資料庫</span>
+    <span class="kw">public</span> AppDbContext(DbContextOptions&lt;AppDbContext&gt; options) : <span class="kw">base</span>(options)
+    {
+    }
+
+    <span class="cmt">// 每一個 DbSet&lt;T&gt; = 一張資料表。</span>
+    <span class="cmt">// 屬性名稱（LeaveTypes）就是資料表名稱，習慣用複數。</span>
+    <span class="kw">public</span> DbSet&lt;LeaveType&gt; LeaveTypes =&gt; Set&lt;LeaveType&gt;();
+}</code></pre>
+    </div>
+
+    <div class="callout tip">
+        <span class="t">為什麼寫 <code>=&gt; Set&lt;LeaveType&gt;()</code> 而不是 <code>{ get; set; }</code>？</span>
+        兩種寫法都能動。<code>=&gt; Set&lt;T&gt;()</code> 是比較新的寫法，
+        好處是這個屬性<strong>永遠不可能是 null</strong>，
+        打開 Nullable 檢查時編譯器不會念你。完成品專案用的也是這種。
+    </div>
+
+    <h2 class="sec" id="conn">5. 連線字串與註冊</h2>
+
+    <h3 class="sub">5.1 把連線字串寫進設定檔</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">appsettings.json</span></div>
+        <pre><code>{
+  <span class="str">"Logging"</span>: {
+    <span class="str">"LogLevel"</span>: { <span class="str">"Default"</span>: <span class="str">"Information"</span>, <span class="str">"Microsoft.AspNetCore"</span>: <span class="str">"Warning"</span> }
+  },
+  <span class="str">"AllowedHosts"</span>: <span class="str">"*"</span>,
+<span class="add">  <span class="str">"ConnectionStrings"</span>: {</span>
+<span class="add">    <span class="str">"DefaultConnection"</span>: <span class="str">"Server=.;Database=MyLeaveSystem;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"</span></span>
+<span class="add">  }</span>
+}</code></pre>
+    </div>
+
+    <table class="doc">
+        <thead><tr><th style="width:240px;">片段</th><th>意思</th></tr></thead>
+        <tbody>
+            <tr><td><code>Server=.</code></td><td>本機預設執行個體。<br>
+                LocalDB 要寫 <code>Server=(localdb)\MSSQLLocalDB</code>；<br>
+                Docker 要寫 <code>Server=localhost,1433</code></td></tr>
+            <tr><td><code>Database=MyLeaveSystem</code></td><td>資料庫名稱。<strong>不存在也沒關係</strong>，Migration 會幫你建</td></tr>
+            <tr><td><code>Trusted_Connection=True</code></td><td>用 Windows 帳號登入，不用帳密。<br>
+                Docker / Linux 要改成 <code>User Id=sa;Password=你的密碼;</code></td></tr>
+            <tr><td><code>TrustServerCertificate=True</code></td><td>本機開發用，跳過憑證驗證</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout oops">
+        <span class="t">正式環境不要把密碼寫在 appsettings.json</span>
+        本機開發沒關係（而且用 Windows 驗證根本沒密碼）。
+        但如果連線字串裡有密碼，<strong>那個檔案就不該進 git</strong>。
+        正式做法是用環境變數或 User Secrets。
+    </div>
+
+    <h3 class="sub">5.2 註冊到 DI 容器</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs</span></div>
+        <pre><code><span class="add"><span class="kw">using</span> Microsoft.EntityFrameworkCore;</span>
+<span class="add"><span class="kw">using</span> MyLeaveSystem.Data;</span>
+
+<span class="kw">var</span> builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllersWithViews();
+
+<span class="add">builder.Services.AddDbContext&lt;AppDbContext&gt;(options =&gt;</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">var</span> connectionString = builder.Configuration.GetConnectionString(<span class="str">"DefaultConnection"</span>)</span>
+<span class="add">        ?? <span class="kw">throw new</span> InvalidOperationException(<span class="str">"找不到連線字串 DefaultConnection"</span>);</span>
+<span class="add">    options.UseSqlServer(connectionString);</span>
+<span class="add">});</span>
+
+<span class="kw">var</span> app = builder.Build();</code></pre>
+    </div>
+
+    <p>
+        這就是<a href="ch02-first-site.html#program">第 2 章</a>說的「上半段：登記服務」。
+        登記之後，任何 Controller 只要在建構式要求 <code>AppDbContext</code>，
+        框架就會自動給它一個。下一節就會用到。
+    </p>
+
+    <h2 class="sec" id="migration">6. Migration：讓程式建表</h2>
+
+    <p>
+        Migration 是<strong>「資料庫結構的版本紀錄」</strong>。
+        每次你改了 Entity，就產生一個 Migration，它記錄「這次要怎麼把資料庫從舊結構改成新結構」。
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">在 MyLeaveSystem 資料夾</span></div>
+        <pre><code>dotnet ef migrations add InitialCreate</code></pre>
+    </div>
+
+    <p>成功的話會多出一個 <code>Migrations</code> 資料夾。打開裡面那個 <code>…_InitialCreate.cs</code>：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">Migrations/20260819…_InitialCreate.cs（自動產生，不要手改）</span></div>
+        <pre><code><span class="kw">protected override void</span> Up(MigrationBuilder migrationBuilder)
+{
+    migrationBuilder.CreateTable(
+        name: <span class="str">"LeaveTypes"</span>,
+        columns: table =&gt; <span class="kw">new</span>
+        {
+            Id          = table.Column&lt;<span class="kw">int</span>&gt;(nullable: <span class="kw">false</span>)
+                               .Annotation(<span class="str">"SqlServer:Identity"</span>, <span class="str">"1, 1"</span>),
+            Name        = table.Column&lt;<span class="kw">string</span>&gt;(maxLength: 20, nullable: <span class="kw">false</span>),
+            Code        = table.Column&lt;<span class="kw">string</span>&gt;(maxLength: 30, nullable: <span class="kw">false</span>),
+            IsActive    = table.Column&lt;<span class="kw">bool</span>&gt;(nullable: <span class="kw">false</span>),
+            SortOrder   = table.Column&lt;<span class="kw">int</span>&gt;(nullable: <span class="kw">false</span>),
+            Description = table.Column&lt;<span class="kw">string</span>&gt;(maxLength: 100, nullable: <span class="kw">true</span>)
+        },
+        constraints: table =&gt; table.PrimaryKey(<span class="str">"PK_LeaveTypes"</span>, x =&gt; x.Id));
+}
+
+<span class="kw">protected override void</span> Down(MigrationBuilder migrationBuilder)
+{
+    migrationBuilder.DropTable(name: <span class="str">"LeaveTypes"</span>);   <span class="cmt">// 反悔時退回去用的</span>
+}</code></pre>
+    </div>
+
+    <p>
+        <strong>注意：到這裡資料庫還是空的。</strong>Migration 只是「計畫書」，
+        要執行它才會真的動到資料庫：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">套用到資料庫</span></div>
+        <pre><code>dotnet ef database update</code></pre>
+    </div>
+
+    <p>
+        現在用 SSMS 連上去看，會有一個 <code>MyLeaveSystem</code> 資料庫，
+        裡面有 <code>LeaveTypes</code> 表，還有一張 <code>__EFMigrationsHistory</code>——
+        那是 EF Core 用來記「哪些 Migration 已經跑過了」的。
+    </p>
+
+    <div class="callout why">
+        <span class="t">Migration 檔案要進版控嗎？要！</span>
+        <p>
+            <code>Migrations/</code> 資料夾<strong>一定要 commit 進 git</strong>。
+        </p>
+        <p>
+            這樣隊友 pull 下來之後，只要跑一次 <code>dotnet ef database update</code>，
+            他的資料庫就跟你一模一樣。<strong>資料庫結構因此有了版本控制</strong>——
+            這是 ORM 最被低估的好處。
+        </p>
+    </div>
+
+    <div class="callout oops">
+        <span class="t">三個最常見的 Migration 問題</span>
+        <p>
+            <strong>「Unable to create an object of type 'AppDbContext'」</strong><br>
+            通常是 <code>Program.cs</code> 沒註冊 <code>AddDbContext</code>，
+            或連線字串讀不到。先確認 <code>dotnet build</code> 過得了。
+        </p>
+        <p>
+            <strong>「A network-related or instance-specific error…」</strong><br>
+            連不到 SQL Server。檢查服務有沒有啟動、<code>Server=</code> 寫對沒。
+        </p>
+        <p>
+            <strong>產生的 Migration 是空的</strong><br>
+            代表 EF Core 覺得「跟上次比沒有變化」。
+            檢查新 Entity 有沒有加到 <code>AppDbContext</code> 的 <code>DbSet</code>。
+        </p>
+    </div>
+
+    <h3 class="sub">6.1 之後改 Entity 的固定流程</h3>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">終端機</span><span class="path">記起來，後面每一章都會用</span></div>
+        <pre><code><span class="cmt"># 1. 改 Entity 類別（加欄位、改型別…）</span>
+<span class="cmt"># 2. 產生 Migration（名字取有意義的）</span>
+dotnet ef migrations add AddLeaveTypeColorColumn
+
+<span class="cmt"># 3. 套用到資料庫</span>
+dotnet ef database update
+
+<span class="cmt"># 產生錯了還沒 update 的話，可以移除最後一個</span>
+dotnet ef migrations remove</code></pre>
+    </div>
+
+    <h2 class="sec" id="use">7. 動手：把 static 清單換掉</h2>
+
+    <p>現在把第 5 章那個暫時的 <code>static</code> 清單換成真的資料庫。</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Controllers/LeaveTypesController.cs（整個換掉）</span></div>
+        <pre><code><span class="kw">using</span> Microsoft.AspNetCore.Mvc;
+<span class="kw">using</span> Microsoft.EntityFrameworkCore;
+<span class="kw">using</span> MyLeaveSystem.Data;
+<span class="kw">using</span> MyLeaveSystem.Models.Entities;
+<span class="kw">using</span> MyLeaveSystem.Models.ViewModels;
+
+<span class="kw">namespace</span> MyLeaveSystem.Controllers;
+
+<span class="kw">public class</span> LeaveTypesController : Controller
+{
+    <span class="kw">private readonly</span> AppDbContext _db;
+
+    <span class="cmt">// 建構式注入：你只要「要求」，框架就會給你一個 AppDbContext</span>
+    <span class="cmt">// （因為第 5.2 節在 Program.cs 登記過了）</span>
+    <span class="kw">public</span> LeaveTypesController(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Index()
+    {
+        <span class="kw">var</span> types = <span class="kw">await</span> _db.LeaveTypes
+            .OrderBy(t =&gt; t.SortOrder)
+            .ToListAsync();
+
+        <span class="kw">return</span> View(types);
+    }
+
+    [HttpGet]
+    <span class="kw">public</span> IActionResult Create() =&gt; View(<span class="kw">new</span> LeaveTypeCreateViewModel());
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    <span class="kw">public async</span> Task&lt;IActionResult&gt; Create(LeaveTypeCreateViewModel input)
+    {
+        <span class="kw">if</span> (!ModelState.IsValid)
+        {
+            <span class="kw">return</span> View(input);
+        }
+
+        <span class="kw">var</span> code = input.Code.Trim().ToUpperInvariant();
+
+        <span class="cmt">// 業務驗證：代碼不能重複（這次是真的去問資料庫）</span>
+        <span class="kw">if</span> (<span class="kw">await</span> _db.LeaveTypes.AnyAsync(t =&gt; t.Code == code))
+        {
+            ModelState.AddModelError(nameof(input.Code), <span class="str">"這個代碼已經被用了"</span>);
+            <span class="kw">return</span> View(input);
+        }
+
+        _db.LeaveTypes.Add(<span class="kw">new</span> LeaveType
+        {
+            Name        = input.Name.Trim(),
+            Code        = code,
+            SortOrder   = input.SortOrder,
+            Description = <span class="kw">string</span>.IsNullOrWhiteSpace(input.Description) ? <span class="kw">null</span> : input.Description.Trim(),
+            IsActive    = <span class="kw">true</span>
+        });
+
+        <span class="kw">await</span> _db.SaveChangesAsync();     <span class="cmt">// ← 這一行才真的寫進資料庫</span>
+
+        TempData[<span class="str">"Success"</span>] = $<span class="str">"已新增假別「{input.Name}」"</span>;
+        <span class="kw">return</span> RedirectToAction(nameof(Index));
+    }
+}</code></pre>
+    </div>
+
+    <p>三個變化值得注意：</p>
+
+    <table class="doc">
+        <thead><tr><th style="width:210px;">變化</th><th>為什麼</th></tr></thead>
+        <tbody>
+            <tr><td>方法變成 <code>async Task&lt;IActionResult&gt;</code></td>
+                <td>查資料庫要等，用 <code>await</code> 才不會卡住執行緒
+                    （<a href="ch01-csharp-basics.html#async">第 1 章第 8 節</a>）</td></tr>
+            <tr><td>不再有 <code>Id = _types.Max(…) + 1</code></td>
+                <td><strong>Id 交給資料庫產生</strong>。<code>SaveChangesAsync()</code> 之後，
+                    EF Core 會自動把產生的 Id 填回你的物件</td></tr>
+            <tr><td>多了 <code>SaveChangesAsync()</code></td>
+                <td><code>Add()</code> 只是在記憶體裡標記「等一下要新增這個」。
+                    <strong>沒有 <code>SaveChangesAsync()</code> 就什麼都不會發生</strong></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout oops">
+        <span class="t">最常見的 EF Core 新手錯誤：忘記 SaveChanges</span>
+        改完資料、頁面也正常轉址了，<strong>但資料就是沒變</strong>——
+        九成是漏了 <code>SaveChangesAsync()</code>。
+        因為不會有任何錯誤訊息，這個 bug 特別難找。
+    </div>
+
+    <p>
+        現在跑起來，<code>/LeaveTypes</code> 應該是<strong>空的</strong>（資料庫是新的）。
+        用「新增假別」加幾筆，然後<strong>重新啟動程式</strong>——資料還在。這就是這一章的重點。
+    </p>
+
+    <h2 class="sec" id="seed">8. 種子資料</h2>
+
+    <p>
+        每次重建資料庫都要手動加四種假別很煩。寫一個「種子」，讓程式啟動時自動補上：
+    </p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag new">新增檔案</span><span class="path">Data/SeedData.cs</span></div>
+        <pre><code><span class="kw">using</span> MyLeaveSystem.Models.Entities;
+
+<span class="kw">namespace</span> MyLeaveSystem.Data;
+
+<span class="kw">public static class</span> SeedData
+{
+    <span class="kw">public static void</span> Initialize(AppDbContext db)
+    {
+        <span class="cmt">// 關鍵：已經有資料就跳過。這讓它可以重複執行而不會愈長愈多。</span>
+        <span class="kw">if</span> (db.LeaveTypes.Any()) <span class="kw">return</span>;
+
+        db.LeaveTypes.AddRange(
+            <span class="kw">new</span> LeaveType { Name = <span class="str">"病假"</span>, Code = <span class="str">"SICK"</span>,        SortOrder = 1, Description = <span class="str">"因病無法到課"</span> },
+            <span class="kw">new</span> LeaveType { Name = <span class="str">"事假"</span>, Code = <span class="str">"PERSONAL"</span>,    SortOrder = 2, Description = <span class="str">"個人事務"</span> },
+            <span class="kw">new</span> LeaveType { Name = <span class="str">"喪假"</span>, Code = <span class="str">"BEREAVEMENT"</span>, SortOrder = 3, Description = <span class="str">"親屬喪事"</span> },
+            <span class="kw">new</span> LeaveType { Name = <span class="str">"公假"</span>, Code = <span class="str">"OFFICIAL"</span>,    SortOrder = 4, Description = <span class="str">"因公務外出"</span> });
+
+        db.SaveChanges();
+    }
+}</code></pre>
+    </div>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">Program.cs（在 builder.Build() 之後）</span></div>
+        <pre><code><span class="kw">var</span> app = builder.Build();
+
+<span class="add"><span class="cmt">// 啟動時自動套用 Migration 並補種子資料</span></span>
+<span class="add"><span class="kw">using</span> (<span class="kw">var</span> scope = app.Services.CreateScope())</span>
+<span class="add">{</span>
+<span class="add">    <span class="kw">var</span> db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();</span>
+<span class="add">    db.Database.Migrate();        <span class="cmt">// 資料庫不存在就建、有未套用的 Migration 就套用</span></span>
+<span class="add">    SeedData.Initialize(db);</span>
+<span class="add">}</span></code></pre>
+    </div>
+
+    <div class="callout why">
+        <span class="t">為什麼要 CreateScope()？</span>
+        <p>
+            <code>AddDbContext</code> 註冊的是 <strong>Scoped</strong> 生命週期——
+            「每個 HTTP 請求一個實例」。但啟動的當下<strong>還沒有任何請求</strong>，
+            所以要自己開一個範圍才拿得到。
+        </p>
+        <p>
+            <code>using</code> 讓它用完就釋放。生命週期這件事第 9 章會完整講。
+        </p>
+    </div>
+
+    <p>
+        把資料庫刪掉（SSMS 右鍵刪除，或 <code>dotnet ef database drop</code>），
+        重新啟動程式——資料庫會自己建好、四種假別自己出現。
+    </p>
+
+    <div class="callout tip">
+        <span class="t">啟動時 Migrate() 是教學專案的取捨</span>
+        好處是「pull 完按 F5 就能跑」，對學習跟小型專案很方便。
+        <strong>正式的多台伺服器環境不會這樣做</strong>——會改成部署腳本執行
+        <code>dotnet ef database update</code>，避免多台機器同時搶著改結構。
+        完成品專案用的也是啟動時 Migrate，原因相同。
+    </div>
+
+    <h2 class="sec" id="sql">9. 看 EF Core 到底送了什麼 SQL</h2>
+
+    <p>
+        <strong>這是最重要的除錯技巧。</strong>
+        當查詢結果跟你想的不一樣，先看它實際送了什麼。
+    </p>
+
+    <p>預設就會印在終端機，只要把記錄層級調低：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag edit">修改</span><span class="path">appsettings.Development.json</span></div>
+        <pre><code>{
+  <span class="str">"Logging"</span>: {
+    <span class="str">"LogLevel"</span>: {
+      <span class="str">"Default"</span>: <span class="str">"Information"</span>,
+      <span class="str">"Microsoft.AspNetCore"</span>: <span class="str">"Warning"</span>,
+<span class="add">      <span class="str">"Microsoft.EntityFrameworkCore.Database.Command"</span>: <span class="str">"Information"</span></span>
+    }
+  }
+}</code></pre>
+    </div>
+
+    <p>重新啟動、開 <code>/LeaveTypes</code>，終端機會出現：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">輸出</span><span class="path">終端機</span></div>
+        <pre><code>info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[], CommandType='Text']
+      SELECT [l].[Id], [l].[Code], [l].[Description], [l].[IsActive], [l].[Name], [l].[SortOrder]
+      FROM [LeaveTypes] AS [l]
+      ORDER BY [l].[SortOrder]</code></pre>
+    </div>
+
+    <p>
+        <code>.OrderBy(t =&gt; t.SortOrder)</code> 真的變成了 <code>ORDER BY</code>。
+        第 8 章你會用這招抓出效能問題（一個頁面送出幾十句查詢的「N+1 問題」）。
+    </p>
+
+    <h3 class="sub">9.1 延遲執行：查詢什麼時候才真的送出去</h3>
+
+    <p>回想<a href="ch01-csharp-basics.html#collection">第 1 章</a>提過的延遲執行，在 EF Core 這裡特別重要：</p>
+
+    <div class="code">
+        <div class="code-head"><span class="tag cmd">C#</span><span class="path">還沒送 SQL vs 已經送了</span></div>
+        <pre><code><span class="cmt">// 這幾行都還沒碰資料庫，只是在「組查詢」</span>
+<span class="kw">var</span> query = _db.LeaveTypes.Where(t =&gt; t.IsActive);
+query = query.OrderBy(t =&gt; t.SortOrder);
+
+<span class="cmt">// 這一行才真的送 SQL 出去</span>
+<span class="kw">var</span> list = <span class="kw">await</span> query.ToListAsync();</code></pre>
+    </div>
+
+    <p>會觸發查詢的：<code>ToListAsync</code>、<code>FirstOrDefaultAsync</code>、
+       <code>AnyAsync</code>、<code>CountAsync</code>、<code>SumAsync</code>，以及 <code>foreach</code>。</p>
+
+    <div class="callout why">
+        <span class="t">為什麼這件事重要</span>
+        <p>
+            因為<strong>「在 <code>ToList()</code> 之前」的篩選由資料庫做，
+            「之後」的由 C# 做</strong>。
+        </p>
+        <p>
+            如果你先 <code>ToListAsync()</code> 把十萬筆全撈回記憶體再 <code>Where</code>，
+            程式會非常慢——但功能是對的，所以你不會發現。
+            這是新手最容易寫出的效能地雷。
+        </p>
+    </div>
+
+    <div class="checkpoint">
+        <div class="t">✅ 第 6 章檢查點</div>
+        <div class="hint">全部做到再進第 7 章。</div>
+        <ul>
+            <li><span><code>dotnet ef database update</code> 成功，SSMS 裡看得到 <code>LeaveTypes</code> 與 <code>__EFMigrationsHistory</code> 兩張表。</span></li>
+            <li><span>我新增了一筆假別，<strong>重新啟動程式後資料還在</strong>。</span></li>
+            <li><span>我把資料庫整個刪掉，重新啟動後它自己建好、四種假別自己出現。</span></li>
+            <li><span>我打開了 SQL 記錄，能在終端機看到 EF Core 實際送出的 <code>SELECT</code>。</span></li>
+            <li><span>我能說出 <code>Add()</code> 與 <code>SaveChangesAsync()</code> 的差別。</span></li>
+            <li><span>我知道 <code>Migrations/</code> 資料夾要進版控，以及為什麼。</span></li>
+        </ul>
+    </div>
+
+    <div class="callout link">
+        <span class="t">對照完成品</span>
+        <p>
+            完成品的 <code>Data/AppDbContext.cs</code> 有 11 個 <code>DbSet</code>、
+            <code>Data/SeedData.cs</code> 種了角色 / Admin 帳號 / 假別 / 簽核規則四類資料、
+            <code>Migrations/</code> 裡有好幾個 Migration。結構跟你剛做的完全一樣，只是多而已。
+        </p>
+        <p>
+            <a href="../tutorial/01-startup-di.html">循序圖教學站 · 01 啟動與 DI</a>
+            的第 7～10 步，畫的就是你剛剛寫的那段 <code>CreateScope</code> + <code>Migrate</code> + <code>SeedData</code>。
+            <strong>現在去看，應該看得懂了。</strong>
+        </p>
+    </div>
+
+    <div class="pager">
+        <a href="ch05-forms.html"><span class="lbl">上一章</span>◀ 第 5 章 表單、繫結與驗證</a>
+        <span class="spacer"></span>
+        <a href="ch07-first-crud.html"><span class="lbl">下一章</span>第 7 章 第一個完整 CRUD ▶</a>
+    </div>
+</main>
+
+<script src="assets/learn.js"></script>
+</body>
+</html>
