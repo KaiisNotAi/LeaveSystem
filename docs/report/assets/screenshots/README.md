@@ -66,8 +66,19 @@ dotnet run --project tools/ScreenshotCapture -- --rollback
 | 22 | `student-flow` | ⬜ 未補 | — | 學員流程拼貼（送單 → 查進度 → 收通知） |
 | 23 | `approver-flow` | ⬜ 未補 | — | 簽核人流程拼貼（待辦 → 詳情 → 核准/駁回） |
 | 24 | `staff-flow` | ⬜ 未補 | — | 行政流程拼貼（建立 → 查詢 → 匯出） |
+| 25 | `mail-pickup-eml` | ✅ 已補 | — | `mocks/mail-pickup-eml.html`（PickupDirectory 落地信件，見下方說明） |
 
 未補的 4 張在投影片中維持虛線佔位，不影響版面。
+
+### 關於 `mail-pickup-eml`
+
+這張圖走 `--mocks` 產生，但**內容不是編造的**：`Capturer.CaptureMailPickupMockAsync` 會當場呼叫
+網站專案裡真正的 `MailKitEmailSender`（`Mode = PickupDirectory`）寄出四封通知信到暫存目錄，
+主旨／內文沿用 `NotificationDispatcher` 四個事件的實際文案，再把產生的檔名與 `.eml` 原文
+讀回來注入 mock 頁渲染。截完圖暫存目錄即刪除，不會在專案裡留下 `.eml`。
+
+因此**改了 `MailKitEmailSender` 或通知文案後，重跑 `--mocks` 就會得到最新的畫面**，
+不需要手動修圖。
 
 ## 示範資料
 

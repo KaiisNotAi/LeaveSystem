@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>mail-pickup 落地信件示意</title>
+<!--
+  「開發期不實寄」的佐證畫面，供專題報告 03 功能描述章節使用。
+
+  左側檔案清單與右側 .eml 原文並非手寫，而是由 tools/ScreenshotCapture 當場呼叫
+  網站專案裡真正的 MailKitEmailSender（Mode = PickupDirectory）產生後注入
+  window.__MAIL_PICKUP__，再由本頁渲染成 mail-pickup-eml.png。
+-->
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
+        background: #eef2f7;
+    }
+
+    .stage {
+        height: 900px;
+        padding: 26px 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    /* ── 頁首 ─────────────────────────────────── */
+    .head { display: flex; align-items: baseline; gap: 14px; }
+    .head h1 { font-size: 32px; color: #1e3a8a; letter-spacing: .01em; }
+    .head .tag {
+        margin-left: auto;
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        background: #d97706;
+        border-radius: 999px;
+        padding: 6px 18px;
+        letter-spacing: .03em;
+    }
+
+    /* ── 主體：左檔案總管 / 右檔案內容 ─────────── */
+    .panes {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 470px 1fr;
+        gap: 20px;
+    }
+
+    .win {
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .09);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .win-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 18px;
+        background: #f1f5f9;
+        border-bottom: 1px solid #dbe2ea;
+        font-size: 19px;
+        color: #334155;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
+    .dot.r { background: #f87171; }
+    .dot.y { background: #fbbf24; }
+    .dot.g { background: #34d399; }
+    .win-bar .path { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* 左欄：上為檔案總管（高度隨內容），下為事件對照卡（吃掉剩餘高度） */
+    .left {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        min-height: 0;
+    }
+
+    /* 檔案清單：每列同時交代「這封信對應哪個通知事件」 */
+    .files { flex: 1; min-height: 0; padding: 14px 0; }
+    .file {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 18px;
+        border-left: 5px solid transparent;
+    }
+    .file .icon { font-size: 26px; flex: none; }
+    .file .meta { min-width: 0; }
+    .file .event { font-size: 19px; color: #1e3a8a; font-weight: 700; }
+    .file .name {
+        font-family: Consolas, "Cascadia Mono", monospace;
+        font-size: 16px;
+        color: #64748b;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .file.active {
+        background: #eff6ff;
+        border-left-color: #2563eb;
+    }
+    .file.active .name { color: #1d4ed8; }
+
+    .files-foot {
+        border-top: 1px solid #e2e8f0;
+        padding: 16px 18px;
+        font-size: 18px;
+        color: #64748b;
+        line-height: 1.6;
+    }
+    .files-foot strong { color: #b45309; }
+
+    .mails { display: grid; grid-template-rows: 1fr; min-height: 0; }
+
+    /* .eml 原文 */
+    .raw {
+        flex: 1;
+        min-height: 0;
+        padding: 20px 24px;
+        font-family: Consolas, "Cascadia Mono", monospace;
+        font-size: 21px;
+        line-height: 1.95;
+        color: #334155;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow: hidden;
+    }
+    .raw .h { color: #7c3aed; font-weight: 700; }
+    .raw .enc { color: #b45309; }
+
+    /* 解碼後 */
+    .decoded {
+        border-top: 1px solid #e2e8f0;
+        background: #f8fafc;
+        padding: 15px 24px 17px;
+        font-size: 20px;
+        color: #1f2937;
+    }
+    .decoded span { color: #0f766e; font-weight: 700; }
+
+    .note {
+        font-size: 19px;
+        color: #475569;
+        line-height: 1.6;
+    }
+    .note strong { color: #b91c1c; }
+</style>
+</head>
+<body>
+<div class="stage">
+    <div class="head">
+        <h1>PickupDirectory 模式：信件確實產生了，只是沒有寄出去</h1>
+        <div class="tag">Mode = PickupDirectory</div>
+    </div>
+
+    <div class="panes">
+        <div class="win">
+            <div class="win-bar">
+                <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+                <span class="path" id="dir-path"></span>
+            </div>
+            <div class="files" id="file-list"></div>
+            <div class="files-foot">
+                四個通知事件各產生一封信，檔名為<em>時間戳 + GUID</em>，同時觸發也不會互相覆蓋。<br>
+                全程<strong>沒有連線任何 SMTP 伺服器</strong>。
+            </div>
+        </div>
+
+        <div class="mails" id="mails"></div>
+    </div>
+
+    <div class="note">
+        <code>Subject</code> 那行的 <em>=?utf-8?b?…?=</em> 是 MIME 對含中文標頭的標準編碼（RFC 2047），
+        <strong>不是亂碼</strong>——郵件軟體開啟時會還原成下方標示的主旨；內文則直接以 UTF-8 純文字存放。
+    </div>
+</div>
+
+<script>
+(function () {
+    var d = window.__MAIL_PICKUP__;
+    if (!d) return;
+
+    document.getElementById('dir-path').textContent = '📁 ' + d.Directory;
+
+    var shownNames = d.Shown.map(function (m) { return m.Name; });
+
+    var list = document.getElementById('file-list');
+    d.Files.forEach(function (f) {
+        var el = document.createElement('div');
+        el.className = 'file' + (shownNames.indexOf(f.Name) >= 0 ? ' active' : '');
+        el.innerHTML =
+            '<div class="icon">✉️</div>' +
+            '<div class="meta"><div class="event"></div><div class="name"></div></div>';
+        el.querySelector('.event').textContent = f.Event;
+        el.querySelector('.name').textContent = f.Name + '　' + f.Size;
+        list.appendChild(el);
+    });
+
+    var esc = function (s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
+    // 原文上色：標頭名稱紫色，編碼過的標頭內容橘色，其餘維持深灰
+    var colorize = function (raw) {
+        return raw.replace(/\r\n/g, '\n').split('\n').map(function (line) {
+            var m = line.match(/^([A-Za-z][A-Za-z0-9-]*):(.*)$/);
+            if (!m) return esc(line);
+            var value = esc(m[2]).replace(/=\?[^?]+\?[BbQq]\?[^?]*\?=/g, function (enc) {
+                return '<span class="enc">' + enc + '</span>';
+            });
+            return '<span class="h">' + esc(m[1]) + ':</span>' + value;
+        }).join('\n');
+    };
+
+    var mails = document.getElementById('mails');
+    d.Shown.forEach(function (m) {
+        var win = document.createElement('div');
+        win.className = 'win';
+        win.innerHTML =
+            '<div class="win-bar">' +
+                '<span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>' +
+                '<span class="path"></span>' +
+            '</div>' +
+            '<div class="raw"></div>' +
+            '<div class="decoded">郵件軟體開啟後的主旨：<span></span></div>';
+        win.querySelector('.path').textContent = '📄 ' + m.Name;
+        win.querySelector('.raw').innerHTML = colorize(m.Raw);
+        win.querySelector('.decoded span').textContent = m.DecodedSubject;
+        mails.appendChild(win);
+    });
+})();
+</script>
+</body>
+</html>
