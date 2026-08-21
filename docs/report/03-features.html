@@ -316,7 +316,57 @@
             </div>
         </section>
 
-        <!-- Slide 11: CSV / Excel 匯出 -->
+        <!-- Slide 11: Email 寄送模式（為何開發期不實寄） -->
+        <section class="slide">
+            <h1>3.7.1 Email 寄送模式：為何開發期不實寄</h1>
+            <div class="content two-col">
+                <div>
+                    <h3>目前狀態</h3>
+                    <ul>
+                        <li>郵件依 MIME 標準<strong>完整組裝</strong>成 <code>.eml</code> 檔，落地到 <code>./mail-pickup/</code></li>
+                        <li>可用 Outlook / Thunderbird 直接開啟，驗證收件人、主旨、內文是否正確</li>
+                        <li><strong>不連線任何 SMTP 伺服器</strong>，所以不會真的送出</li>
+                    </ul>
+                    <h3>為何刻意這樣設計</h3>
+                    <ol>
+                        <li><strong>避免誤寄真人</strong>：測試帳號的信箱多為模擬資料，接上真實 SMTP 會對外亂發信</li>
+                        <li><strong>免除外部相依</strong>：不需 SMTP 帳號、應用程式密碼與網路白名單，離線也能完整展示</li>
+                        <li><strong>隔離故障</strong>：SMTP 連不上或被擋信，不會干擾簽核流程本身的測試結果</li>
+                    </ol>
+                </div>
+                <div>
+                    <h3>架構如何支撐「一行切換」</h3>
+                    <ul>
+                        <li><code>NotificationDispatcher</code> 只依賴 <code>IEmailSender</code> <strong>介面</strong> → <strong>依賴反轉</strong></li>
+                        <li><code>MailKitEmailSender</code> 依 <code>Mode</code> 分流落檔／SMTP 兩條路徑</li>
+                        <li>切換<strong>只改設定檔一個字串</strong>，C# 零修改 → <strong>開閉原則</strong></li>
+                        <li>站內通知 🔔 走資料庫，不受寄送模式影響</li>
+                        <li>容錯：寄信失敗只記 log，<strong>不讓簽核交易 rollback</strong></li>
+                    </ul>
+                    <div style="margin-top:14px; padding:12px 16px; border-left:4px solid var(--accent); background:#f9fafb;">
+                        <code>"Mode": "PickupDirectory"</code><br>
+                        <span style="color:var(--text-muted);">↓ 上線只需改這一個字串</span><br>
+                        <code>"Mode": "Smtp"</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 12: mail-pickup 落地信件（3.7.1 的佐證） -->
+        <section class="slide">
+            <h1>3.7.2 佐證：信件確實產生了</h1>
+            <div class="content">
+                <p style="margin-bottom:12px;">
+                    四個通知事件各自產生一封完整的 <code>.eml</code>，<strong>全程沒有連線任何 SMTP 伺服器</strong>。
+                </p>
+                <figure class="screenshot-placeholder" data-shot="mail-pickup-eml">
+                    <div class="ph-box">📷 mail-pickup 資料夾與 .eml 原文</div>
+                    <figcaption>檔名與 .eml 原文由 <code>tools/ScreenshotCapture</code> 呼叫實際的 <code>MailKitEmailSender</code> 產生後擷取，非示意圖</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <!-- Slide 13: CSV / Excel 匯出 -->
         <section class="slide">
             <h1>3.8 報表匯出（CSV / Excel）</h1>
             <div class="content two-col">
@@ -348,7 +398,7 @@
             </div>
         </section>
 
-        <!-- Slide 12: 其他管理畫面 -->
+        <!-- Slide 14: 其他管理畫面 -->
         <section class="slide">
             <h1>3.9 其他管理與查詢畫面</h1>
             <div class="content two-col">
@@ -367,7 +417,7 @@
             </div>
         </section>
 
-        <!-- Slide 13: 章末 -->
+        <!-- Slide 15: 章末 -->
         <section class="slide chapter-cover">
             <div class="chapter-no">CHAPTER 03 · 小結</div>
             <h1>八大功能完成度</h1>
@@ -379,9 +429,16 @@
                 </p>
                 <ul style="font-size:20px;">
                     <li>Phase 0 ~ 6：帳號、組織、請假、簽核、報表、曠課</li>
-                    <li>Phase 7：站內通知 + Email</li>
+                    <li>Phase 7：站內通知 + Email（開發期採 PickupDirectory，不實寄）</li>
                     <li>Phase 8：CSV / Excel 匯出</li>
                     <li>Phase 9：LINE 通知（因 API 免費配額限制暫緩，設計已凍結）</li>
+                    <li><strong>Email 實寄上線前置作業</strong>（已盤點，待執行）：
+                        <ul style="font-size:17px;">
+                            <li>設定切換 <code>Mode=Smtp</code>，密碼放 User Secrets / 環境變數，不進版控</li>
+                            <li>補齊 <code>UserAccount.Email</code>；修正三處程式缺口（加密模式、信件連結、背景寄送）</li>
+                            <li>先以本機假 SMTP 驗證，非正式環境加防誤寄開關</li>
+                        </ul>
+                    </li>
                 </ul>
                 <p style="margin-top:16px;">
                     <a href="04-usage.html" style="font-size:22px; color:var(--accent-dark); font-weight:700;">
@@ -394,7 +451,7 @@
 
     <footer class="site-footer">
         <a href="02-introduction.html">◀ 上一章</a>
-        <span class="page-indicator">1 / 13</span>
+        <span class="page-indicator">1 / 15</span>
         <div>
             <button data-action="prev">◀</button>
             <button data-action="next">▶</button>

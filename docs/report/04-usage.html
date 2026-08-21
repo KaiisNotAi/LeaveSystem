@@ -187,7 +187,9 @@
                     <p><strong>Q3：學員可以自己填曠課嗎？</strong><br>
                         A：不行。曠課由行政事後登錄，學員僅能查閱。</p>
                     <p><strong>Q4：Email 收不到通知？</strong><br>
-                        A：開發環境走 PickupDirectory，請至專案的 <code>./mail-pickup/</code> 資料夾檢視 .eml 檔。</p>
+                        A：這是<strong>刻意設計、不是故障</strong>。開發環境走 PickupDirectory 模式，郵件會完整寫成
+                        <code>.eml</code> 檔存到 <code>./mail-pickup/</code>，不連線 SMTP 也就不會真的寄出，以免誤寄給
+                        測試資料裡的真人信箱。切換為實寄的完整步驟見 <code>docs/11-Email通知設定.md</code>。</p>
                 </div>
             </div>
         </section>

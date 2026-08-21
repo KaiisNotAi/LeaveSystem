@@ -56,6 +56,53 @@
 
 如 SendGrid、Mailgun、Amazon SES。它們給你一組 SMTP 帳密或 API Key，寄送穩定度與抗擋信能力遠優於個人 Gmail，且免額度內免費。
 
+## 實寄前必須修正的程式缺口
+
+上面「切換步驟」只涵蓋設定。以下三處是**只有真的連 SMTP 才會踩到**的問題，落檔模式完全看不出來，切換前應一併處理。
+
+### 1. 加密模式對應不完整
+
+`Services/Email/MailKitEmailSender.cs` 目前為：
+
+```csharp
+var secure = _options.Smtp.UseSsl ? SecureSocketOptions.StartTlsWhenAvailable : SecureSocketOptions.None;
+```
+
+兩個問題：
+
+- **465 埠連不上**。465 是「隱式 SSL」（一連上就握手），必須用 `SecureSocketOptions.SslOnConnect`；用 `StartTlsWhenAvailable` 會卡在等待明文問候而逾時。
+- **帳密可能以明文送出**。`StartTlsWhenAvailable` 在伺服器沒有宣告 STARTTLS 能力時會**靜默降級成不加密**，接著照樣把 `Username` / `Password` 送出去。
+
+建議改為依 Port 判斷，或把設定從 `bool UseSsl` 改成明確的加密模式列舉：
+
+| Port | 應使用 |
+|---|---|
+| 465 | `SslOnConnect` |
+| 587 | `StartTls`（**Required**，不可 WhenAvailable） |
+| 25 | 內網無認證才可用 `None`；有帳密一律要求加密 |
+
+### 2. 信件內文缺少系統連結
+
+`Services/Notifications/NotificationDispatcher.cs` 的 `DispatchAsync` 只把 `title` / `message` 交給 `IEmailSender`，同一方法算出的 `url`（來自 `BuildApprovalUrl` / `BuildRequestUrl`）**只寫進站內通知，沒有進到信件**。收信人得自己回系統翻找對應假單。
+
+要修正需要兩件事：
+
+- 新增一個 BaseUrl 設定（例如 `Email:BaseUrl`），因為 `BuildApprovalUrl` 產生的是 `/Approvals/Details/5` 這種相對路徑，信件裡必須是絕對網址才能點。
+- `IEmailSender.SendAsync` 目前只收純文字 body，需擴充為支援 HTML 內文。
+
+### 3. 同步寄送會阻塞使用者請求
+
+`DispatchAsync` 是在簽核的 HTTP 請求執行緒內 `await` 整套 SMTP 連線 → 認證 → 寄送 → 斷線。落檔模式下這只是寫本機檔案，感覺不出來；改走 SMTP 後每封信約需 1～3 秒，按下「核准」的人會明顯感覺到停頓，且一次要通知多人時會累加。
+
+建議改為背景寄送（`System.Threading.Channels` 佇列 + `BackgroundService` 消化），請求端只負責入列。注意背景服務是 Singleton，不能直接注入 Scoped 的 `AppDbContext` / `IEmailSender`，需自行建立 scope。
+
+## 驗證順序（別一開始就接真信箱）
+
+1. **先接本機假 SMTP**：安裝 Papercut-SMTP / MailHog / smtp4dev，監聽 `localhost:25`，設定 `Mode=Smtp`、`Host=localhost`、`Port=25`、免帳密。
+   這一步確認的是「程式真的走了 SMTP 分支且信件格式正確」，而且信一封都出不了本機。
+2. **再換真實帳號**，先只寄給自己的信箱測試。
+3. **非正式環境加防誤寄開關**：建議增加類似 `Email:RedirectAllTo` 的設定，只要有值就把所有收件人強制改成該信箱，並在主旨標注原收件人。這樣即使拿正式資料庫做測試也不會騷擾到真人。
+
 ## 安全提醒（切換到 Smtp 前必看）
 
 - **不要把 SMTP 密碼直接 commit 進 `appsettings.json`**。可用：

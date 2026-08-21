@@ -1,4 +1,8 @@
 using System.Diagnostics;
+using System.Text.Json;
+using LeaveSystem.Services.Email;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
 
 namespace LeaveSystem.Tools.ScreenshotCapture;
@@ -42,6 +46,7 @@ public static class Capturer
             await CaptureStaffAsync(browser, outDir);
             await CaptureAdminAsync(browser, outDir, ids);
             await CapturePaperFormMockAsync(browser, repoRoot, outDir);
+            await CaptureMailPickupMockAsync(browser, repoRoot, outDir);
 
             Console.WriteLine("[✓] 全部截圖完成");
         }
@@ -62,6 +67,7 @@ public static class Capturer
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync(new() { Channel = "chrome", Headless = true });
         await CapturePaperFormMockAsync(browser, repoRoot, outDir);
+        await CaptureMailPickupMockAsync(browser, repoRoot, outDir);
     }
 
     /// <summary>
@@ -221,6 +227,107 @@ public static class Capturer
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await SaveAsync(page, outDir, "paper-form");
     }
+
+    /// <summary>
+    /// mail-pickup 示意圖：證明「開發期不實寄」時信件確實有被完整產生。
+    ///
+    /// 畫面上的檔名與 .eml 原文<b>不是編造的</b>，而是當場呼叫網站專案裡真正的
+    /// <see cref="MailKitEmailSender"/>（Mode = PickupDirectory）產生到暫存目錄後讀回來的，
+    /// 主旨／內文也沿用 NotificationDispatcher 四個事件的實際文案。
+    /// 截完圖就把暫存目錄刪掉，不會留下任何檔案。
+    /// </summary>
+    private static async Task CaptureMailPickupMockAsync(IBrowser browser, string repoRoot, string outDir)
+    {
+        var mock = Path.Combine(repoRoot, "tools", "ScreenshotCapture", "mocks", "mail-pickup-eml.html");
+        if (!File.Exists(mock))
+        {
+            Console.WriteLine($"[!] 找不到 {mock}，略過 mail-pickup-eml");
+            return;
+        }
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "leavesystem-mailshot-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var payload = await BuildMailPickupPayloadAsync(tempDir);
+
+            await using var ctx = await NewContextAsync(browser);
+            var page = await ctx.NewPageAsync();
+            // 在頁面自己的 script 執行前先塞資料，mock 頁載入時就能直接渲染
+            await page.AddInitScriptAsync($"window.__MAIL_PICKUP__ = {JsonSerializer.Serialize(payload)};");
+            await page.GotoAsync(new Uri(mock).AbsoluteUri);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await SaveAsync(page, outDir, "mail-pickup-eml");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// 以真正的 MailKitEmailSender 寄出四封「通知信」到暫存目錄，再把產生的檔案讀回來。
+    /// </summary>
+    private static async Task<MailPickupPayload> BuildMailPickupPayloadAsync(string tempDir)
+    {
+        var options = Options.Create(new EmailOptions
+        {
+            Mode = EmailMode.PickupDirectory,
+            PickupDirectory = tempDir,
+            From = "noreply@leavesystem.local"
+        });
+        var sender = new MailKitEmailSender(options, NullLogger<MailKitEmailSender>.Instance);
+
+        // 文案與 Services/Notifications/NotificationDispatcher.cs 的四個事件一致
+        var mails = new (string To, string Subject, string Body, string Event)[]
+        {
+            ("tutor@leavesystem.local", "您有新的請假申請待簽核",
+                "學員 王小明 送出的請假申請（事假 16h）需要您簽核。",
+                "① 學員送單 → 通知第一關簽核人"),
+            ("chief@leavesystem.local", "有請假申請進入您這一關待簽核",
+                "學員 王小明 送出的請假申請（事假 16h）需要您簽核。",
+                "② 逐級通過 → 通知下一關簽核人"),
+            ("wang@leavesystem.local", "您的請假申請已核准",
+                "您於 2026/08/07 送出的請假申請（事假 16h）已完成所有簽核，狀態：核准。",
+                "③ 全部通過 → 通知申請人"),
+            ("wang@leavesystem.local", "您的請假申請已駁回",
+                "您於 2026/07/17 送出的請假申請已被駁回。駁回原因：事由描述過於簡略且未附證明，請假不予核准。",
+                "④ 任一關駁回 → 通知申請人 + 原因")
+        };
+
+        foreach (var (to, subject, body, _) in mails)
+        {
+            if (!await sender.SendAsync(to, subject, body))
+            {
+                throw new InvalidOperationException($"產生 .eml 失敗：{subject}");
+            }
+            // 檔名以毫秒為單位，稍微錯開才不會出現一模一樣的時間
+            await Task.Delay(120);
+        }
+
+        var files = new DirectoryInfo(tempDir).GetFiles("*.eml").OrderBy(f => f.Name).ToArray();
+
+        // 只攤開第 1 封（待簽核）的原文。四封全攤會讓字級被壓到投影機上看不清楚，
+        // 「四個事件各產生一封」由左側檔案清單負責交代。
+        var shownIndexes = new[] { 0 };
+        var shown = shownIndexes.Select(i => new MailPickupMail(
+            files[i].Name,
+            File.ReadAllText(files[i].FullName),
+            mails[i].Subject)).ToArray();
+
+        return new MailPickupPayload(
+            Directory: "LeaveSystem/mail-pickup",
+            Files: files.Select((f, i) => new MailPickupFile(f.Name, $"{f.Length:N0} 位元組", mails[i].Event)).ToArray(),
+            Shown: shown);
+    }
+
+    private sealed record MailPickupFile(string Name, string Size, string Event);
+
+    private sealed record MailPickupMail(string Name, string Raw, string DecodedSubject);
+
+    private sealed record MailPickupPayload(
+        string Directory,
+        MailPickupFile[] Files,
+        MailPickupMail[] Shown);
 
     // ─────────────────────────────────────────────────────────────
     // 共用流程
